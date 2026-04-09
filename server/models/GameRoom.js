@@ -1,0 +1,98 @@
+const mongoose = require('mongoose');
+
+const cardInstanceSchema = new mongoose.Schema({
+    instanceId: { type: String, required: true },
+    scryfallId: { type: String },
+    name: { type: String, required: true },
+    imageUri: { type: String },
+    backImageUri: { type: String },
+    manaCost: { type: String },
+    typeLine: { type: String },
+    oracleText: { type: String },
+    power: { type: String },
+    toughness: { type: String },
+    colors: [String],
+    layout: { type: String },
+    x: { type: Number, default: 0 },
+    y: { type: Number, default: 0 },
+    tapped: { type: Boolean, default: false },
+    flipped: { type: Boolean, default: false },
+    faceDown: { type: Boolean, default: false },
+    counters: { type: Map, of: Number, default: {} },
+    attachedTo: { type: String, default: null },
+    zIndex: { type: Number, default: 0 },
+    isToken: { type: Boolean, default: false },
+    isCustom: { type: Boolean, default: false },
+    customImageUrl: { type: String },
+}, { _id: false });
+
+const playerStateSchema = new mongoose.Schema({
+    odjeebCookieId: { type: String },
+    odjeebUserId: { type: String },
+    userId: { type: String, required: true },
+    username: { type: String, required: true },
+    socketId: { type: String },
+    life: { type: Number, default: 40 },
+    counters: { type: Map, of: Number, default: { poison: 0, energy: 0, experience: 0 } },
+    commanderDeaths: { type: Number, default: 0 },
+    commanderDamageFrom: { type: Map, of: Number, default: {} },
+    commanderTax: { type: Number, default: 0 },
+    background: { type: String, default: null },
+    designations: {
+        monarch: { type: Boolean, default: false },
+        initiative: { type: Boolean, default: false },
+        dayNight: { type: String, default: null },
+        citysBlessing: { type: Boolean, default: false },
+    },
+    zones: {
+        hand: [cardInstanceSchema],
+        library: [cardInstanceSchema],
+        battlefield: [cardInstanceSchema],
+        graveyard: [cardInstanceSchema],
+        exile: [cardInstanceSchema],
+        commandZone: [cardInstanceSchema],
+    },
+    teamId: { type: String, default: null },
+}, { _id: false });
+
+const strokeSchema = new mongoose.Schema({
+    strokeId: { type: String, required: true },
+    playerId: { type: String },
+    points: [{ x: Number, y: Number }],
+    color: { type: String, default: '#ffffff' },
+    size: { type: Number, default: 3 },
+}, { _id: false });
+
+const gameRoomSchema = new mongoose.Schema({
+    roomCode: { type: String, required: true, unique: true },
+    hostId: { type: String, required: true },
+    players: [playerStateSchema],
+    drawings: [strokeSchema],
+    turnIndex: { type: Number, default: 0 },
+    currentPhase: { type: String, default: 'main1' },
+    actionHistory: [{
+        actionId: { type: String },
+        playerId: { type: String },
+        type: { type: String },
+        data: { type: mongoose.Schema.Types.Mixed },
+        timestamp: { type: Date, default: Date.now },
+    }],
+    settings: {
+        startingLife: { type: Number, default: 40 },
+        useCommanderDamage: { type: Boolean, default: true },
+        commanderDamageLethal: { type: Number, default: 21 },
+        maxPlayers: { type: Number, default: 8 },
+    },
+    teams: [{
+        teamId: { type: String },
+        name: { type: String },
+        sharedLife: { type: Number, default: null },
+    }],
+    started: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
+    lastActivity: { type: Date, default: Date.now },
+});
+
+gameRoomSchema.index({ lastActivity: 1 }, { expireAfterSeconds: 3600 * 6 }); // auto-expire after 6h inactivity
+
+module.exports = mongoose.model('GameRoom', gameRoomSchema);
