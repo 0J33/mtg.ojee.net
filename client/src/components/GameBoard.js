@@ -10,11 +10,13 @@ import ScryModal from './ScryModal';
 import ContextMenu from './ContextMenu';
 import LibrarySearch from './LibrarySearch';
 import ManaCost from './ManaCost';
+import CounterModal from './CounterModal';
 import { useDialog } from './Dialog';
-import { useEscapeKey } from '../utils';
+import { useEscapeKey, useIsTouchDevice } from '../utils';
 
 export default function GameBoard({ user, gameState, roomCode, onLeave, revealedCard, onDismissReveal }) {
     const dialog = useDialog();
+    const isTouch = useIsTouchDevice();
     const [showSearch, setShowSearch] = useState(null); // null, 'token', 'add'
     const [maximizedCard, setMaximizedCard] = useState(null);
     const [drawingEnabled, setDrawingEnabled] = useState(false);
@@ -35,6 +37,7 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
     const [librarySortMode, setLibrarySortMode] = useState('order'); // 'order' | 'alphabetical'
     const [compactMode, setCompactMode] = useState(false);
     const [notifications, setNotifications] = useState([]);
+    const [counterModalCard, setCounterModalCard] = useState(null); // card object whose counters are being edited
 
     // Find the freshest version of the maximized card from current gameState
     // (so notes/counters reflect immediately without needing a useEffect race)
@@ -113,6 +116,30 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
         socket.emit('bulkMove', { instanceIds: Array.from(selectedIds), toZone, targetPlayerId: user.id });
         clearSelection();
     };
+
+    // Find the live card object + zone name for an instanceId. Used for the
+    // mobile sticky toolbar and to give CardMaximized the source zone for moves.
+    const findCardWithZone = (instanceId) => {
+        if (!gameState || !instanceId) return null;
+        for (const player of gameState.players) {
+            for (const [zoneName, zone] of Object.entries(player.zones || {})) {
+                if (Array.isArray(zone)) {
+                    const found = zone.find(c => c?.instanceId === instanceId);
+                    if (found) return { card: found, zone: zoneName, player };
+                }
+            }
+        }
+        return null;
+    };
+
+    const firstSelectedCard = (() => {
+        if (selectedIds.size === 0) return null;
+        const firstId = selectedIds.values().next().value;
+        return findCardWithZone(firstId)?.card || null;
+    })();
+    const liveMaximizedInfo = liveMaximizedCard?.instanceId
+        ? findCardWithZone(liveMaximizedCard.instanceId)
+        : null;
 
     const me = gameState.players.find(p => p.userId === user.id);
     const isHost = gameState.hostId === user.id;
@@ -367,6 +394,7 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                                     onClearSelection={clearSelection}
                                     compact={compactMode && !isSelf}
                                     isCurrentTurn={idx === gameState.turnIndex}
+                                    touchMode={isTouch}
                                 />
                             </div>
                         );
@@ -393,16 +421,32 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
 
             {/* Selection action bar */}
             {selectedIds.size > 0 && (
-                <div className="selection-bar">
-                    <span className="selection-count">{selectedIds.size} selected</span>
-                    <button onClick={() => bulkTap(true)}>Tap All</button>
-                    <button onClick={() => bulkTap(false)}>Untap All</button>
-                    <button onClick={() => bulkTap()}>Toggle Tap</button>
-                    <button onClick={() => bulkMove('battlefield')}>→ Battlefield</button>
+                <div className={`selection-bar ${isTouch ? 'touch-toolbar' : ''}`}>
+                    <span className="selection-count">
+                        {selectedIds.size === 1 && firstSelectedCard
+                            ? firstSelectedCard.name || '1 selected'
+                            : `${selectedIds.size} selected`}
+                    </span>
+                    {/* Single-card-only actions (only meaningful for one card at a time) */}
+                    {selectedIds.size === 1 && firstSelectedCard && (
+                        <>
+                            <button onClick={() => setMaximizedCard(firstSelectedCard)}>View</button>
+                            <button onClick={() => setCounterModalCard(firstSelectedCard)}>+Counter</button>
+                            <button onClick={() => setNoteEditor({ instanceId: firstSelectedCard.instanceId })}>Note</button>
+                            <button onClick={() => socket.emit('flipCard', { instanceId: firstSelectedCard.instanceId })}>Flip</button>
+                            <button onClick={() => socket.emit('toggleFaceDown', { instanceId: firstSelectedCard.instanceId })}>
+                                {firstSelectedCard.faceDown ? 'Face up' : 'Face down'}
+                            </button>
+                            <button onClick={() => socket.emit('revealCard', { instanceId: firstSelectedCard.instanceId, targetPlayerIds: 'all' })}>Reveal</button>
+                        </>
+                    )}
+                    <button onClick={() => bulkTap()}>Tap</button>
+                    <button onClick={() => bulkMove('battlefield')}>→ BF</button>
                     <button onClick={() => bulkMove('hand')}>→ Hand</button>
-                    <button onClick={() => bulkMove('graveyard')}>→ Graveyard</button>
+                    <button onClick={() => bulkMove('graveyard')}>→ GY</button>
                     <button onClick={() => bulkMove('exile')}>→ Exile</button>
-                    <button onClick={() => bulkMove('library')}>→ Library</button>
+                    <button onClick={() => bulkMove('library')}>→ Lib</button>
+                    <button onClick={() => bulkMove('commandZone')}>→ Cmd</button>
                     <button onClick={clearSelection}>Clear</button>
                 </div>
             )}
@@ -422,6 +466,10 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                     onClose={() => setMaximizedCard(null)}
                     onClickCard={(c) => setMaximizedCard(c)}
                     onAddNote={(instanceId) => setNoteEditor({ instanceId })}
+                    onAddCounter={(c) => setCounterModalCard(c)}
+                    allPlayers={gameState.players}
+                    userId={user.id}
+                    currentZone={liveMaximizedInfo?.zone}
                 />
             )}
             {noteEditor && <NoteEditor instanceId={noteEditor.instanceId} onClose={() => setNoteEditor(null)} />}
@@ -470,6 +518,16 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
 
             {customCardModal && <CustomCardModal onClose={() => setCustomCardModal(false)} />}
             {bgModal && <BackgroundModal onClose={() => setBgModal(false)} />}
+            {counterModalCard && (
+                <CounterModal
+                    card={counterModalCard}
+                    onAdd={(name, val) => {
+                        socket.emit('setCardCounter', { instanceId: counterModalCard.instanceId, counter: name, value: val });
+                        setCounterModalCard(null);
+                    }}
+                    onClose={() => setCounterModalCard(null)}
+                />
+            )}
             {librarySearchOpen && (
                 <LibrarySearch
                     onClose={() => setLibrarySearchOpen(false)}

@@ -6,9 +6,11 @@ import ManaCost, { OracleText } from './ManaCost';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
-export default function CardMaximized({ card, onClose, onClickCard, onAddNote }) {
+export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone }) {
     useEscapeKey(onClose);
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
+    const [showRevealMenu, setShowRevealMenu] = useState(false);
+    const [showMoveMenu, setShowMoveMenu] = useState(false);
     if (!card) return null;
 
     const isFaceDown = card.faceDown;
@@ -106,9 +108,56 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote })
                             })}
                         </div>
                     )}
-                    {onAddNote && card.instanceId && (
+                    {card.instanceId && (
                         <div className="card-max-actions">
-                            <button onClick={() => onAddNote(card.instanceId)} className="small-btn">+ Add Effect / Note</button>
+                            {/* Quick actions row */}
+                            <div className="card-max-action-row">
+                                <button className="small-btn" onClick={() => socket.emit('tapCard', { instanceId: card.instanceId })}>
+                                    {card.tapped ? 'Untap' : 'Tap'}
+                                </button>
+                                <button className="small-btn" onClick={() => socket.emit('flipCard', { instanceId: card.instanceId })}>Flip</button>
+                                <button className="small-btn" onClick={() => socket.emit('toggleFaceDown', { instanceId: card.instanceId })}>
+                                    {card.faceDown ? 'Face up' : 'Face down'}
+                                </button>
+                                {onAddCounter && (
+                                    <button className="small-btn" onClick={() => onAddCounter(card)}>+ Counter</button>
+                                )}
+                                {onAddNote && (
+                                    <button className="small-btn" onClick={() => onAddNote(card.instanceId)}>+ Note</button>
+                                )}
+                            </div>
+
+                            {/* Move card to a different zone */}
+                            {currentZone && (
+                                <div className="card-max-action-row">
+                                    <span className="card-max-action-label">Move to:</span>
+                                    {['hand', 'battlefield', 'graveyard', 'exile', 'commandZone', 'library'].filter(z => z !== currentZone).map(z => (
+                                        <button key={z} className="small-btn" onClick={() => {
+                                            socket.emit('moveCard', { instanceId: card.instanceId, fromZone: currentZone, toZone: z });
+                                            onClose?.();
+                                        }}>
+                                            {z === 'commandZone' ? 'Cmd' : z === 'battlefield' ? 'BF' : z === 'graveyard' ? 'GY' : z.charAt(0).toUpperCase() + z.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Reveal */}
+                            {allPlayers && (
+                                <div className="card-max-action-row">
+                                    <span className="card-max-action-label">Reveal:</span>
+                                    <button className="small-btn" onClick={() => socket.emit('revealCard', { instanceId: card.instanceId, targetPlayerIds: 'all' })}>To all</button>
+                                    {!showRevealMenu && allPlayers.filter(p => p.userId !== userId).length > 0 && (
+                                        <button className="small-btn" onClick={() => setShowRevealMenu(true)}>To specific...</button>
+                                    )}
+                                    {showRevealMenu && allPlayers.filter(p => p.userId !== userId).map(p => (
+                                        <button key={p.userId} className="small-btn" onClick={() => {
+                                            socket.emit('revealCard', { instanceId: card.instanceId, targetPlayerIds: [p.userId] });
+                                            setShowRevealMenu(false);
+                                        }}>{p.username}</button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

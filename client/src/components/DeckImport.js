@@ -4,9 +4,7 @@ import { useEscapeKey } from '../utils';
 
 export default function DeckImport({ onImport, onClose }) {
     useEscapeKey(onClose);
-    const [mode, setMode] = useState('text'); // 'text' or 'moxfield'
     const [text, setText] = useState('');
-    const [url, setUrl] = useState('');
     const [deckName, setDeckName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -38,19 +36,12 @@ export default function DeckImport({ onImport, onClose }) {
         setError('');
         setLoading(true);
         try {
-            let data;
-            if (mode === 'moxfield') {
-                data = await imports.moxfield(url);
-            } else {
-                data = await imports.text(text);
-            }
-
+            const data = await imports.text(text);
             if (data.error) {
                 setError(data.error);
                 setLoading(false);
                 return;
             }
-
             setPreview(data);
         } catch (err) {
             setError('Import failed');
@@ -102,8 +93,8 @@ export default function DeckImport({ onImport, onClose }) {
                 {!preview ? (
                     <>
                         <div className="tab-row">
-                            <button className={mode === 'text' ? 'active' : ''} onClick={() => setMode('text')}>Paste Text</button>
-                            <button className={mode === 'moxfield' ? 'active' : ''} onClick={() => setMode('moxfield')}>Moxfield URL</button>
+                            <button className="active">Paste Text</button>
+                            <button className="disabled-tab" disabled title="Temporarily disabled">Moxfield URL</button>
                         </div>
 
                         <input
@@ -113,24 +104,21 @@ export default function DeckImport({ onImport, onClose }) {
                             onChange={e => setDeckName(e.target.value)}
                         />
 
-                        {mode === 'text' ? (
-                            <textarea
-                                placeholder={`Paste your decklist here...\n\nFormat:\nCommander\n1 Card Name\n\nDeck\n1 Card Name\n1 Card Name`}
-                                value={text}
-                                onChange={e => setText(e.target.value)}
-                                rows={12}
-                            />
-                        ) : (
-                            <input
-                                type="text"
-                                placeholder="https://moxfield.com/decks/..."
-                                value={url}
-                                onChange={e => setUrl(e.target.value)}
-                            />
-                        )}
+                        <p className="muted import-instructions">
+                            On Moxfield, open your deck → click <strong>"Copy for Moxfield"</strong> (More → Export → Copy for Moxfield)
+                            and paste the result below. Each line should look like <code>1 Card Name (SET) 123</code>.
+                            You'll pick your commander on the next step.
+                        </p>
+
+                        <textarea
+                            placeholder={`1 Sol Ring (C21) 263\n1 Arcane Signet (PIP) 224\n31 Island (J22) 103\n...`}
+                            value={text}
+                            onChange={e => setText(e.target.value)}
+                            rows={12}
+                        />
 
                         {error && <div className="error">{error}</div>}
-                        <button onClick={handleImport} disabled={loading} className="primary-btn">
+                        <button onClick={handleImport} disabled={loading || !text.trim()} className="primary-btn">
                             {loading ? 'Importing...' : 'Import'}
                         </button>
                     </>

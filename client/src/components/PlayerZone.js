@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import socket from '../socket';
 import Card from './Card';
 import ContextMenu from './ContextMenu';
 import NoteEditor from './NoteEditor';
+import CounterModal from './CounterModal';
 import { useEscapeKey, useHorizontalWheel } from '../utils';
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode }) {
     const [contextMenu, setContextMenu] = useState(null);
     const [expandedZone, setExpandedZone] = useState(null);
     const [editingLife, setEditingLife] = useState(false);
@@ -35,7 +35,15 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             onToggleSelect?.(card.instanceId);
             return;
         }
-        // Normal click — clear selection and maximize
+        // Touch devices: tap toggles selection (the sticky toolbar takes over).
+        // Desktop behavior is unchanged.
+        if (touchMode) {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleSelect?.(card.instanceId);
+            return;
+        }
+        // Normal desktop click — clear selection and maximize
         if (selectedIds && selectedIds.size > 0) onClearSelection?.();
         onMaximizeCard(card);
     };
@@ -43,6 +51,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     const handleCardContext = (e, card, zone) => {
         e.preventDefault();
         e.stopPropagation();
+        // On touch devices the right-click context menu is unreachable; the
+        // sticky bottom toolbar is the equivalent. Suppress the menu so a
+        // long-press doesn't open something with no good way to dismiss it.
+        if (touchMode) return;
         const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commandZone'];
 
         const bfRowItems = (zone === 'battlefield') ? [
@@ -178,6 +190,24 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 <span className={`player-name ${player.connected ? 'online' : 'offline'}`}>
                     {player.username}
                 </span>
+                {touchMode && (
+                    <button
+                        className="player-options-btn"
+                        title="Player options"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            // Synthesize a click event with coordinates so the
+                            // context-menu opens anchored to this button.
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            onPlayerContextMenu?.({
+                                preventDefault: () => {},
+                                clientX: rect.left,
+                                clientY: rect.bottom + 4,
+                            });
+                        }}
+                    >⋮</button>
+                )}
 
                 <div className="life-counter">
                     <button onClick={() => adjustLife(-1)}>-</button>
@@ -440,97 +470,3 @@ function HandZone({ player, isOwner, renderZoneCards, onDragOver, onDrop }) {
     );
 }
 
-const BUILTIN_COUNTER_PRESETS = ['+1/+1', '-1/-1', 'loyalty', 'charge', 'shield', 'lore', 'time'];
-const CUSTOM_COUNTER_KEY = 'mtg_customCounters';
-
-function loadCustomCounters() {
-    try {
-        const raw = localStorage.getItem(CUSTOM_COUNTER_KEY);
-        if (!raw) return [];
-        const arr = JSON.parse(raw);
-        return Array.isArray(arr) ? arr : [];
-    } catch { return []; }
-}
-function saveCustomCounters(arr) {
-    try { localStorage.setItem(CUSTOM_COUNTER_KEY, JSON.stringify(arr)); } catch {}
-}
-
-function CounterModal({ card, onAdd, onClose }) {
-    useEscapeKey(onClose);
-    const [name, setName] = useState('+1/+1');
-    const [value, setValue] = useState(1);
-    const [customs, setCustoms] = useState([]);
-
-    useEffect(() => { setCustoms(loadCustomCounters()); }, []);
-
-    const allPresets = [...BUILTIN_COUNTER_PRESETS, ...customs];
-
-    const saveAsPreset = () => {
-        const trimmed = name.trim();
-        if (!trimmed || allPresets.includes(trimmed)) return;
-        const next = [...customs, trimmed];
-        setCustoms(next);
-        saveCustomCounters(next);
-    };
-
-    const removeCustom = (preset) => {
-        const next = customs.filter(c => c !== preset);
-        setCustoms(next);
-        saveCustomCounters(next);
-        if (name === preset) setName('+1/+1');
-    };
-
-    const handleAdd = () => {
-        // Auto-save if user typed a brand-new counter name
-        const trimmed = name.trim();
-        if (trimmed && !allPresets.includes(trimmed)) {
-            const next = [...customs, trimmed];
-            setCustoms(next);
-            saveCustomCounters(next);
-        }
-        onAdd(trimmed, value);
-    };
-
-    return createPortal(
-        <div className="modal-overlay">
-            <div className="modal counter-modal">
-                <div className="modal-header">
-                    <h3>Add Counter to {card.name}</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
-                </div>
-                <div className="counter-presets">
-                    {BUILTIN_COUNTER_PRESETS.map(p => (
-                        <button key={p} className={name === p ? 'active' : ''} onClick={() => setName(p)}>{p}</button>
-                    ))}
-                    {customs.map(p => (
-                        <span key={p} className="counter-preset-custom">
-                            <button className={name === p ? 'active' : ''} onClick={() => setName(p)}>{p}</button>
-                            <button className="counter-preset-remove" title="Remove preset" onClick={() => removeCustom(p)}>×</button>
-                        </span>
-                    ))}
-                </div>
-                <div className="counter-custom">
-                    <input
-                        type="text"
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        placeholder="Counter name (typed names auto-save as presets)"
-                        onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                    />
-                    <input
-                        type="number"
-                        value={value}
-                        onChange={e => setValue(parseInt(e.target.value) || 0)}
-                        min={0}
-                        onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                    />
-                </div>
-                <div className="counter-actions">
-                    <button onClick={saveAsPreset} className="small-btn" title="Save name as a preset without adding">Save preset</button>
-                    <button onClick={handleAdd} className="primary-btn">Add</button>
-                </div>
-            </div>
-        </div>,
-        document.body
-    );
-}

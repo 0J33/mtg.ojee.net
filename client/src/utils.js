@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function v4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -19,6 +19,27 @@ export function useEscapeKey(onEscape) {
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
     }, [onEscape]);
+}
+
+// Detect a touch-only device (phones, tablets without mice). Re-evaluates if the
+// matchMedia changes (e.g. external mouse plugged in).
+export function useIsTouchDevice() {
+    const [isTouch, setIsTouch] = useState(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) return false;
+        return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    });
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) return;
+        const mq = window.matchMedia('(hover: none) and (pointer: coarse)');
+        const handler = (e) => setIsTouch(e.matches);
+        if (mq.addEventListener) mq.addEventListener('change', handler);
+        else mq.addListener(handler);
+        return () => {
+            if (mq.removeEventListener) mq.removeEventListener('change', handler);
+            else mq.removeListener(handler);
+        };
+    }, []);
+    return isTouch;
 }
 
 // Convert vertical mouse wheel scrolling into horizontal scrolling on a ref'd element.
