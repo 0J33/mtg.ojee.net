@@ -26,6 +26,7 @@ const deckSchema = new mongoose.Schema({
     companions: [cardEntrySchema],
     mainboard: [cardEntrySchema],
     sideboard: [cardEntrySchema],
+    notFound: { type: [String], default: [] },
     importedFrom: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

@@ -7,5 +7,8 @@ const socket = io(SERVER_URL, {
     withCredentials: true,
 });
 
+// Expose for debugging
+if (typeof window !== 'undefined') window.__socket = socket;
+
 export default socket;
 export { SERVER_URL };

@@ -12,10 +12,14 @@ const cardInstanceSchema = new mongoose.Schema({
     power: { type: String },
     toughness: { type: String },
     colors: [String],
+    producedMana: [String],
     layout: { type: String },
     x: { type: Number, default: 0 },
     y: { type: Number, default: 0 },
     tapped: { type: Boolean, default: false },
+    tappedFor: { type: String, default: null },
+    bfRow: { type: String, default: null },
+    notes: { type: [mongoose.Schema.Types.Mixed], default: [] },
     flipped: { type: Boolean, default: false },
     faceDown: { type: Boolean, default: false },
     counters: { type: Map, of: Number, default: {} },
@@ -34,8 +38,17 @@ const playerStateSchema = new mongoose.Schema({
     socketId: { type: String },
     life: { type: Number, default: 40 },
     counters: { type: Map, of: Number, default: { poison: 0, energy: 0, experience: 0 } },
+    manaPool: {
+        W: { type: Number, default: 0 },
+        U: { type: Number, default: 0 },
+        B: { type: Number, default: 0 },
+        R: { type: Number, default: 0 },
+        G: { type: Number, default: 0 },
+        C: { type: Number, default: 0 },
+    },
     commanderDeaths: { type: Number, default: 0 },
     commanderDamageFrom: { type: Map, of: Number, default: {} },
+    infect: { type: Number, default: 0 },
     commanderTax: { type: Number, default: 0 },
     background: { type: String, default: null },
     designations: {
@@ -53,6 +66,7 @@ const playerStateSchema = new mongoose.Schema({
         commandZone: [cardInstanceSchema],
     },
     teamId: { type: String, default: null },
+    mulliganCount: { type: Number, default: 0 },
 }, { _id: false });
 
 const strokeSchema = new mongoose.Schema({

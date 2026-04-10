@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import socket from '../socket';
 import Card from './Card';
+import { useEscapeKey } from '../utils';
 
 export default function ScryModal({ cards, onClose }) {
+    useEscapeKey(onClose);
     const [order, setOrder] = useState(cards.map(c => c.instanceId));
     const [toBottom, setToBottom] = useState(new Set());
+    const [draggingId, setDraggingId] = useState(null);
 
     const toggleBottom = (id) => {
         setToBottom(prev => {
@@ -14,22 +18,28 @@ export default function ScryModal({ cards, onClose }) {
         });
     };
 
-    const moveUp = (idx) => {
-        if (idx === 0) return;
-        setOrder(prev => {
-            const next = [...prev];
-            [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-            return next;
-        });
+    const handleDragStart = (e, id) => {
+        setDraggingId(id);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', id);
     };
 
-    const moveDown = (idx) => {
-        if (idx >= order.length - 1) return;
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDrop = (e, targetId) => {
+        e.preventDefault();
+        if (!draggingId || draggingId === targetId) return;
         setOrder(prev => {
-            const next = [...prev];
-            [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+            const next = prev.filter(id => id !== draggingId);
+            const targetIdx = next.indexOf(targetId);
+            if (targetIdx === -1) return prev;
+            next.splice(targetIdx, 0, draggingId);
             return next;
         });
+        setDraggingId(null);
     };
 
     const handleConfirm = () => {
@@ -45,37 +55,40 @@ export default function ScryModal({ cards, onClose }) {
         onClose();
     };
 
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal scry-modal" onClick={e => e.stopPropagation()}>
+    return createPortal(
+        <div className="modal-overlay">
+            <div className="modal scry-modal">
                 <div className="modal-header">
                     <h2>Scry {cards.length}</h2>
                     <button className="close-btn" onClick={onClose}>x</button>
                 </div>
-                <p className="muted">Click cards to send to bottom. Drag to reorder top.</p>
+                <p className="muted">Click cards to mark for bottom. Drag to reorder top of library.</p>
                 <div className="scry-cards">
                     {order.map((id, idx) => {
                         const card = cards.find(c => c.instanceId === id);
                         if (!card) return null;
                         const isBottom = toBottom.has(id);
                         return (
-                            <div key={id} className={`scry-card ${isBottom ? 'to-bottom' : ''}`}>
-                                <Card card={card} onClick={() => toggleBottom(id)} small />
+                            <div
+                                key={id}
+                                className={`scry-card ${isBottom ? 'to-bottom' : ''} ${draggingId === id ? 'dragging' : ''}`}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, id)}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, id)}
+                                onDragEnd={() => setDraggingId(null)}
+                            >
+                                <Card card={card} onClick={() => toggleBottom(id)} />
                                 <div className="scry-card-label">
                                     {isBottom ? 'BOTTOM' : `Top #${idx + 1}`}
                                 </div>
-                                {!isBottom && (
-                                    <div className="scry-card-controls">
-                                        <button onClick={() => moveUp(idx)} disabled={idx === 0}>up</button>
-                                        <button onClick={() => moveDown(idx)} disabled={idx === order.length - 1}>dn</button>
-                                    </div>
-                                )}
                             </div>
                         );
                     })}
                 </div>
                 <button onClick={handleConfirm} className="primary-btn">Confirm</button>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

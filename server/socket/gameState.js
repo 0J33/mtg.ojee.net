@@ -23,10 +23,14 @@ function createCardInstance(cardData, overrides = {}) {
         power: cardData.power || '',
         toughness: cardData.toughness || '',
         colors: cardData.colors || [],
+        producedMana: cardData.producedMana || [],
         layout: cardData.layout || 'normal',
         x: 0,
         y: 0,
         tapped: false,
+        tappedFor: null, // color that was added to mana pool when this was tapped (for refund on untap)
+        bfRow: null, // override for battlefield row: 'creatures' | 'artifacts' | 'lands' | 'other' | null (auto)
+        notes: [], // array of { text, card?: { name, imageUri } }
         flipped: false,
         faceDown: false,
         counters: {},
@@ -50,6 +54,7 @@ function createPlayerState(userId, username) {
         commanderDeaths: 0,
         commanderDamageFrom: {},
         commanderTax: 0,
+        infect: 0, // cumulative poison counters; 10 = death
         background: null,
         designations: { monarch: false, initiative: false, dayNight: null, citysBlessing: false },
         zones: {
@@ -61,6 +66,7 @@ function createPlayerState(userId, username) {
             commandZone: [],
         },
         teamId: null,
+        mulliganCount: 0, // 0 = haven't mulled, 1 = mulled once (drew 6), 2 = mulled twice (drew 5)
     };
 }
 
@@ -76,6 +82,7 @@ function createRoom(hostId, hostUsername, settings = {}) {
         turnIndex: 0,
         currentPhase: 'main1',
         actionHistory: [],
+        undoStack: [],
         settings: {
             startingLife: settings.startingLife || 40,
             useCommanderDamage: settings.useCommanderDamage !== false,
@@ -141,10 +148,12 @@ function getRoomStateForPlayer(room, userId) {
                 counters: Object.fromEntries(p.counters instanceof Map ? p.counters : Object.entries(p.counters || {})),
                 commanderDeaths: p.commanderDeaths,
                 commanderDamageFrom: Object.fromEntries(p.commanderDamageFrom instanceof Map ? p.commanderDamageFrom : Object.entries(p.commanderDamageFrom || {})),
+                infect: p.infect || 0,
                 commanderTax: p.commanderTax,
                 background: p.background,
                 designations: p.designations,
                 teamId: p.teamId,
+                mulliganCount: p.mulliganCount || 0,
                 connected: !!p.socketId,
                 zones: {
                     hand: isOwner ? p.zones.hand : p.zones.hand.map(() => ({ hidden: true })),
@@ -159,6 +168,53 @@ function getRoomStateForPlayer(room, userId) {
             };
         }),
     };
+}
+
+// Snapshot game-relevant player state (excludes socketId/connection info)
+function snapshotState(room) {
+    return JSON.parse(JSON.stringify({
+        players: room.players.map(p => ({
+            userId: p.userId,
+            username: p.username,
+            life: p.life,
+            counters: p.counters,
+            commanderDeaths: p.commanderDeaths,
+            commanderDamageFrom: p.commanderDamageFrom,
+            infect: p.infect || 0,
+            commanderTax: p.commanderTax,
+            background: p.background,
+            designations: p.designations,
+            teamId: p.teamId,
+            zones: p.zones,
+        })),
+        turnIndex: room.turnIndex,
+        teams: room.teams,
+    }));
+}
+
+function pushUndo(room) {
+    if (!room.undoStack) room.undoStack = [];
+    room.undoStack.push(snapshotState(room));
+    if (room.undoStack.length > 30) room.undoStack.shift();
+}
+
+function popUndo(room) {
+    if (!room.undoStack || room.undoStack.length === 0) return null;
+    return room.undoStack.pop();
+}
+
+function restoreSnapshot(room, snapshot) {
+    if (!snapshot) return;
+    for (const snapPlayer of snapshot.players) {
+        const player = room.players.find(p => p.userId === snapPlayer.userId);
+        if (!player) continue;
+        // Preserve socketId and other connection state, restore everything else
+        const socketId = player.socketId;
+        Object.assign(player, snapPlayer);
+        player.socketId = socketId;
+    }
+    if (snapshot.turnIndex !== undefined) room.turnIndex = snapshot.turnIndex;
+    if (snapshot.teams) room.teams = snapshot.teams;
 }
 
 function getAllRooms() {
@@ -183,5 +239,9 @@ module.exports = {
     addAction,
     shuffleArray,
     getRoomStateForPlayer,
+    snapshotState,
+    pushUndo,
+    popUndo,
+    restoreSnapshot,
     getAllRooms,
 };

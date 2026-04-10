@@ -5,7 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', requireAuth, async (req, res) => {
-    const decks = await Deck.find({ ownerId: req.user._id }).select('name format commanders createdAt updatedAt').sort({ updatedAt: -1 });
+    const decks = await Deck.find({ ownerId: req.user._id }).select('name format commanders notFound createdAt updatedAt').sort({ updatedAt: -1 });
     res.json({ decks });
 });
 
@@ -16,7 +16,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 router.post('/', requireAuth, async (req, res) => {
-    const { name, format, commanders, companions, mainboard, sideboard, importedFrom } = req.body;
+    const { name, format, commanders, companions, mainboard, sideboard, notFound, importedFrom } = req.body;
     const deck = await Deck.create({
         ownerId: req.user._id,
         name: name || 'Untitled Deck',
@@ -25,6 +25,7 @@ router.post('/', requireAuth, async (req, res) => {
         companions: companions || [],
         mainboard: mainboard || [],
         sideboard: sideboard || [],
+        notFound: notFound || [],
         importedFrom,
     });
     await req.user.updateOne({ $push: { decks: deck._id } });
@@ -33,9 +34,18 @@ router.post('/', requireAuth, async (req, res) => {
 
 router.put('/:id', requireAuth, async (req, res) => {
     const { name, format, commanders, companions, mainboard, sideboard } = req.body;
+    // Only update fields that are provided (avoid clearing data on partial updates like rename)
+    const update = { updatedAt: Date.now() };
+    if (name !== undefined) update.name = name;
+    if (format !== undefined) update.format = format;
+    if (commanders !== undefined) update.commanders = commanders;
+    if (companions !== undefined) update.companions = companions;
+    if (mainboard !== undefined) update.mainboard = mainboard;
+    if (sideboard !== undefined) update.sideboard = sideboard;
+
     const deck = await Deck.findOneAndUpdate(
         { _id: req.params.id, ownerId: req.user._id },
-        { name, format, commanders, companions, mainboard, sideboard, updatedAt: Date.now() },
+        update,
         { new: true }
     );
     if (!deck) return res.status(404).json({ error: 'Deck not found' });

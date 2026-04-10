@@ -33,3 +33,10 @@ export const scryfall = {
     search: (q, opts = {}) => request(`/api/scryfall/search?q=${encodeURIComponent(q)}${opts.include_extras ? '&include_extras=true' : ''}`),
     named: (name, fuzzy = false) => request(`/api/scryfall/named?${fuzzy ? 'fuzzy' : 'exact'}=${encodeURIComponent(name)}`),
 };
+
+export const customCards = {
+    list: () => request('/api/custom-cards'),
+    create: (card) => request('/api/custom-cards', { method: 'POST', body: JSON.stringify(card) }),
+    update: (id, card) => request(`/api/custom-cards/${id}`, { method: 'PUT', body: JSON.stringify(card) }),
+    delete: (id) => request(`/api/custom-cards/${id}`, { method: 'DELETE' }),
+};

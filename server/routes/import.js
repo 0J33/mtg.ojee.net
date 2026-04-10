@@ -18,6 +18,7 @@ function scryfallCardToEntry(card) {
         toughness: card.toughness || face?.toughness || '',
         colors: card.colors || face?.colors || [],
         colorIdentity: card.color_identity || [],
+        producedMana: card.produced_mana || face?.produced_mana || [],
         layout: card.layout || 'normal',
     };
 }
@@ -46,7 +47,10 @@ function parseDecklist(text) {
         const match = line.match(/^(\d+)\s*x?\s+(.+?)(?:\s+\([A-Z0-9]+\)\s+\S+)?$/i);
         if (match) {
             const quantity = parseInt(match[1]);
-            const name = match[2].replace(/\s*\*[FE]\*\s*$/, '').trim(); // strip foil markers
+            let name = match[2].replace(/\s*\*[FE]\*\s*$/, '').trim(); // strip foil markers
+            // For DFC cards "Front // Back" or "Front / Back", use just the front name
+            if (name.includes(' // ')) name = name.split(' // ')[0].trim();
+            else if (name.includes(' / ')) name = name.split(' / ')[0].trim();
             sections[currentSection].push({ name, quantity });
         }
     }
@@ -90,10 +94,16 @@ router.post('/text', async (req, res) => {
 
             for (const card of (data.data || [])) {
                 const entry = scryfallCardToEntry(card);
-                const info = nameToSection[card.name];
+                // Try multiple keys: full name, front face name, root name
+                let info = nameToSection[card.name];
+                if (!info && card.card_faces?.[0]?.name) info = nameToSection[card.card_faces[0].name];
+                if (!info && card.name.includes(' // ')) info = nameToSection[card.name.split(' // ')[0]];
                 if (info) {
                     entry.quantity = info.quantity;
                     result[info.section].push(entry);
+                } else {
+                    // Fall back to mainboard if we can't match the section
+                    result.mainboard.push(entry);
                 }
             }
             for (const nf of (data.not_found || [])) {
@@ -122,19 +132,36 @@ router.post('/moxfield', async (req, res) => {
 
     const deckId = match[1];
 
+    // Try multiple endpoints with browser-like headers
+    const endpoints = [
+        `https://api2.moxfield.com/v3/decks/all/${deckId}`,
+        `https://api.moxfield.com/v2/decks/all/${deckId}`,
+    ];
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': `https://moxfield.com/decks/${deckId}`,
+        'Origin': 'https://moxfield.com',
+    };
+
+    let data = null;
+    for (const endpoint of endpoints) {
+        try {
+            const response = await fetch(endpoint, { headers });
+            const text = await response.text();
+            if (response.ok && text.trim().startsWith('{')) {
+                data = JSON.parse(text);
+                break;
+            }
+        } catch (err) { /* try next */ }
+    }
+
+    if (!data) {
+        return res.status(400).json({ error: 'Moxfield blocks API access from servers. Please use the "Paste Text" option: in Moxfield, click "More" → "Export" → copy the text and paste it here.' });
+    }
+
     try {
-        const response = await fetch(`https://api2.moxfield.com/v3/decks/all/${deckId}`, {
-            headers: {
-                'User-Agent': 'MTGOjeeNet/1.0',
-                'Accept': 'application/json',
-            },
-        });
-
-        if (!response.ok) {
-            return res.status(response.status).json({ error: 'Failed to fetch from Moxfield. Try pasting the decklist as text instead.' });
-        }
-
-        const data = await response.json();
         const result = { commanders: [], companions: [], mainboard: [], sideboard: [], notFound: [] };
 
         const processSection = (section, target) => {
@@ -155,6 +182,7 @@ router.post('/moxfield', async (req, res) => {
                     toughness: card.toughness || '',
                     colors: card.colors || [],
                     colorIdentity: card.color_identity || [],
+                    producedMana: card.produced_mana || [],
                     layout: card.layout || 'normal',
                 });
             }

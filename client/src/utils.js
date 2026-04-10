@@ -1,21 +1,45 @@
+import { useEffect, useRef } from 'react';
+
 export function v4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : ((r & 0x3) | 0x8)).toString(16);
     });
 }
 
-export const PHASES = [
-    { id: 'untap', label: 'Untap' },
-    { id: 'upkeep', label: 'Upkeep' },
-    { id: 'draw', label: 'Draw' },
-    { id: 'main1', label: 'Main 1' },
-    { id: 'combat_begin', label: 'Begin Combat' },
-    { id: 'combat_attackers', label: 'Attackers' },
-    { id: 'combat_blockers', label: 'Blockers' },
-    { id: 'combat_damage', label: 'Damage' },
-    { id: 'combat_end', label: 'End Combat' },
-    { id: 'main2', label: 'Main 2' },
-    { id: 'end', label: 'End Step' },
-    { id: 'cleanup', label: 'Cleanup' },
-];
+// Close modal/popup when Escape is pressed
+export function useEscapeKey(onEscape) {
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === 'Escape') {
+                e.stopPropagation();
+                onEscape();
+            }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    }, [onEscape]);
+}
+
+// Convert vertical mouse wheel scrolling into horizontal scrolling on a ref'd element.
+// Only when the element actually overflows horizontally, otherwise the wheel is ignored
+// and the page can still scroll normally above it.
+export function useHorizontalWheel() {
+    const ref = useRef(null);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const handler = (e) => {
+            // Only intercept "pure" vertical wheel events; trackpads delivering horizontal deltas
+            // already work natively.
+            if (e.deltaY === 0) return;
+            if (el.scrollWidth <= el.clientWidth) return;
+            e.preventDefault();
+            el.scrollLeft += e.deltaY;
+        };
+        el.addEventListener('wheel', handler, { passive: false });
+        return () => el.removeEventListener('wheel', handler);
+    }, []);
+    return ref;
+}
+
