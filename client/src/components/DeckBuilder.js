@@ -80,7 +80,11 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
         colors: cc.colors || [],
         isCustom: true,
         customImageUrl: cc.imageUrl || '',
-        customCardId: cc._id,
+        // Stable identity for the origin-aware edit fanout: editing this
+        // custom card will update every deck entry with matching
+        // (customCardOriginId, customCardOwnerId).
+        customCardOriginId: cc.originId,
+        customCardOwnerId: cc.ownerId,
     });
 
     const addToSection = (entry, section) => {

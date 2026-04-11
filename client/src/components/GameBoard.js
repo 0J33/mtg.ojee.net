@@ -15,6 +15,9 @@ import Chat from './Chat';
 import Guide from './Guide';
 import ActionLog from './ActionLog';
 import Cursors from './Cursors';
+import DeckImport from './DeckImport';
+import DeckBuilder from './DeckBuilder';
+import DeckViewer from './DeckViewer';
 import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 
@@ -29,6 +32,16 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [scryCountModal, setScryCountModal] = useState(false);
     const [showDeckPicker, setShowDeckPicker] = useState(false);
     const [myDecks, setMyDecks] = useState([]);
+    // In-game deck management modals — same components used by the lobby so
+    // players don't need to leave the table to build/import/view a deck.
+    const [ingameDeckImportOpen, setIngameDeckImportOpen] = useState(false);
+    const [ingameDeckBuilderOpen, setIngameDeckBuilderOpen] = useState(null); // null = closed, false = new, deckId = edit
+    const [ingameDeckViewerId, setIngameDeckViewerId] = useState(null);
+
+    const refreshMyDecks = useCallback(async () => {
+        const data = await decks.list();
+        if (data?.decks) setMyDecks(data.decks);
+    }, []);
     const [showPlayerMenu, setShowPlayerMenu] = useState(null);
     const [showSettings, setShowSettings] = useState(false);
     const [customCardModal, setCustomCardModal] = useState(false);
@@ -590,6 +603,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                     isCurrentTurn={idx === gameState.turnIndex}
                                     touchMode={isTouch}
                                     spectating={isSpectator}
+                                    gameStarted={gameStarted}
                                 />
                             </div>
                         );
@@ -755,20 +769,76 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             <h2>Select Deck</h2>
                             <button className="close-btn" onClick={() => setShowDeckPicker(false)}>x</button>
                         </div>
+                        <div className="deck-picker-actions">
+                            <button className="small-btn" onClick={() => setIngameDeckBuilderOpen(false)}>Build New</button>
+                            <button className="small-btn" onClick={() => setIngameDeckImportOpen(true)}>Import</button>
+                        </div>
                         {myDecks.length === 0 ? (
-                            <p className="muted">No decks saved. Import one from the lobby first.</p>
+                            <p className="muted">No decks saved. Build or import one.</p>
                         ) : (
                             <div className="deck-list">
                                 {myDecks.map(d => (
-                                    <div key={d._id} className="deck-item" onClick={() => handleSelectDeck(d._id)}>
-                                        <span className="deck-name">{d.name}</span>
-                                        <span className="deck-commander">{d.commanders?.map(c => c.name).join(' & ')}</span>
+                                    <div key={d._id} className="deck-item"
+                                        onClick={() => handleSelectDeck(d._id)}>
+                                        <div className="deck-info">
+                                            <span className="deck-name">{d.name}</span>
+                                            <span className="deck-commander">
+                                                {d.commanders?.map(c => c.name).join(' & ')}
+                                                {d.sharedByUsername && (
+                                                    <span className="deck-author-badge"> · shared by {d.sharedByUsername}</span>
+                                                )}
+                                            </span>
+                                        </div>
+                                        <button className="small-btn" title="View deck" onClick={(e) => { e.stopPropagation(); setIngameDeckViewerId(d._id); }}>View</button>
+                                        <button className="small-btn" title="Edit deck" onClick={(e) => { e.stopPropagation(); setIngameDeckBuilderOpen(d._id); }}>Edit</button>
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
+            )}
+
+            {/* In-game deck management — these three modals stack on top of
+                the deck picker so you can create / edit / inspect decks without
+                leaving the table. All of them use the same components the
+                lobby uses; they share state via the decks REST API so changes
+                are immediately reflected in myDecks on save. */}
+            {ingameDeckImportOpen && (
+                <DeckImport
+                    onImport={async (deckData) => {
+                        const data = await decks.create(deckData);
+                        if (data?.deck) setMyDecks(prev => [data.deck, ...prev]);
+                        setIngameDeckImportOpen(false);
+                    }}
+                    onDeckCreated={(deck) => {
+                        if (deck) setMyDecks(prev => [deck, ...prev]);
+                        setIngameDeckImportOpen(false);
+                    }}
+                    onClose={() => setIngameDeckImportOpen(false)}
+                />
+            )}
+            {ingameDeckBuilderOpen !== null && (
+                <DeckBuilder
+                    deckId={ingameDeckBuilderOpen || null}
+                    onClose={() => setIngameDeckBuilderOpen(null)}
+                    onSaved={() => refreshMyDecks()}
+                />
+            )}
+            {ingameDeckViewerId && (
+                <DeckViewer
+                    deckId={ingameDeckViewerId}
+                    onClose={() => setIngameDeckViewerId(null)}
+                    onDelete={async (id) => {
+                        await decks.delete(id);
+                        setMyDecks(prev => prev.filter(d => d._id !== id));
+                        setIngameDeckViewerId(null);
+                    }}
+                    onEdit={(id) => {
+                        setIngameDeckViewerId(null);
+                        setIngameDeckBuilderOpen(id);
+                    }}
+                />
             )}
 
             {/* Player context menu */}

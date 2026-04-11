@@ -252,6 +252,34 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .deck-commander { font-size: 0.85em; color: var(--text-dim); font-style: italic; }
 .deck-rename-input { padding: 6px 10px; font-size: 0.95em; background: var(--bg-deep); border: 1px solid var(--accent); border-radius: 2px; color: var(--text); font-family: 'Cinzel', serif; }
 .deck-missing-badge { color: var(--danger); margin-left: 4px; }
+/* Author-badge styling for decks/cards imported from another user, shown
+   next to deck names and on custom card entries. Visually subdued so it
+   doesn't steal attention from the primary name. */
+.deck-author-badge {
+    color: var(--accent-dim);
+    font-style: italic;
+    font-size: 0.85em;
+    letter-spacing: 0;
+    font-family: 'EB Garamond', serif;
+}
+.custom-author-badge {
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: 0.75em;
+    margin-left: 6px;
+    letter-spacing: 0;
+    font-family: 'EB Garamond', serif;
+    font-weight: normal;
+}
+.custom-author-line {
+    color: var(--accent-dim);
+    font-style: italic;
+    font-size: 0.8em;
+    margin: 2px 0 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-family: 'Cinzel', serif;
+}
 
 /* ─── MODAL ───────────────────────────────────────────────── */
 .modal-overlay {
@@ -1323,6 +1351,83 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .invite-choice-cancel { background: transparent; border: none; color: var(--text-dim); font-size: 0.8em; cursor: pointer; letter-spacing: 1px; padding: 6px; }
 .invite-choice-cancel:hover { color: var(--text); background: transparent; }
 
+/* ─── DECK IMPORT PASTE ROW ───────────────────────────────── */
+.paste-row {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0 4px;
+}
+
+/* ─── IN-GAME DECK PICKER TOOLBAR ─────────────────────────── */
+.deck-picker-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+/* ─── CUSTOM CARD COPY/LINK PICKER (DeckImport) ───────────── */
+.custom-card-mode-picker {
+    margin: 14px 0 8px;
+    padding: 14px 16px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.custom-card-mode-picker > strong {
+    display: block;
+    font-family: 'Cinzel', serif;
+    font-size: 0.75em;
+    color: var(--text-mid);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.custom-card-mode-picker label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.88em;
+    line-height: 1.4;
+    padding: 6px 8px;
+    border-radius: 2px;
+}
+.custom-card-mode-picker label:hover { background: var(--bg-elev); }
+.custom-card-mode-picker input[type="radio"] {
+    margin: 3px 0 0;
+    flex-shrink: 0;
+    width: auto;
+}
+.custom-card-mode-picker label strong { color: var(--text); }
+
+/* ─── TURN-START NUDGE GLOW ───────────────────────────────── */
+/* Applied to the Draw button when the current-turn player hasn't drawn yet,
+   and to land cards in hand when they haven't played a land yet. Pulsing
+   amber border so it's noticeable without stealing attention from the game. */
+@keyframes turnNudgePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0.55), 0 0 4px rgba(255, 204, 0, 0.7); }
+    50%      { box-shadow: 0 0 0 4px rgba(255, 204, 0, 0.15), 0 0 12px rgba(255, 204, 0, 0.9); }
+}
+.turn-nudge {
+    animation: turnNudgePulse 1.6s ease-in-out infinite;
+    border-color: rgba(255, 204, 0, 0.7) !important;
+    color: #ffcc00 !important;
+}
+.card-wrapper.turn-nudge-land {
+    position: relative;
+    border-radius: 6px;
+    animation: turnNudgePulse 1.6s ease-in-out infinite;
+}
+.card-wrapper.turn-nudge-land .card {
+    outline: 2px solid rgba(255, 204, 0, 0.85);
+    outline-offset: 1px;
+}
+
 /* ─── LIVE CURSOR OVERLAY ─────────────────────────────────── */
 .cursors-overlay {
     position: absolute;
@@ -1523,6 +1628,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .action-log-entry.type-turnEnd { border-left-color: var(--accent); }
 .action-log-entry.type-victory { border-left-color: gold; background: rgba(255, 215, 0, 0.08); }
 .action-log-entry.type-startGame { border-left-color: var(--accent); }
+.action-log-entry.type-autoUntap,
+.action-log-entry.type-initialDraw { border-left-color: var(--text-faint); opacity: 0.85; font-style: italic; }
 .action-log-time { font-family: monospace; font-size: 0.7em; color: var(--text-faint); flex-shrink: 0; }
 .action-log-text { color: var(--text); word-wrap: break-word; overflow-wrap: break-word; min-width: 0; }
 

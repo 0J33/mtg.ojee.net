@@ -1,9 +1,62 @@
 const express = require('express');
 const CustomCard = require('../models/CustomCard');
+const Deck = require('../models/Deck');
 const Share = require('../models/Share');
 const { requireAuth } = require('../middleware/auth');
+const mongoose = require('mongoose');
 
 const router = express.Router();
+
+// When a CustomCard is edited, fan the new inline data out to every deck
+// entry that was made from that specific version. The match key is the pair
+// (customCardOriginId, customCardOwnerId) — this is what lets "linked"
+// shared decks automatically see the original author's edits.
+async function propagateCustomCardEdit(card) {
+    if (!card || !card.originId) return { decksUpdated: 0, entriesUpdated: 0 };
+    // Find every deck with at least one entry that matches this exact
+    // (originId, ownerId). Cross-user query — we need to update shared /
+    // linked decks owned by other people too.
+    const filter = {
+        $or: [
+            { 'commanders.customCardOriginId': card.originId, 'commanders.customCardOwnerId': card.ownerId },
+            { 'companions.customCardOriginId': card.originId, 'companions.customCardOwnerId': card.ownerId },
+            { 'mainboard.customCardOriginId': card.originId, 'mainboard.customCardOwnerId': card.ownerId },
+            { 'sideboard.customCardOriginId': card.originId, 'sideboard.customCardOwnerId': card.ownerId },
+        ],
+    };
+    const decks = await Deck.find(filter);
+    let entriesUpdated = 0;
+    for (const deck of decks) {
+        let touched = false;
+        for (const section of ['commanders', 'companions', 'mainboard', 'sideboard']) {
+            const arr = deck[section];
+            if (!Array.isArray(arr)) continue;
+            for (const entry of arr) {
+                if (!entry || !entry.isCustom) continue;
+                if (String(entry.customCardOriginId) !== String(card.originId)) continue;
+                if (String(entry.customCardOwnerId) !== String(card.ownerId)) continue;
+                // Overwrite the inline fields that the CustomCard controls.
+                // Quantity, scryfallId, etc. stay put.
+                entry.name = card.name;
+                entry.imageUri = card.imageUrl || '';
+                entry.customImageUrl = card.imageUrl || '';
+                entry.manaCost = card.manaCost || '';
+                entry.typeLine = card.typeLine || '';
+                entry.oracleText = card.oracleText || '';
+                entry.power = card.power || '';
+                entry.toughness = card.toughness || '';
+                entry.colors = card.colors || [];
+                entriesUpdated++;
+                touched = true;
+            }
+        }
+        if (touched) {
+            deck.updatedAt = Date.now();
+            await deck.save();
+        }
+    }
+    return { decksUpdated: decks.length, entriesUpdated };
+}
 
 // Mirrors the share-code generator in routes/decks.js. Kept local so the tiny
 // helper doesn't need its own module.
@@ -33,8 +86,13 @@ router.get('/', requireAuth, async (req, res) => {
 
 router.post('/', requireAuth, async (req, res) => {
     const { name, imageUrl, manaCost, typeLine, oracleText, power, toughness, colors } = req.body;
+    // originId is assigned up-front from a pre-generated ObjectId so the
+    // doc is internally consistent from the first save. Fresh cards are
+    // their own "origin".
+    const originId = new mongoose.Types.ObjectId().toString();
     const card = await CustomCard.create({
         ownerId: req.user._id,
+        originId,
         name: name || 'Custom Card',
         imageUrl: imageUrl || '',
         manaCost: manaCost || '',
@@ -55,6 +113,16 @@ router.put('/:id', requireAuth, async (req, res) => {
         { new: true }
     );
     if (!card) return res.status(404).json({ error: 'Card not found' });
+    // Fan the edits out to every deck entry made from this card, including
+    // across other users who linked to it via a shared deck import.
+    try {
+        const fanout = await propagateCustomCardEdit(card);
+        if (fanout.entriesUpdated > 0) {
+            console.log(`[customCards] edit propagated to ${fanout.entriesUpdated} deck entries in ${fanout.decksUpdated} decks`);
+        }
+    } catch (err) {
+        console.warn('[customCards] edit propagation failed:', err.message);
+    }
     res.json({ card });
 });
 

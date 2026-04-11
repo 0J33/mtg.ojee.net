@@ -28,7 +28,17 @@ app.use(authMiddleware);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mtg')
-    .then(() => console.log('Connected to MongoDB'))
+    .then(async () => {
+        console.log('Connected to MongoDB');
+        // Run one-shot migrations. They're idempotent (skip already-migrated
+        // rows) so it's safe to call on every startup.
+        try {
+            const runCustomCardOriginMigration = require('./migrations/customCardOrigin');
+            await runCustomCardOriginMigration();
+        } catch (err) {
+            console.error('[migration] custom-card origin failed:', err);
+        }
+    })
     .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes

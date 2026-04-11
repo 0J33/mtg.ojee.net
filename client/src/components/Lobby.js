@@ -233,6 +233,11 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
                                     )}
                                     <span className="deck-commander">
                                         {deck.commanders?.map(c => c.name).join(' & ') || 'No commander'}
+                                        {deck.sharedByUsername && (
+                                            <span className="deck-author-badge" title={`Imported from ${deck.sharedByUsername}`}>
+                                                · shared by {deck.sharedByUsername}
+                                            </span>
+                                        )}
                                         {deck.notFound?.length > 0 && (
                                             <span className="deck-missing-badge" title={`${deck.notFound.length} missing card(s)`}>
                                                 · {deck.notFound.length} missing

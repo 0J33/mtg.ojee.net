@@ -64,7 +64,12 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                     onMouseEnter={(e) => handleHover(e, c)}
                     onMouseLeave={() => setHoveredCard(null)}>
                     <span className="deck-card-qty">{c.quantity || 1}x</span>
-                    <span className="deck-card-name">{c.name}</span>
+                    <span className="deck-card-name">
+                        {c.name}
+                        {c.isCustom && c.customCardAuthorUsername && (
+                            <span className="custom-author-badge"> custom · by {c.customCardAuthorUsername}</span>
+                        )}
+                    </span>
                     <span className="deck-card-mana">{c.manaCost && <ManaCost cost={c.manaCost} />}</span>
                 </div>
             ))}
@@ -78,7 +83,12 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                     <h2>{deck.name}</h2>
                     <button className="close-btn" onClick={onClose}>x</button>
                 </div>
-                <p className="muted">{totalCount} cards · {deck.format}</p>
+                <p className="muted">
+                    {totalCount} cards · {deck.format}
+                    {deck.sharedByUsername && (
+                        <> · <span className="deck-author-badge">shared by {deck.sharedByUsername}</span></>
+                    )}
+                </p>
 
                 {deck.commanders?.length > 0 && (
                     <div className="preview-section">

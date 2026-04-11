@@ -28,6 +28,9 @@ const cardInstanceSchema = new mongoose.Schema({
     isToken: { type: Boolean, default: false },
     isCustom: { type: Boolean, default: false },
     customImageUrl: { type: String },
+    customCardAuthorUsername: { type: String, default: null },
+    customCardOriginId: { type: String, default: null },
+    customCardOwnerId: { type: mongoose.Schema.Types.ObjectId, default: null },
 }, { _id: false });
 
 const playerStateSchema = new mongoose.Schema({

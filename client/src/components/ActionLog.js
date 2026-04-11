@@ -16,10 +16,14 @@ function formatEntry(entry, playerNameById) {
     switch (entry.type) {
         case 'startGame':
             return `Game started (${d.firstPlayer || '?'} goes first)`;
+        case 'initialDraw':
+            return `${d.player || '?'} drew opening hand of ${d.count ?? 7}`;
         case 'turnStart':
             return `Turn begins — ${d.player || '?'}`;
         case 'turnEnd':
             return `${d.player || '?'} ended their turn`;
+        case 'autoUntap':
+            return `Auto-untapped ${d.count ?? 0} ${d.count === 1 ? 'card' : 'cards'} for ${d.player || '?'}`;
         case 'moveCard':
             return `${actorName} moved ${d.cardName || 'a card'} to ${d.toZone || '?'}`;
         case 'tapCard':

@@ -88,7 +88,8 @@ const PAGES = [
             <>
                 <p>The <strong>turn indicator</strong> in the topbar shows whose turn it is. Only the <em>current turn player</em> (or the host) can press <strong>End Turn</strong>.</p>
                 <p>Dead/eliminated players (life ≤ 0, 21+ commander damage, 10+ poison) are <em>automatically skipped</em> on turn advance.</p>
-                <p><strong>Auto-untap</strong> runs at the start of your turn by default. You can turn it off per-player via the player context menu — useful for effects like "doesn't untap during your untap step".</p>
+                <p><strong>Turn-start nudges</strong>: on your turn, the Draw button glows amber until you draw, and any land card in your hand glows until you drop your first land. Purely visual reminders — nothing is enforced, just hard to forget your land drop.</p>
+                <p><strong>Auto-untap</strong> runs at the start of your turn by default. You can turn it off per-player via the player context menu — useful for effects like "doesn't untap during your untap step". Auto-untap events appear in the action log (italic/faint) so you can always see what happened.</p>
                 <p><strong>Mulligans</strong> follow the sequence 7 → 7 → 6 → 5, then no more. After drawing your initial 7, you can mulligan up to 3 times total.</p>
                 <p><strong>Undo</strong> reverts the last mutating action (30 deep). Custom designations (Monarch, Initiative, City's Blessing, Day/Night) are in the player context menu — visual only, no automatic triggers.</p>
             </>
@@ -105,29 +106,45 @@ const PAGES = [
         ),
     },
     {
-        title: 'Chat, log & spectators',
+        title: 'Chat, log, cursors & spectators',
         body: (
             <>
                 <p>The <strong>chat icon</strong> on the right edge opens a sidebar for table talk. Both players and spectators can type.</p>
-                <p>The <strong>Log</strong> button in the topbar (or the burger icon on the right edge) opens the <strong>action log</strong> — a running feed of every mutating action in the room, including turn start/end. Visible to everyone, including spectators who joined late.</p>
+                <p>The <strong>Log</strong> button in the topbar (or the burger icon on the right edge) opens the <strong>action log</strong> — a running feed of every action in the room including turn start/end, auto-untap, opening draws, mulligans, and victory. Visible to everyone, including spectators who joined late.</p>
+                <p><strong>Live cursors</strong>: desktop players who aren't in compact mode see each other's mouse pointers in real time (with a small username label). Toggle it per-user via the <em>Cursor</em> checkbox in the topbar. Touch devices and compact-mode users don't participate — their layouts don't line up.</p>
                 <p>
-                    Spectators join via the lobby's <strong>Spectate</strong> button with
-                    a room code. Spectators see every player's hand, but can't interact —
-                    only chat. The topbar shows "👁 N watching" when spectators are
-                    present; click it to see their usernames.
+                    Spectators join via the lobby's <strong>Spectate</strong> button or by
+                    clicking an invite link and picking <em>Spectate</em>. They see every
+                    player's hand, but can't interact — only chat and point with the cursor.
+                    The topbar shows "👁 N watching"; click it to see their usernames.
                 </p>
-                <p>To reveal your hand to a specific person, right-click your own player name → "Reveal hand to X".</p>
+                <p>To reveal your hand to a specific person, right-click your own player name → "Reveal hand to X". Revealing "to all" sends to every other player but not yourself.</p>
             </>
         ),
     },
     {
-        title: 'Inviting & sharing decks',
+        title: 'Inviting friends',
         body: (
             <>
-                <p>When you create a room, an <strong>invite link</strong> is copied to your clipboard automatically. Paste it anywhere (Discord, SMS, etc.) — opening the link auto-joins the room.</p>
+                <p>When you create a room, an <strong>invite link</strong> is copied to your clipboard automatically. Paste it anywhere (Discord, SMS, etc.) — opening the link takes the recipient to a <em>role picker</em>: they choose <strong>Join as Player</strong> or <strong>Join as Spectator</strong> before actually entering the room.</p>
                 <p>The room code in the topbar is hidden by default. Click it once to reveal, click again to copy the invite link.</p>
-                <p><strong>Sharing decks</strong>: in the lobby, click the <em>share</em> icon next to a deck to generate a short 8-character share code (copied to clipboard). Send it to a friend — they open <strong>Import</strong> → <strong>Share Code</strong> tab and paste it to get the full deck, including any custom cards you used. Custom cards have their own share codes too, via the <strong>Custom Cards</strong> manager.</p>
                 <p>Leaving a room returns you to the lobby. Your session is remembered — refreshing the page drops you back into the same room in the same role.</p>
+            </>
+        ),
+    },
+    {
+        title: 'Decks & custom cards',
+        body: (
+            <>
+                <p><strong>Build / import / view decks from anywhere</strong> — in the lobby under "My Decks", or inside a room via the <em>Load Deck</em> modal. Every deck list has <em>Build New</em>, <em>Import</em>, and per-deck <em>View</em> / <em>Edit</em> actions.</p>
+                <p><strong>Moxfield import</strong>: open your deck on Moxfield → More → Export → <strong>Copy as plain text</strong> (not "Copy for Moxfield" — plain text is more reliable, fewer missing cards). Paste into Import → Paste Text tab. The "Moxfield URL" tab is disabled because Moxfield's API is Cloudflare-protected and blocks both server-side and cross-origin access — there's no way around it without OAuth.</p>
+                <p><strong>Custom cards</strong> — create them from the lobby's <em>Custom Cards</em> button, or from the Custom Cards tab inside Deck Builder. They show up in any deck you build. Editing a custom card propagates the change to every deck that uses it — yours AND any friend who imported your deck in link mode.</p>
+                <p><strong>Sharing decks</strong> — click the share icon next to a deck to generate a short 8-character share code. The recipient opens <strong>Import</strong> → <strong>Share Code</strong>, pastes it, and picks how to handle custom cards:</p>
+                <ul>
+                    <li><strong>Copy</strong> (default): custom cards become new records owned by the importer. They can edit independently — the sharer's future edits don't reach them.</li>
+                    <li><strong>Link</strong>: the deck references the original author's custom cards directly. When the author edits, the linked deck auto-updates.</li>
+                </ul>
+                <p><strong>Author visibility</strong> — the deck viewer, deck list, and maximized card view all show who created a custom card ("by &lt;username&gt;"). Imported decks show "shared by &lt;username&gt;" in the deck list.</p>
             </>
         ),
     },

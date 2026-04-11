@@ -23,7 +23,7 @@ export const decks = {
     update: (id, deck) => request(`/api/decks/${id}`, { method: 'PUT', body: JSON.stringify(deck) }),
     delete: (id) => request(`/api/decks/${id}`, { method: 'DELETE' }),
     share: (id) => request(`/api/decks/${id}/share`),
-    importShare: (code) => request('/api/decks/share/import', { method: 'POST', body: JSON.stringify({ code }) }),
+    importShare: (code, customCardMode = 'copy') => request('/api/decks/share/import', { method: 'POST', body: JSON.stringify({ code, customCardMode }) }),
 };
 
 export const imports = {

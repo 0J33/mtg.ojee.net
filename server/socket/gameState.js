@@ -45,6 +45,13 @@ function createCardInstance(cardData, overrides = {}) {
         isToken: false,
         isCustom: cardData.isCustom || false,
         customImageUrl: cardData.customImageUrl || null,
+        // Custom card authorship snapshot — lives on the card instance so
+        // CardMaximized and similar UI can show "by <author>" without any
+        // cross-user DB lookup. Only populated for isCustom cards; empty
+        // otherwise.
+        customCardAuthorUsername: cardData.customCardAuthorUsername || null,
+        customCardOriginId: cardData.customCardOriginId || null,
+        customCardOwnerId: cardData.customCardOwnerId || null,
         ...overrides,
     };
 }
@@ -78,6 +85,12 @@ function createPlayerState(userId, username) {
         // Per-player flag — if true, their battlefield auto-untaps when their
         // turn begins. Default on because most players expect it.
         autoUntap: true,
+        // Per-turn state used by the UI to nudge the player ("you haven't
+        // drawn yet", "you haven't played a land yet"). Reset on each turn
+        // advance and on startGame. They're hints, not enforced rules — a
+        // player can ignore them or drop to 0 lands per turn.
+        drewThisTurn: false,
+        landsPlayedThisTurn: 0,
     };
 }
 
@@ -213,6 +226,8 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
                 teamId: p.teamId,
                 mulliganCount: p.mulliganCount || 0,
                 autoUntap: p.autoUntap !== false,
+                drewThisTurn: !!p.drewThisTurn,
+                landsPlayedThisTurn: p.landsPlayedThisTurn || 0,
                 connected: !!p.socketId,
                 zones: {
                     hand: canSeeHand ? p.zones.hand : p.zones.hand.map(() => ({ hidden: true })),

@@ -403,6 +403,10 @@ module.exports = function registerSocketHandlers(io) {
                     drawn.push(card);
                 }
             }
+            // Satisfies the "did you draw this turn?" nudge. Any draw counts,
+            // including extra draws from effects — we don't distinguish the
+            // turn-start draw specifically.
+            if (num > 0) player.drewThisTurn = true;
 
             addAction(room, currentUserId, 'drawCards', { count: num });
             broadcastRoomState(io, room);
@@ -454,6 +458,17 @@ module.exports = function registerSocketHandlers(io) {
 
             // Add to target zone
             targetPlayer.zones[toZone].push(card);
+
+            // Satisfy "did you play a land?" nudge when a land enters the
+            // battlefield from the owner's hand. We only count it for the
+            // card's owning player (the one who dragged it there), and only
+            // from hand — not from other zones like graveyard.
+            if (toZone === 'battlefield' && fromZone === 'hand' && sourcePlayer === targetPlayer) {
+                const typeLine = (card.typeLine || '').toLowerCase();
+                if (typeLine.includes('land')) {
+                    targetPlayer.landsPlayedThisTurn = (targetPlayer.landsPlayedThisTurn || 0) + 1;
+                }
+            }
 
             addAction(room, currentUserId, 'moveCard', {
                 cardName: card.name, fromZone, toZone,
@@ -521,6 +536,15 @@ module.exports = function registerSocketHandlers(io) {
                             const dest = targetPlayer || player;
                             dest.zones[toZone].push(card);
                             moved++;
+                            // Count lands being played this turn if this bulk
+                            // move is hand → battlefield for the card's own
+                            // player. Same rule as moveCard.
+                            if (toZone === 'battlefield' && zoneName === 'hand' && dest === player) {
+                                const typeLine = (card.typeLine || '').toLowerCase();
+                                if (typeLine.includes('land')) {
+                                    player.landsPlayedThisTurn = (player.landsPlayedThisTurn || 0) + 1;
+                                }
+                            }
                         }
                     }
                 }
@@ -1162,12 +1186,25 @@ module.exports = function registerSocketHandlers(io) {
             room.currentPhase = 'untap';
             const newPlayer = room.players[room.turnIndex];
 
+            // Reset per-turn nudges for the incoming player. These drive the
+            // "you haven't drawn / played a land yet" glow on the client.
+            if (newPlayer) {
+                newPlayer.drewThisTurn = false;
+                newPlayer.landsPlayedThisTurn = 0;
+            }
+
             // Auto-untap respects the new player's per-player toggle. Default
             // is on; player can switch it off for upkeep effects like Thousand-
             // Year Elixir or similar "doesn't untap" plays.
             if (newPlayer && newPlayer.zones?.battlefield && newPlayer.autoUntap !== false) {
+                let untapped = 0;
                 for (const card of newPlayer.zones.battlefield) {
-                    card.tapped = false;
+                    if (card.tapped) { card.tapped = false; untapped++; }
+                }
+                // Only log if anything was actually untapped — "auto-untapped 0
+                // cards" is noise in the action log.
+                if (untapped > 0) {
+                    addAction(room, newPlayer.userId, 'autoUntap', { player: newPlayer.username, count: untapped });
                 }
             }
 
@@ -1390,21 +1427,37 @@ module.exports = function registerSocketHandlers(io) {
                     player.zones.library.push(...player.zones.hand);
                     player.zones.hand = [];
                 }
+                let drawnCount = 0;
                 if (player.zones.library && player.zones.library.length > 0) {
                     shuffleArray(player.zones.library);
-                    const drawCount = Math.min(7, player.zones.library.length);
-                    for (let i = 0; i < drawCount; i++) {
+                    drawnCount = Math.min(7, player.zones.library.length);
+                    for (let i = 0; i < drawnCount; i++) {
                         player.zones.hand.push(player.zones.library.shift());
                     }
                 }
                 player.life = room.settings.startingLife;
                 player.mulliganCount = 0;
+                // Fresh turn-state for every player; the turn-1 player's state
+                // gets overridden below once we know who goes first.
+                player.drewThisTurn = false;
+                player.landsPlayedThisTurn = 0;
+                // Log the opening draw per player so the action log shows
+                // "<player> drew 7" for each seat instead of silently filling
+                // hands.
+                if (drawnCount > 0) {
+                    addAction(room, player.userId, 'initialDraw', { player: player.username, count: drawnCount });
+                }
             }
 
             room.started = true;
             room.winnerUserId = null; // clear any previous victor for rematches
             room.turnIndex = Math.floor(Math.random() * room.players.length); // random first player
             const firstPlayer = room.players[room.turnIndex];
+            // Turn-1 player in MTG doesn't draw on their first upkeep, so
+            // suppress the "you haven't drawn" nudge for them — otherwise
+            // the glow would fire immediately after start-game which is
+            // wrong. Subsequent turns will reset it via nextTurn.
+            if (firstPlayer) firstPlayer.drewThisTurn = true;
             addAction(room, currentUserId, 'startGame', { firstPlayer: firstPlayer?.username });
             addAction(room, currentUserId, 'turnStart', { player: firstPlayer?.username });
             broadcastToRoom(io, room, 'notification', {

@@ -11,6 +11,10 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
     const [text, setText] = useState('');
     const [deckName, setDeckName] = useState('');
     const [shareCode, setShareCode] = useState('');
+    // Copy = new CustomCard records owned by me, fully independent.
+    // Link = keep the original author's ownership; their edits propagate to
+    // my deck automatically.
+    const [customCardMode, setCustomCardMode] = useState('copy');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [preview, setPreview] = useState(null);
@@ -54,6 +58,31 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
         setLoading(false);
     };
 
+    // One-click clipboard paste — removes the "focus textarea + Ctrl+V" step
+    // from the Moxfield flow. navigator.clipboard.readText requires a user
+    // gesture (the button click counts) and a secure context (https). Failure
+    // is handled by showing an inline error that nudges the user to paste
+    // manually instead.
+    const handlePasteFromClipboard = async () => {
+        setError('');
+        try {
+            if (!navigator.clipboard?.readText) {
+                setError('Clipboard read not supported in this browser — paste manually.');
+                return;
+            }
+            const clip = await navigator.clipboard.readText();
+            if (!clip || !clip.trim()) {
+                setError('Clipboard is empty — copy a decklist first.');
+                return;
+            }
+            setText(clip);
+        } catch (err) {
+            // Usually "permission denied" or "document not focused" — both of
+            // which mean the user needs to click/grant permission themselves.
+            setError('Couldn\'t read clipboard. Click inside the page first, or paste manually.');
+        }
+    };
+
     const handleSave = () => {
         if (!preview) return;
         // Move selected commander cards from mainboard to commanders
@@ -91,7 +120,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
         if (!code) { setError('Enter a share code'); return; }
         setLoading(true);
         try {
-            const res = await decks.importShare(code);
+            const res = await decks.importShare(code, customCardMode);
             if (res?.error) { setError(res.error); setLoading(false); return; }
             if (res?.deck) {
                 onDeckCreated?.(res.deck);
@@ -120,7 +149,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                         <div className="tab-row">
                             <button className={mode === 'paste' ? 'active' : ''} onClick={() => { setMode('paste'); setError(''); }}>Paste Text</button>
                             <button className={mode === 'share' ? 'active' : ''} onClick={() => { setMode('share'); setError(''); }}>Share Code</button>
-                            <button className="disabled-tab" disabled title="Temporarily disabled">Moxfield URL</button>
+                            <button className="disabled-tab" disabled title="Moxfield blocks API access with Cloudflare. Use Paste Text with 'Copy as plain text' from Moxfield's export menu.">Moxfield URL</button>
                         </div>
 
                         {mode === 'paste' && (
@@ -133,11 +162,29 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                                 />
 
                                 <p className="muted import-instructions">
-                                    On Moxfield, open your deck → click <strong>"Copy for Moxfield"</strong> (More → Export → Copy for Moxfield)
-                                    and paste the result below. Each line should look like <code>1 Card Name (SET) 123</code>.
-                                    You'll pick your commander on the next step.
+                                    On Moxfield, open your deck → More → Export → <strong>Copy as plain text</strong>.
+                                    Plain text is the most reliable format (fewer missing cards than "Copy for Moxfield").
+                                    Paste the result below. You'll pick your commander on the next step.
                                 </p>
 
+                                <div className="paste-row">
+                                    <button
+                                        type="button"
+                                        className="small-btn"
+                                        onClick={handlePasteFromClipboard}
+                                        title="Read the decklist from your clipboard"
+                                    >
+                                        Paste from clipboard
+                                    </button>
+                                    {text && (
+                                        <button
+                                            type="button"
+                                            className="small-btn"
+                                            onClick={() => setText('')}
+                                            title="Clear the text area"
+                                        >Clear</button>
+                                    )}
+                                </div>
                                 <textarea
                                     placeholder={`1 Sol Ring (C21) 263\n1 Arcane Signet (PIP) 224\n31 Island (J22) 103\n...`}
                                     value={text}
@@ -167,6 +214,33 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                                     autoFocus
                                     onKeyDown={e => e.key === 'Enter' && handleShareImport()}
                                 />
+                                <div className="custom-card-mode-picker">
+                                    <strong>If the deck contains custom cards:</strong>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            name="customCardMode"
+                                            value="copy"
+                                            checked={customCardMode === 'copy'}
+                                            onChange={() => setCustomCardMode('copy')}
+                                        />
+                                        <span>
+                                            <strong>Copy</strong> — add to my custom cards, I can edit freely. No link to the original author.
+                                        </span>
+                                    </label>
+                                    <label>
+                                        <input
+                                            type="radio"
+                                            name="customCardMode"
+                                            value="link"
+                                            checked={customCardMode === 'link'}
+                                            onChange={() => setCustomCardMode('link')}
+                                        />
+                                        <span>
+                                            <strong>Link</strong> — use the original author's version. Their future edits show up automatically in this deck.
+                                        </span>
+                                    </label>
+                                </div>
                                 {error && <div className="error">{error}</div>}
                                 <button onClick={handleShareImport} disabled={loading || !shareCode.trim()} className="primary-btn">
                                     {loading ? 'Importing...' : 'Import from Share Code'}

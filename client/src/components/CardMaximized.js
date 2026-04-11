@@ -38,6 +38,11 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                 <img src={largeUrl} alt={card.name} />
                 <div className="card-max-info">
                     <h3>{card.name}</h3>
+                    {card.isCustom && (
+                        <p className="custom-author-line">
+                            Custom card{card.customCardAuthorUsername ? ` · by ${card.customCardAuthorUsername}` : ''}
+                        </p>
+                    )}
                     {card.manaCost && <div className="mana-cost"><ManaCost cost={card.manaCost} /></div>}
                     <p className="type-line">{card.typeLine}</p>
                     {card.oracleText && <p className="oracle-text"><OracleText text={card.oracleText} /></p>}

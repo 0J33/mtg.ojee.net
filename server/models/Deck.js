@@ -16,6 +16,17 @@ const cardEntrySchema = new mongoose.Schema({
     layout: { type: String },
     isCustom: { type: Boolean, default: false },
     customImageUrl: { type: String },
+    // Pointers to the CustomCard record this entry was made from. They make
+    // the entry "linked" — editing the referenced custom card will fan out
+    // to every deck entry with matching (originId, ownerId). Missing on
+    // pre-migration entries; backfilled at startup.
+    customCardOriginId: { type: String },
+    customCardOwnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    // Snapshot of the custom card author's username at create/import time,
+    // so the UI can render "by <username>" without a cross-user User lookup.
+    // Not automatically updated if a username changes (usernames are
+    // effectively immutable in this app, so it doesn't matter).
+    customCardAuthorUsername: { type: String },
 }, { _id: false });
 
 const deckSchema = new mongoose.Schema({
@@ -28,6 +39,11 @@ const deckSchema = new mongoose.Schema({
     sideboard: [cardEntrySchema],
     notFound: { type: [String], default: [] },
     importedFrom: { type: String, default: null },
+    // If this deck was created via a share-code import, sharedByUsername is a
+    // snapshot of the original sharer's username. Self-built decks leave
+    // this blank. Used purely for UI display ("Shared by <name>").
+    sharedByUsername: { type: String, default: null },
+    sharedByUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
 });

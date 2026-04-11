@@ -6,7 +6,17 @@ import NoteEditor from './NoteEditor';
 import CounterModal from './CounterModal';
 import { useEscapeKey, useHorizontalWheel, fmtNum, parseGameValue, isInfinite, INFINITE } from '../utils';
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted }) {
+    // Turn-start nudges: on the self-zone only, once the game has started and
+    // it's actually your turn, glow the draw button until you've drawn and
+    // glow each land card in hand until you've played a land. Purely visual
+    // hints — nothing is enforced.
+    const needsDraw = isOwner && gameStarted && isCurrentTurn && !player.drewThisTurn;
+    const needsLand = isOwner && gameStarted && isCurrentTurn && (player.landsPlayedThisTurn || 0) === 0;
+    const isLandCard = (card) => {
+        const t = (card?.typeLine || '').toLowerCase();
+        return t.includes('land');
+    };
     const [contextMenu, setContextMenu] = useState(null);
     const [expandedZone, setExpandedZone] = useState(null);
     const [editingLife, setEditingLife] = useState(false);
@@ -189,8 +199,12 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             const isHidden = card.hidden;
             if (isHidden) return <div key={Math.random()} className="card card-hidden" />;
             const isSelected = selectedIds?.has(card.instanceId);
+            // Glow any land in your own hand on your own turn until you
+            // actually play one — the nudge clears as soon as landsPlayedThisTurn
+            // becomes nonzero (which updates needsLand above).
+            const pendingLand = zone === 'hand' && needsLand && isLandCard(card);
             return (
-                <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''}`}>
+                <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''} ${pendingLand ? 'turn-nudge-land' : ''}`}>
                     <Card
                         card={card}
                         onClick={(e) => handleCardClick(e, card)}
@@ -420,7 +434,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     </div>
                     {isOwner && (
                         <div className="library-actions">
-                            <button onClick={() => socket.emit('drawCards', { count: 1 })}>Draw</button>
+                            <button
+                                onClick={() => socket.emit('drawCards', { count: 1 })}
+                                className={needsDraw ? 'turn-nudge' : ''}
+                                title={needsDraw ? "You haven't drawn this turn" : 'Draw a card'}
+                            >Draw</button>
                             <button onClick={() => socket.emit('shuffleLibrary')}>Shuffle</button>
                             <button onClick={() => socket.emit('mill', { count: 1 })}>Mill 1</button>
                             <button onClick={() => onScry?.()}>Scry</button>
