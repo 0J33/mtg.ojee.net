@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { imports } from '../api';
+import { imports, decks } from '../api';
 import { useEscapeKey } from '../utils';
 
-export default function DeckImport({ onImport, onClose }) {
+export default function DeckImport({ onImport, onDeckCreated, onClose }) {
     useEscapeKey(onClose);
+    // 'paste' = paste a text decklist, 'share' = enter an 8-char share code.
+    // These live on the same modal instead of two separate lobby buttons so
+    // users only have one "Import" entry point to learn.
+    const [mode, setMode] = useState('paste');
     const [text, setText] = useState('');
     const [deckName, setDeckName] = useState('');
+    const [shareCode, setShareCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [preview, setPreview] = useState(null);
@@ -77,6 +82,26 @@ export default function DeckImport({ onImport, onClose }) {
         });
     };
 
+    // Share-code import: server has already stored the full deck snapshot, so
+    // we just POST the code and it returns the created deck. No commander-pick
+    // step, no preview — the share already has everything resolved.
+    const handleShareImport = async () => {
+        setError('');
+        const code = shareCode.trim().toUpperCase();
+        if (!code) { setError('Enter a share code'); return; }
+        setLoading(true);
+        try {
+            const res = await decks.importShare(code);
+            if (res?.error) { setError(res.error); setLoading(false); return; }
+            if (res?.deck) {
+                onDeckCreated?.(res.deck);
+            }
+        } catch (err) {
+            setError(err.message || 'Import failed');
+        }
+        setLoading(false);
+    };
+
     // Combine commanders + mainboard for display so user can re-select
     const allCards = preview ? [...(preview.commanders || []), ...(preview.mainboard || [])] : [];
     const legendaries = allCards.filter(isPossibleCommander);
@@ -93,34 +118,61 @@ export default function DeckImport({ onImport, onClose }) {
                 {!preview ? (
                     <>
                         <div className="tab-row">
-                            <button className="active">Paste Text</button>
+                            <button className={mode === 'paste' ? 'active' : ''} onClick={() => { setMode('paste'); setError(''); }}>Paste Text</button>
+                            <button className={mode === 'share' ? 'active' : ''} onClick={() => { setMode('share'); setError(''); }}>Share Code</button>
                             <button className="disabled-tab" disabled title="Temporarily disabled">Moxfield URL</button>
                         </div>
 
-                        <input
-                            type="text"
-                            placeholder="Deck name"
-                            value={deckName}
-                            onChange={e => setDeckName(e.target.value)}
-                        />
+                        {mode === 'paste' && (
+                            <>
+                                <input
+                                    type="text"
+                                    placeholder="Deck name"
+                                    value={deckName}
+                                    onChange={e => setDeckName(e.target.value)}
+                                />
 
-                        <p className="muted import-instructions">
-                            On Moxfield, open your deck → click <strong>"Copy for Moxfield"</strong> (More → Export → Copy for Moxfield)
-                            and paste the result below. Each line should look like <code>1 Card Name (SET) 123</code>.
-                            You'll pick your commander on the next step.
-                        </p>
+                                <p className="muted import-instructions">
+                                    On Moxfield, open your deck → click <strong>"Copy for Moxfield"</strong> (More → Export → Copy for Moxfield)
+                                    and paste the result below. Each line should look like <code>1 Card Name (SET) 123</code>.
+                                    You'll pick your commander on the next step.
+                                </p>
 
-                        <textarea
-                            placeholder={`1 Sol Ring (C21) 263\n1 Arcane Signet (PIP) 224\n31 Island (J22) 103\n...`}
-                            value={text}
-                            onChange={e => setText(e.target.value)}
-                            rows={12}
-                        />
+                                <textarea
+                                    placeholder={`1 Sol Ring (C21) 263\n1 Arcane Signet (PIP) 224\n31 Island (J22) 103\n...`}
+                                    value={text}
+                                    onChange={e => setText(e.target.value)}
+                                    rows={12}
+                                />
 
-                        {error && <div className="error">{error}</div>}
-                        <button onClick={handleImport} disabled={loading || !text.trim()} className="primary-btn">
-                            {loading ? 'Importing...' : 'Import'}
-                        </button>
+                                {error && <div className="error">{error}</div>}
+                                <button onClick={handleImport} disabled={loading || !text.trim()} className="primary-btn">
+                                    {loading ? 'Importing...' : 'Import'}
+                                </button>
+                            </>
+                        )}
+
+                        {mode === 'share' && (
+                            <>
+                                <p className="muted import-instructions">
+                                    Enter a share code from a friend to import their deck, including any custom cards they used.
+                                    Share codes are 8 characters and last 180 days.
+                                </p>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. AB3KMQ78"
+                                    value={shareCode}
+                                    onChange={e => setShareCode(e.target.value.toUpperCase())}
+                                    maxLength={12}
+                                    autoFocus
+                                    onKeyDown={e => e.key === 'Enter' && handleShareImport()}
+                                />
+                                {error && <div className="error">{error}</div>}
+                                <button onClick={handleShareImport} disabled={loading || !shareCode.trim()} className="primary-btn">
+                                    {loading ? 'Importing...' : 'Import from Share Code'}
+                                </button>
+                            </>
+                        )}
                     </>
                 ) : (
                     <>

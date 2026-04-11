@@ -77,11 +77,21 @@ const strokeSchema = new mongoose.Schema({
     size: { type: Number, default: 3 },
 }, { _id: false });
 
+const chatMessageSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    userId: { type: String },
+    username: { type: String, required: true },
+    text: { type: String, required: true },
+    ts: { type: Number, default: Date.now },
+    isSpectator: { type: Boolean, default: false },
+}, { _id: false });
+
 const gameRoomSchema = new mongoose.Schema({
     roomCode: { type: String, required: true, unique: true },
     hostId: { type: String, required: true },
     players: [playerStateSchema],
     drawings: [strokeSchema],
+    chat: { type: [chatMessageSchema], default: [] },
     turnIndex: { type: Number, default: 0 },
     currentPhase: { type: String, default: 'main1' },
     actionHistory: [{

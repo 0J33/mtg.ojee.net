@@ -1,5 +1,14 @@
-body {
+html, body {
   margin: 0;
+  height: 100%;
+  /* Prevent document-level scrolling on mobile. The game-board is its own
+     scroll container — letting the body also scroll chained both together and
+     produced the "scroll the navbar too" bug where content at the top/bottom
+     was pinned out of reach until you scrolled a second container. */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;

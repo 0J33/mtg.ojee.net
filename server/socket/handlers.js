@@ -1,9 +1,42 @@
 const {
-    createRoom, getRoom, deleteRoom, getPlayerInRoom,
+    createRoom, getRoom, deleteRoom, getPlayerInRoom, getSpectatorInRoom,
     createCardInstance, createPlayerState, addAction,
     shuffleArray, getRoomStateForPlayer, activeRooms,
-    pushUndo, popUndo, restoreSnapshot,
+    pushUndo, popUndo, restoreSnapshot, appendChatMessage, INFINITE,
 } = require('./gameState');
+
+// Returns true if `p` is eliminated (dead). Mirrors the client's logic:
+// zero/negative life, 21+ commander damage from any source, or 10+ poison.
+function isPlayerEliminated(p) {
+    if (!p) return false;
+    if (typeof p.life === 'number' && p.life <= 0) return true;
+    if ((p.infect || 0) >= 10) return true;
+    const dmg = p.commanderDamageFrom || {};
+    for (const k of Object.keys(dmg)) {
+        if ((dmg[k] || 0) >= 21) return true;
+    }
+    return false;
+}
+
+// Clamp a user-supplied value to a sane range. Supports the "∞" sentinel so
+// combo players can express an effectively-infinite resource without triggering
+// JSON serialization issues. Negative values are allowed because life totals
+// can go negative before being recognized as dead.
+function clampGameValue(v, { allowNegative = true } = {}) {
+    if (typeof v === 'string') {
+        const s = v.trim().toLowerCase();
+        if (s === '∞' || s === 'inf' || s === 'infinity' || s === 'infinite') return INFINITE;
+        const parsed = parseInt(s, 10);
+        if (!isNaN(parsed)) v = parsed;
+        else return 0;
+    }
+    if (typeof v !== 'number' || !isFinite(v)) return 0;
+    v = Math.round(v);
+    if (v > INFINITE) v = INFINITE;
+    if (!allowNegative && v < 0) v = 0;
+    if (v < -INFINITE) v = -INFINITE;
+    return v;
+}
 const { v4: uuidv4 } = require('uuid');
 const GameRoom = require('../models/GameRoom');
 
@@ -43,12 +76,38 @@ function stopAutoSave(roomCode) {
     if (timer) { clearInterval(timer); saveTimers.delete(roomCode); }
 }
 
+// Check whether the game has a winner (exactly one non-eliminated player) and
+// fire a one-shot 'victory' broadcast. Tracked via room.winnerUserId so we
+// don't spam the notification on every state broadcast after the game ends.
+function checkVictory(io, room) {
+    if (!room.started) return;
+    if (room.winnerUserId) return; // already declared
+    const alive = room.players.filter(p => !isPlayerEliminated(p));
+    if (alive.length === 1 && room.players.length > 1) {
+        const winner = alive[0];
+        room.winnerUserId = winner.userId;
+        addAction(room, winner.userId, 'victory', { player: winner.username });
+        broadcastToRoom(io, room, 'victory', {
+            userId: winner.userId,
+            username: winner.username,
+            ts: Date.now(),
+        });
+    }
+}
+
 function broadcastRoomState(io, room) {
     for (const player of room.players) {
         if (player.socketId) {
             io.to(player.socketId).emit('gameState', getRoomStateForPlayer(room, player.userId));
         }
     }
+    // Spectators get a state flagged isSpectator — hands are visible, UI goes read-only.
+    for (const spec of (room.spectators || [])) {
+        if (spec.socketId) {
+            io.to(spec.socketId).emit('gameState', getRoomStateForPlayer(room, spec.userId, { isSpectator: true }));
+        }
+    }
+    checkVictory(io, room);
 }
 
 function broadcastToRoom(io, room, event, data, excludeSocketId = null) {
@@ -57,17 +116,42 @@ function broadcastToRoom(io, room, event, data, excludeSocketId = null) {
             io.to(player.socketId).emit(event, data);
         }
     }
+    for (const spec of (room.spectators || [])) {
+        if (spec.socketId && spec.socketId !== excludeSocketId) {
+            io.to(spec.socketId).emit(event, data);
+        }
+    }
 }
+
+// Events a spectator is allowed to emit. Everything else is dropped server-side
+// with an error callback (if the packet carries one) so a client can't escalate
+// out of spectator mode by spoofing events.
+const SPECTATOR_ALLOWED_EVENTS = new Set([
+    'joinRoom', 'joinRoomAsSpectator', 'leaveRoom',
+    'sendChatMessage',
+    'disconnect', 'disconnecting',
+]);
 
 module.exports = function registerSocketHandlers(io) {
     io.on('connection', (socket) => {
         console.log(`[socket] connected: ${socket.id}`);
         let currentRoom = null;
         let currentUserId = null;
+        // True when this socket joined as a spectator (not a seated player).
+        let isSpectator = false;
 
-        // Auto-snapshot state before any mutating event for undo support
+        // Socket-level guard + auto-snapshot. Runs before every incoming event.
         socket.use((packet, next) => {
             const eventName = packet[0];
+            // Block mutating events from spectators. The check runs before
+            // SNAPSHOT_EVENTS so we don't push bogus undo entries.
+            if (isSpectator && !SPECTATOR_ALLOWED_EVENTS.has(eventName)) {
+                const maybeCallback = packet[packet.length - 1];
+                if (typeof maybeCallback === 'function') {
+                    maybeCallback({ error: 'Spectators cannot perform game actions' });
+                }
+                return; // swallow the event
+            }
             if (currentRoom && SNAPSHOT_EVENTS.has(eventName)) {
                 const room = getRoom(currentRoom);
                 if (room) pushUndo(room);
@@ -99,13 +183,25 @@ module.exports = function registerSocketHandlers(io) {
         socket.on('joinRoom', ({ roomCode, userId, username }, callback) => {
             const room = getRoom(roomCode);
             if (!room) return callback({ error: 'Room not found' });
-            if (room.players.length >= room.settings.maxPlayers) return callback({ error: 'Room is full' });
+            // If this user was previously spectating this room, drop the spectator
+            // entry before seating them as a player so they don't get duplicate
+            // gameState broadcasts.
+            const existingSpec = getSpectatorInRoom(room, userId);
+            if (existingSpec) {
+                room.spectators = room.spectators.filter(s => s.userId !== userId);
+            }
+            // Block joining as a player if room is full — spectators can still join.
+            const existingPlayer = getPlayerInRoom(room, userId);
+            if (!existingPlayer && room.players.length >= room.settings.maxPlayers) {
+                return callback({ error: 'Room is full' });
+            }
 
             currentUserId = userId;
             currentRoom = roomCode;
+            isSpectator = false;
 
             // Check if reconnecting
-            let player = getPlayerInRoom(room, userId);
+            let player = existingPlayer;
             if (player) {
                 player.socketId = socket.id;
                 player.username = username;
@@ -119,6 +215,62 @@ module.exports = function registerSocketHandlers(io) {
             socket.join(roomCode);
             broadcastRoomState(io, room);
             callback({ success: true, state: getRoomStateForPlayer(room, userId) });
+        });
+
+        socket.on('joinRoomAsSpectator', ({ roomCode, userId, username }, callback) => {
+            const room = getRoom(roomCode);
+            if (!room) return callback?.({ error: 'Room not found' });
+
+            // If this user is already a seated player, deny — they should just
+            // rejoin normally. Spectating a room you're playing in makes no sense.
+            if (getPlayerInRoom(room, userId)) {
+                return callback?.({ error: 'You are already a player in this room. Rejoin normally.' });
+            }
+
+            currentUserId = userId;
+            currentRoom = roomCode;
+            isSpectator = true;
+
+            // Reconnect path: if they were already spectating, just refresh socketId.
+            let spec = getSpectatorInRoom(room, userId);
+            if (spec) {
+                spec.socketId = socket.id;
+                spec.username = username;
+            } else {
+                spec = { userId, username, socketId: socket.id };
+                if (!room.spectators) room.spectators = [];
+                room.spectators.push(spec);
+            }
+
+            socket.join(roomCode);
+            broadcastRoomState(io, room);
+            callback?.({ success: true, state: getRoomStateForPlayer(room, userId, { isSpectator: true }) });
+        });
+
+        socket.on('sendChatMessage', ({ text }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const trimmed = (text || '').toString().trim().slice(0, 500);
+            if (!trimmed) return callback?.({ error: 'Empty message' });
+
+            // Look up the sender's username — from player record if seated, else
+            // the spectator record. currentUserId is set at join time.
+            const player = getPlayerInRoom(room, currentUserId);
+            const spec = getSpectatorInRoom(room, currentUserId);
+            const sender = player || spec;
+            if (!sender) return callback?.({ error: 'Not in room' });
+
+            const msg = appendChatMessage(room, {
+                userId: currentUserId,
+                username: sender.username,
+                text: trimmed,
+                isSpectator: !player,
+            });
+            // Broadcast just the new message so clients can append without
+            // re-rendering the whole board. gameState still carries full history
+            // for late joiners / reconnects.
+            broadcastToRoom(io, room, 'chatMessage', msg);
+            callback?.({ success: true });
         });
 
         socket.on('kickPlayer', ({ targetPlayerId }, callback) => {
@@ -146,8 +298,13 @@ module.exports = function registerSocketHandlers(io) {
             if (!currentRoom) return callback?.({ error: 'Not in a room' });
             const room = getRoom(currentRoom);
             if (room) {
-                const player = getPlayerInRoom(room, currentUserId);
-                if (player) player.socketId = null;
+                if (isSpectator) {
+                    // Spectators just get removed outright — no persistence required.
+                    room.spectators = (room.spectators || []).filter(s => s.userId !== currentUserId);
+                } else {
+                    const player = getPlayerInRoom(room, currentUserId);
+                    if (player) player.socketId = null;
+                }
                 broadcastRoomState(io, room);
                 if (room.players.every(p => !p.socketId)) {
                     stopAutoSave(currentRoom);
@@ -155,6 +312,7 @@ module.exports = function registerSocketHandlers(io) {
             }
             socket.leave(currentRoom);
             currentRoom = null;
+            isSpectator = false;
             callback?.({ success: true });
         });
 
@@ -535,7 +693,7 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true, library: player.zones.library });
         });
 
-        socket.on('tutorCard', ({ instanceId, toZone, shuffle }, callback) => {
+        socket.on('tutorCard', ({ instanceId, toZone, shuffle, libraryPosition }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             const player = getPlayerInRoom(room, currentUserId);
@@ -546,12 +704,57 @@ module.exports = function registerSocketHandlers(io) {
             const [card] = player.zones.library.splice(idx, 1);
             const dest = toZone || 'hand';
             if (dest !== 'battlefield') { card.tapped = false; card.x = 0; card.y = 0; }
-            player.zones[dest].push(card);
 
+            // If the destination is library, allow putting the card at a
+            // specific index (0 = top). Missing/undefined position → top.
+            if (dest === 'library') {
+                const pos = typeof libraryPosition === 'number'
+                    ? Math.max(0, Math.min(libraryPosition, player.zones.library.length))
+                    : 0;
+                player.zones.library.splice(pos, 0, card);
+            } else {
+                player.zones[dest].push(card);
+            }
+
+            // Shuffle is now opt-in only. Default is OFF because "tutor then
+            // shuffle" is the less common case — most search effects want you
+            // to put the card in hand without touching library order.
             if (shuffle) shuffleArray(player.zones.library);
 
             addAction(room, currentUserId, 'tutor', { cardName: card.name, toZone: dest, shuffled: !!shuffle });
             broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Reveal the current user's hand to a list of target players (or 'all').
+        socket.on('revealHand', ({ targetPlayerIds }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const player = getPlayerInRoom(room, currentUserId);
+            if (!player) return callback?.({ error: 'Not in room' });
+
+            const cards = player.zones.hand || [];
+            // Never send the reveal back to the sender — they already know
+            // what's in their own hand, the modal would be noise.
+            const targets = (targetPlayerIds === 'all'
+                ? room.players.filter(p => p.userId !== currentUserId)
+                : room.players.filter(p => (targetPlayerIds || []).includes(p.userId) && p.userId !== currentUserId));
+
+            for (const p of targets) {
+                if (p.socketId) {
+                    io.to(p.socketId).emit('handRevealed', {
+                        revealedBy: currentUserId,
+                        revealedByName: player.username,
+                        cards,
+                    });
+                }
+            }
+            // Spectators always see hands anyway, so no need to send to them.
+            addAction(room, currentUserId, 'revealHand', {
+                player: player.username,
+                handCount: cards.length,
+                to: targetPlayerIds === 'all' ? 'all' : `${targets.length} player(s)`,
+            });
             callback?.({ success: true });
         });
 
@@ -640,10 +843,11 @@ module.exports = function registerSocketHandlers(io) {
             }
             if (!foundCard) return callback?.({ error: 'Card not found' });
 
-            // Send to specific players or all
-            const targets = targetPlayerIds === 'all'
-                ? room.players
-                : room.players.filter(p => targetPlayerIds.includes(p.userId));
+            // Send to specific players or all. "All" means all OTHER players —
+            // no point spamming the sender with their own reveal.
+            const targets = (targetPlayerIds === 'all'
+                ? room.players.filter(p => p.userId !== currentUserId)
+                : room.players.filter(p => (targetPlayerIds || []).includes(p.userId) && p.userId !== currentUserId));
 
             for (const player of targets) {
                 if (player.socketId) {
@@ -669,8 +873,8 @@ module.exports = function registerSocketHandlers(io) {
             if (!player) return callback?.({ error: 'Player not found' });
 
             const oldLife = player.life;
-            player.life = life;
-            addAction(room, currentUserId, 'setLife', { target: player.username, from: oldLife, to: life });
+            player.life = clampGameValue(life);
+            addAction(room, currentUserId, 'setLife', { target: player.username, from: oldLife, to: player.life });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -681,7 +885,13 @@ module.exports = function registerSocketHandlers(io) {
             const player = getPlayerInRoom(room, targetPlayerId || currentUserId);
             if (!player) return callback?.({ error: 'Player not found' });
 
-            player.life += amount;
+            // If life is already at the infinite sentinel, don't move it —
+            // infinite +/- anything is still infinite.
+            if (player.life >= INFINITE) {
+                // Noop — already infinite.
+            } else {
+                player.life = clampGameValue((player.life || 0) + (typeof amount === 'number' ? amount : 0));
+            }
             addAction(room, currentUserId, 'adjustLife', { target: player.username, amount, newLife: player.life });
             broadcastRoomState(io, room);
             callback?.({ success: true });
@@ -694,8 +904,8 @@ module.exports = function registerSocketHandlers(io) {
             if (!player) return callback?.({ error: 'Player not found' });
 
             if (typeof player.counters !== 'object') player.counters = {};
-            player.counters[counter] = value;
-            addAction(room, currentUserId, 'setPlayerCounter', { target: player.username, counter, value });
+            player.counters[counter] = clampGameValue(value, { allowNegative: false });
+            addAction(room, currentUserId, 'setPlayerCounter', { target: player.username, counter, value: player.counters[counter] });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -707,12 +917,13 @@ module.exports = function registerSocketHandlers(io) {
             const card = findCardAnywhere(room, instanceId);
             if (!card) return callback?.({ error: 'Card not found' });
             if (typeof card.counters !== 'object') card.counters = {};
-            if (value === 0) {
+            const clamped = clampGameValue(value);
+            if (clamped === 0) {
                 delete card.counters[counter];
             } else {
-                card.counters[counter] = value;
+                card.counters[counter] = clamped;
             }
-            addAction(room, currentUserId, 'setCardCounter', { cardName: card.name, counter, value });
+            addAction(room, currentUserId, 'setCardCounter', { cardName: card.name, counter, value: clamped });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -732,7 +943,7 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
             const target = getPlayerInRoom(room, toPlayerId);
             if (!target) return callback?.({ error: 'Target not found' });
-            target.infect = Math.max(0, amount);
+            target.infect = clampGameValue(amount, { allowNegative: false });
             addAction(room, currentUserId, 'setInfect', { to: target.username, amount: target.infect });
             broadcastRoomState(io, room);
             callback?.({ success: true });
@@ -746,15 +957,17 @@ module.exports = function registerSocketHandlers(io) {
 
             if (typeof target.commanderDamageFrom !== 'object') target.commanderDamageFrom = {};
             const previous = target.commanderDamageFrom[fromPlayerId] || 0;
-            const delta = damage - previous;
-            target.commanderDamageFrom[fromPlayerId] = damage;
+            const clamped = clampGameValue(damage, { allowNegative: false });
+            const delta = clamped - previous;
+            target.commanderDamageFrom[fromPlayerId] = clamped;
 
-            // Apply delta to life total (default true)
-            if (applyToLife !== false && delta !== 0) {
-                target.life -= delta;
+            // Apply delta to life total (default true). Infinite life can't
+            // be reduced, and infinite damage will leave their life at 0.
+            if (applyToLife !== false && delta !== 0 && target.life < INFINITE) {
+                target.life = clampGameValue((target.life || 0) - delta);
             }
 
-            addAction(room, currentUserId, 'setCommanderDamage', { from: fromPlayerId, to: target.username, damage, lifeAdjusted: applyToLife !== false ? -delta : 0 });
+            addAction(room, currentUserId, 'setCommanderDamage', { from: fromPlayerId, to: target.username, damage: clamped, lifeAdjusted: applyToLife !== false ? -delta : 0 });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -889,23 +1102,60 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
 
             const endingPlayer = room.players[room.turnIndex];
-            room.turnIndex = (room.turnIndex + 1) % room.players.length;
+            // Only the current-turn player can end their own turn. The host is
+            // also allowed to advance for AFK/disconnected players, otherwise
+            // a stuck game can't progress.
+            if (endingPlayer && endingPlayer.userId !== currentUserId && room.hostId !== currentUserId) {
+                return callback?.({ error: "Only the current turn player (or host) can end the turn" });
+            }
+
+            // Log the turn ending explicitly — lets the action log show a
+            // clean "X ended their turn" → "Y's turn begins" sequence.
+            if (endingPlayer) {
+                addAction(room, currentUserId, 'turnEnd', { player: endingPlayer.username });
+            }
+
+            // Advance through eliminated players automatically. Safety cap
+            // equal to player count so we can't infinite-loop if everyone is
+            // somehow dead.
+            const total = room.players.length;
+            let advanced = 0;
+            do {
+                room.turnIndex = (room.turnIndex + 1) % total;
+                advanced++;
+            } while (isPlayerEliminated(room.players[room.turnIndex]) && advanced < total);
+
             room.currentPhase = 'untap';
             const newPlayer = room.players[room.turnIndex];
 
-            // Untap all of new turn player's battlefield
-            if (newPlayer && newPlayer.zones?.battlefield) {
+            // Auto-untap respects the new player's per-player toggle. Default
+            // is on; player can switch it off for upkeep effects like Thousand-
+            // Year Elixir or similar "doesn't untap" plays.
+            if (newPlayer && newPlayer.zones?.battlefield && newPlayer.autoUntap !== false) {
                 for (const card of newPlayer.zones.battlefield) {
                     card.tapped = false;
                 }
             }
 
-            addAction(room, currentUserId, 'nextTurn', { turnPlayer: newPlayer.username });
+            addAction(room, currentUserId, 'turnStart', { player: newPlayer?.username });
             broadcastToRoom(io, room, 'notification', {
                 type: 'turn',
-                message: `${newPlayer.username}'s turn`,
-                playerId: newPlayer.userId,
+                message: `${newPlayer?.username || '?'}'s turn`,
+                playerId: newPlayer?.userId,
             });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Toggle the per-player auto-untap setting. A player can only change
+        // their own flag (no forcing someone else's battlefield to untap).
+        socket.on('setAutoUntap', ({ value }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const player = getPlayerInRoom(room, currentUserId);
+            if (!player) return callback?.({ error: 'Not in room' });
+            player.autoUntap = !!value;
+            addAction(room, currentUserId, 'setAutoUntap', { value: !!value });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -967,12 +1217,16 @@ module.exports = function registerSocketHandlers(io) {
             const player = getPlayerInRoom(room, currentUserId);
             if (!player) return callback?.({ error: 'Not in room' });
 
-            // Mulligan cap: 0 (initial 7) -> 1 (6) -> 2 (5), then blocked
-            if ((player.mulliganCount || 0) >= 2) {
+            // Mulligan sequence: initial draw = 7 (mulliganCount 0).
+            //   mulligan 1 → draws 7 ("free" first mulligan)
+            //   mulligan 2 → draws 6
+            //   mulligan 3 → draws 5
+            //   mulligan 4+ → blocked
+            if ((player.mulliganCount || 0) >= 3) {
                 return callback?.({ error: 'No more mulligans (minimum 5 cards reached)' });
             }
             player.mulliganCount = (player.mulliganCount || 0) + 1;
-            const drawSize = 7 - player.mulliganCount;
+            const drawSize = 8 - player.mulliganCount;
 
             // Return hand to library
             player.zones.library.push(...player.zones.hand);
@@ -1042,6 +1296,20 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
+        // Erase specific strokes by id. The eraser tool runs hit-testing on
+        // the client and sends up the ids of strokes it touched. We rebroadcast
+        // an 'erasedStrokes' event so other clients can remove them without
+        // needing the full gameState round-trip.
+        socket.on('eraseStrokes', ({ strokeIds }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            if (!Array.isArray(strokeIds) || strokeIds.length === 0) return callback?.({ error: 'No strokes' });
+            const ids = new Set(strokeIds);
+            room.drawings = room.drawings.filter(d => !ids.has(d.strokeId));
+            broadcastToRoom(io, room, 'erasedStrokes', { strokeIds });
+            callback?.({ success: true });
+        });
+
         // ─── UNDO ───────────────────────────────────────────────────────
         socket.on('undo', (callback) => {
             const room = getRoom(currentRoom);
@@ -1094,9 +1362,11 @@ module.exports = function registerSocketHandlers(io) {
             }
 
             room.started = true;
+            room.winnerUserId = null; // clear any previous victor for rematches
             room.turnIndex = Math.floor(Math.random() * room.players.length); // random first player
             const firstPlayer = room.players[room.turnIndex];
             addAction(room, currentUserId, 'startGame', { firstPlayer: firstPlayer?.username });
+            addAction(room, currentUserId, 'turnStart', { player: firstPlayer?.username });
             broadcastToRoom(io, room, 'notification', {
                 type: 'game-start',
                 message: `Game started — ${firstPlayer?.username} goes first`,
@@ -1111,8 +1381,13 @@ module.exports = function registerSocketHandlers(io) {
             const room = getRoom(currentRoom);
             if (!room) return;
 
-            const player = getPlayerInRoom(room, currentUserId);
-            if (player) player.socketId = null;
+            if (isSpectator) {
+                // Drop spectator on disconnect — no reconnect state to preserve.
+                room.spectators = (room.spectators || []).filter(s => s.userId !== currentUserId);
+            } else {
+                const player = getPlayerInRoom(room, currentUserId);
+                if (player) player.socketId = null;
+            }
 
             broadcastRoomState(io, room);
 

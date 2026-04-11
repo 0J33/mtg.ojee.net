@@ -27,10 +27,19 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         if (!el) return;
         const rect = el.getBoundingClientRect();
         const zoomW = 320;
-        const panelW = 260;
-        const totalWidth = zoomW + panelW + 8;
+        // Only reserve room for the side panel if this card actually has
+        // counters/notes to display. Before this fix we reserved 260px + gap
+        // even for empty cards, which pushed left-side placements 260px too
+        // far off the left edge of the card the user was hovering.
+        const hasSideEffects = (Array.isArray(card.notes) && card.notes.length > 0)
+            || (card.counters && Object.values(card.counters).some(v => v !== 0));
+        const panelW = hasSideEffects ? 260 : 0;
+        const gap = hasSideEffects ? 8 : 0;
+        const totalWidth = zoomW + panelW + gap;
         const ZOOM_H = 460;
-        // Place to the right of the card by default; if not enough space, place to the left
+        // Place to the right of the card by default; if not enough space, place to the left.
+        // When flipped to the left, the preview extends leftward from the card,
+        // so posX = rect.left - totalWidth - margin.
         const spaceRight = window.innerWidth - rect.right;
         let posX;
         if (spaceRight >= totalWidth + 20) {

@@ -22,6 +22,8 @@ export const decks = {
     create: (deck) => request('/api/decks', { method: 'POST', body: JSON.stringify(deck) }),
     update: (id, deck) => request(`/api/decks/${id}`, { method: 'PUT', body: JSON.stringify(deck) }),
     delete: (id) => request(`/api/decks/${id}`, { method: 'DELETE' }),
+    share: (id) => request(`/api/decks/${id}/share`),
+    importShare: (code) => request('/api/decks/share/import', { method: 'POST', body: JSON.stringify({ code }) }),
 };
 
 export const imports = {
@@ -39,4 +41,6 @@ export const customCards = {
     create: (card) => request('/api/custom-cards', { method: 'POST', body: JSON.stringify(card) }),
     update: (id, card) => request(`/api/custom-cards/${id}`, { method: 'PUT', body: JSON.stringify(card) }),
     delete: (id) => request(`/api/custom-cards/${id}`, { method: 'DELETE' }),
+    share: (id) => request(`/api/custom-cards/${id}/share`),
+    importShare: (code) => request('/api/custom-cards/share/import', { method: 'POST', body: JSON.stringify({ code }) }),
 };

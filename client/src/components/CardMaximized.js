@@ -6,7 +6,7 @@ import ManaCost, { OracleText } from './ManaCost';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
-export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone }) {
+export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly }) {
     useEscapeKey(onClose);
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
     const [showRevealMenu, setShowRevealMenu] = useState(false);
@@ -46,7 +46,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                         <div className="card-effects-section">
                             <div className="card-effects-section-head">
                                 <strong>Counters</strong>
-                                {card.instanceId && (
+                                {card.instanceId && !readOnly && (
                                     <button
                                         className="small-btn"
                                         onClick={() => socket.emit('clearCardCounters', { instanceId: card.instanceId })}
@@ -56,7 +56,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                             {counterEntries.map(([name, val]) => (
                                 <div key={name} className="counter-line-max">
                                     <span>· <strong>{name}</strong> × {val}</span>
-                                    {card.instanceId && (
+                                    {card.instanceId && !readOnly && (
                                         <span className="counter-line-actions">
                                             <button
                                                 className="counter-step-btn"
@@ -96,7 +96,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                             />
                                         )}
                                         <span className="note-text"><OracleText text={noteObj.text} /></span>
-                                        {card.instanceId && (
+                                        {card.instanceId && !readOnly && (
                                             <button
                                                 className="note-remove-btn"
                                                 title="Remove note"
@@ -108,17 +108,22 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                             })}
                         </div>
                     )}
-                    {card.instanceId && (
+                    {card.instanceId && !readOnly && (
                         <div className="card-max-actions">
                             {/* Quick actions row */}
                             <div className="card-max-action-row">
                                 <button className="small-btn" onClick={() => socket.emit('tapCard', { instanceId: card.instanceId })}>
                                     {card.tapped ? 'Untap' : 'Tap'}
                                 </button>
-                                <button className="small-btn" onClick={() => socket.emit('flipCard', { instanceId: card.instanceId })}>Flip</button>
-                                <button className="small-btn" onClick={() => socket.emit('toggleFaceDown', { instanceId: card.instanceId })}>
-                                    {card.faceDown ? 'Face up' : 'Face down'}
-                                </button>
+                                {card.backImageUri ? (
+                                    <button className="small-btn" onClick={() => socket.emit('flipCard', { instanceId: card.instanceId })}>
+                                        {card.flipped ? 'Front' : 'Back'}
+                                    </button>
+                                ) : (
+                                    <button className="small-btn" onClick={() => socket.emit('toggleFaceDown', { instanceId: card.instanceId })}>
+                                        {card.faceDown ? 'Face up' : 'Face down'}
+                                    </button>
+                                )}
                                 {onAddCounter && (
                                     <button className="small-btn" onClick={() => onAddCounter(card)}>+ Counter</button>
                                 )}

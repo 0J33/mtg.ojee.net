@@ -3,6 +3,12 @@ const { v4: uuidv4 } = require('uuid');
 // In-memory game rooms (also saved to MongoDB periodically)
 const activeRooms = new Map();
 
+// "Infinite" sentinel — JSON can't encode JS Infinity (it becomes null when
+// passed through socket.io), so we use a large-but-safe integer that still
+// supports arithmetic (e.g. infinite + 1 = still infinite on the client).
+// Anything at or above this threshold is rendered as ∞ by the client.
+const INFINITE = 9999;
+
 function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
     let code = '';
@@ -66,7 +72,12 @@ function createPlayerState(userId, username) {
             commandZone: [],
         },
         teamId: null,
-        mulliganCount: 0, // 0 = haven't mulled, 1 = mulled once (drew 6), 2 = mulled twice (drew 5)
+        // Mulligan sequence: 0=initial 7, 1=draws 7 (free first mulligan),
+        // 2=draws 6, 3=draws 5, >=4 blocked.
+        mulliganCount: 0,
+        // Per-player flag — if true, their battlefield auto-untaps when their
+        // turn begins. Default on because most players expect it.
+        autoUntap: true,
     };
 }
 
@@ -78,6 +89,12 @@ function createRoom(hostId, hostUsername, settings = {}) {
         roomCode,
         hostId,
         players: [createPlayerState(hostId, hostUsername)],
+        // Spectators join the room to watch and chat but never hold a seat.
+        // Shape: { userId, username, socketId }. Not persisted to Mongo — ephemeral.
+        spectators: [],
+        // Shared chat log — last CHAT_HISTORY_LIMIT messages. Broadcast to players
+        // and spectators. Shape: { id, userId, username, text, ts, isSpectator }.
+        chat: [],
         drawings: [],
         turnIndex: 0,
         currentPhase: 'main1',
@@ -112,6 +129,31 @@ function getPlayerInRoom(room, userId) {
     return room.players.find(p => p.userId === userId);
 }
 
+function getSpectatorInRoom(room, userId) {
+    return (room.spectators || []).find(s => s.userId === userId);
+}
+
+// Keep only the last N chat messages to bound room memory usage. Any more and
+// long-running rooms eat memory and slow down gameState broadcasts.
+const CHAT_HISTORY_LIMIT = 200;
+
+function appendChatMessage(room, { userId, username, text, isSpectator }) {
+    if (!room.chat) room.chat = [];
+    const msg = {
+        id: uuidv4(),
+        userId,
+        username,
+        text,
+        ts: Date.now(),
+        isSpectator: !!isSpectator,
+    };
+    room.chat.push(msg);
+    if (room.chat.length > CHAT_HISTORY_LIMIT) {
+        room.chat = room.chat.slice(-CHAT_HISTORY_LIMIT);
+    }
+    return msg;
+}
+
 function addAction(room, playerId, type, data) {
     const action = { actionId: uuidv4(), playerId, type, data, timestamp: Date.now() };
     room.actionHistory.push(action);
@@ -128,8 +170,12 @@ function shuffleArray(arr) {
     return arr;
 }
 
-// Get sanitized room state for a specific player (hides private info)
-function getRoomStateForPlayer(room, userId) {
+// Get sanitized room state for a specific viewer.
+// opts.isSpectator — if true, all player hands are revealed (spectators see
+// everything but can't interact). Spectators never appear in `players`; they're
+// listed separately under `spectators` so the client can show "2 watching".
+function getRoomStateForPlayer(room, userId, opts = {}) {
+    const isSpectator = !!opts.isSpectator;
     return {
         roomCode: room.roomCode,
         hostId: room.hostId,
@@ -139,8 +185,20 @@ function getRoomStateForPlayer(room, userId) {
         teams: room.teams,
         started: room.started,
         drawings: room.drawings,
+        // Strip socketId from spectator list before sending to clients
+        spectators: (room.spectators || []).map(s => ({
+            userId: s.userId,
+            username: s.username,
+            connected: !!s.socketId,
+        })),
+        chat: room.chat || [],
+        // Send the recent action log so late joiners / spectators see history.
+        // actionHistory is already capped at 200 entries by addAction().
+        actionHistory: room.actionHistory || [],
+        viewerIsSpectator: isSpectator,
         players: room.players.map(p => {
-            const isOwner = p.userId === userId;
+            // Spectators see everyone's hand; players only see their own.
+            const canSeeHand = isSpectator || p.userId === userId;
             return {
                 userId: p.userId,
                 username: p.username,
@@ -154,9 +212,10 @@ function getRoomStateForPlayer(room, userId) {
                 designations: p.designations,
                 teamId: p.teamId,
                 mulliganCount: p.mulliganCount || 0,
+                autoUntap: p.autoUntap !== false,
                 connected: !!p.socketId,
                 zones: {
-                    hand: isOwner ? p.zones.hand : p.zones.hand.map(() => ({ hidden: true })),
+                    hand: canSeeHand ? p.zones.hand : p.zones.hand.map(() => ({ hidden: true })),
                     handCount: p.zones.hand.length,
                     library: [],
                     libraryCount: p.zones.library.length,
@@ -236,6 +295,10 @@ module.exports = {
     getRoom,
     deleteRoom,
     getPlayerInRoom,
+    getSpectatorInRoom,
+    appendChatMessage,
+    CHAT_HISTORY_LIMIT,
+    INFINITE,
     addAction,
     shuffleArray,
     getRoomStateForPlayer,

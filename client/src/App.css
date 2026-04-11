@@ -188,6 +188,26 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     letter-spacing: 0;
 }
 .delete-btn:hover { color: var(--danger); background: none; }
+/* Icon-only button — square, transparent background, used for rename / share
+   / similar actions where the icon carries the whole meaning. */
+.icon-btn {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.1s, border-color 0.1s;
+}
+.icon-btn:hover { color: var(--accent); border-color: var(--accent-dim); background: var(--bg-panel); }
+.icon-btn svg { display: block; }
+
 .close-btn {
     background: none;
     border: none;
@@ -201,6 +221,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     width: 24px;
     height: 24px;
     line-height: 1;
+    z-index: 6;
+}
+/* Inside a sticky modal-header the button flows with the header instead of
+   pinning to the modal's scroll origin (where it would scroll out of view). */
+.modal-header .close-btn {
+    position: static;
+    flex-shrink: 0;
 }
 .close-btn:hover { color: var(--text); background: none; }
 
@@ -236,11 +263,16 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     justify-content: center;
     z-index: 1000;
     backdrop-filter: blur(4px);
+    /* Fallback: if a modal's contents exceed its max-height (or a modal doesn't
+       use .modal and has no internal scroll), let the overlay itself scroll
+       instead of clipping the close button. */
+    overflow-y: auto;
+    padding: 20px 0;
 }
 .modal {
     background: var(--bg-panel);
     border: 1px solid var(--border);
-    padding: 30px;
+    padding: 0 30px 30px;
     border-radius: 4px;
     width: 90%;
     max-width: 520px;
@@ -253,9 +285,16 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    padding: 18px 0 14px;
     margin-bottom: 20px;
-    padding-bottom: 14px;
     border-bottom: 1px solid var(--border-soft);
+    /* Stick to the top of the scrollable modal so the close button is always
+       reachable on mobile even when the body content is very tall. */
+    position: sticky;
+    top: 0;
+    background: var(--bg-panel);
+    z-index: 5;
 }
 .modal h2 { font-size: 1.1em; letter-spacing: 3px; text-transform: uppercase; color: var(--text); }
 .modal h3 { font-size: 1em; letter-spacing: 2px; text-transform: uppercase; color: var(--text-mid); }
@@ -290,7 +329,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .commander-pick span { font-size: 0.75em; text-align: center; }
 
 /* ─── GAME BOARD ──────────────────────────────────────────── */
-.game-board { height: 100vh; display: flex; flex-direction: column; position: relative; background: var(--bg-deep); }
+.game-board {
+    height: 100vh;
+    /* dvh = dynamic viewport height; tracks the mobile browser URL bar as it
+       shows/hides so content doesn't get cut off by collapsing/revealing chrome. */
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--bg-deep);
+    overflow: hidden;
+}
 
 .game-topbar {
     display: flex;
@@ -315,7 +364,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     padding: 4px 12px;
     border: 1px solid var(--accent-dim);
     border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    text-transform: none;
 }
+.room-code.hidden { color: var(--text-dim); border-color: var(--border-soft); letter-spacing: 3px; }
+.room-code.hidden:hover { color: var(--accent); border-color: var(--accent-dim); }
+.room-code.revealed:hover { background: rgba(255,255,255,0.04); }
+.room-code-copied { margin-left: 6px; font-size: 0.75em; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
 .turn-info { font-size: 0.85em; color: var(--text-mid); font-style: italic; }
 .turn-info strong { color: var(--text); font-style: normal; font-family: 'Cinzel', serif; letter-spacing: 1px; }
 .topbar-right { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
@@ -737,12 +793,36 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .drawing-layer { position: absolute; inset: 0; pointer-events: none; z-index: 90; }
 .drawing-layer.active { z-index: 200; }
 .drawing-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.drawing-toolbar { position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: var(--bg-panel); border: 1px solid var(--border); padding: 10px 18px; border-radius: 4px; pointer-events: auto; z-index: 201; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
+.drawing-toolbar { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: var(--bg-panel); border: 1px solid var(--border); padding: 10px 18px; border-radius: 4px; pointer-events: auto; z-index: 201; box-shadow: 0 8px 30px rgba(0,0,0,0.7); max-width: 92vw; flex-wrap: wrap; justify-content: center; }
+.tool-picker { display: flex; gap: 4px; padding-right: 8px; border-right: 1px solid var(--border-soft); }
+.tool-btn { background: var(--bg-deep); border: 1px solid var(--border); color: var(--text-mid); padding: 6px 8px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tool-btn.active { background: var(--accent); color: var(--bg-deep); border-color: var(--accent); }
 .color-picker { display: flex; gap: 4px; }
 .color-swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; padding: 0; }
 .color-swatch.active { border-color: var(--text); transform: scale(1.2); }
 .brush-size input { width: 70px; }
-.drawing-toggle { position: absolute; bottom: 14px; right: 14px; pointer-events: auto; z-index: 201; padding: 8px; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+/* Pen button sits on the LEFT edge of the screen, vertically centered but
+   offset from chat (right edge) and the selection bar (bottom). Previously at
+   bottom-right where it covered opponent UI in 3-4 player layouts. */
+.drawing-toggle {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    z-index: 205;
+    padding: 10px 8px;
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 4px 4px 0;
+    border-left: none;
+    background: var(--bg-panel);
+    border-color: var(--border);
+    box-shadow: 4px 0 16px rgba(0,0,0,0.5);
+}
 .drawing-toggle.active { background: var(--accent); border-color: var(--accent); color: var(--bg-deep); }
 
 /* ─── DICE / COINS ────────────────────────────────────────── */
@@ -938,14 +1018,37 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .deck-card-mana { display: inline-flex; align-items: center; }
 
 /* ─── DECK BUILDER ────────────────────────────────────────── */
-.deck-builder-modal { max-width: 1200px; width: 95vw; max-height: 92vh; }
+.deck-builder-modal {
+    max-width: 1200px;
+    width: 95vw;
+    max-height: 92vh;
+    /* Flex column layout so db-body can take whatever vertical space is
+       actually left after the sticky header, name row, and actions bar,
+       instead of using a hardcoded 64vh that doesn't compose. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.deck-builder-modal .modal-header { flex-shrink: 0; }
+.deck-builder-modal .db-name-row { flex-shrink: 0; }
+.deck-builder-modal .modal-actions { flex-shrink: 0; margin-top: 14px; }
 .db-name-row { display: flex; gap: 12px; align-items: center; margin: 12px 0; }
 .db-name-row input { flex: 1; }
-.db-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-height: 64vh; overflow: hidden; }
+.db-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    /* Fill remaining vertical space in the flex column; `min-height: 0` lets
+       the grid items shrink below their content size so internal overflow
+       containers can scroll instead of pushing the parent taller. */
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
 .db-left, .db-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .db-left input { width: 100%; }
 .db-right { overflow-y: auto; padding: 0 4px; }
-.db-search-results { flex: 1; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.db-search-results { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
 .db-search-item { display: flex; gap: 10px; align-items: center; padding: 8px; background: var(--bg-deep); border: 1px solid var(--border-soft); border-radius: 2px; }
 .db-search-item:hover { border-color: var(--accent-dim); }
 .db-search-item img { width: 44px; height: 60px; object-fit: cover; border-radius: 3px; }
@@ -1050,8 +1153,33 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .modal-actions { flex-direction: column-reverse; }
     .modal-actions button { width: 100%; }
     .deck-builder-modal { width: 100vw; max-width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; }
-    .db-body { grid-template-columns: 1fr; max-height: none; overflow-y: auto; }
-    .card-maximized { flex-direction: column; gap: 16px; padding: 18px; max-width: 95vw; }
+    /* On mobile, switch to a single scrolling column. Drop the flex:1 +
+       overflow-hidden pattern the desktop layout uses, because with only one
+       column it was collapsing the search-results pane to zero height and
+       the deck-contents pane's inner scroll would disappear too. */
+    .db-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+    }
+    .db-left, .db-right {
+        flex: 0 0 auto;
+        overflow: visible;
+        min-height: 0;
+    }
+    .db-search-results {
+        flex: 0 0 auto;
+        overflow: visible;
+        max-height: none;
+    }
+    .db-right { padding: 0; overflow: visible; }
+    .card-maximized { flex-direction: column; gap: 16px; padding: 18px; max-width: 95vw; max-height: 90vh; overflow-y: auto; }
+    /* .card-maximized doesn't have a modal-header, so pin its close button to
+       the viewport so it's still reachable after scrolling the card content. */
+    .card-maximized > .close-btn { position: fixed; top: 14px; right: 14px; background: rgba(20,20,20,0.8); border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
     .card-maximized > img { width: 100%; max-width: 280px; align-self: center; }
     .card-max-info { max-width: 100%; }
 
@@ -1062,7 +1190,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .room-code { font-size: 0.8em; padding: 3px 8px; letter-spacing: 2px; }
     .turn-info { font-size: 0.75em; }
     .game-topbar .small-btn { padding: 4px 8px; font-size: 0.62em; letter-spacing: 1px; }
-    .compact-toggle { padding: 4px 8px; font-size: 0.62em; }
+    /* Compact mode is a desktop affordance only — on mobile the player zones
+       already stack vertically and there's no room for the toggle to do
+       anything useful. Hide it to claim back topbar space. */
+    .compact-toggle { display: none; }
 
     /* Player zones — stack vertically on mobile, never grid */
     .player-zones,
@@ -1165,7 +1296,416 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .oracle-text { font-size: 0.85em; }
 }
 
+/* ─── CUSTOM CARD MANAGER ─────────────────────────────────── */
+.custom-card-manager-modal { max-width: 640px; width: 95%; }
+.ccm-toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+.ccm-list { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; }
+.ccm-row { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--bg-deep); border: 1px solid var(--border-soft); border-radius: 2px; }
+.ccm-row:hover { border-color: var(--accent-dim); }
+.ccm-thumb { width: 44px; height: 60px; object-fit: cover; border-radius: 3px; }
+.ccm-info { flex: 1; min-width: 0; }
+.ccm-info strong { display: block; font-size: 0.9em; font-family: 'Cinzel', serif; }
+.ccm-actions { display: flex; gap: 4px; }
+.ccm-form { display: flex; flex-direction: column; gap: 10px; }
+.ccm-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 2px; color: var(--text-mid); }
+.ccm-form label input, .ccm-form label textarea { margin: 0; font-family: 'EB Garamond', serif; text-transform: none; letter-spacing: 0; font-size: 1em; color: var(--text); }
+.ccm-form-row { display: flex; gap: 10px; }
+.ccm-form-row label { flex: 1; }
+.ccm-preview { max-width: 200px; align-self: center; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+
+/* ─── INVITE CHOICE ───────────────────────────────────────── */
+.invite-choice-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+.invite-choice-card { max-width: 460px; width: 100%; padding: 32px; text-align: center; }
+.invite-choice-card h2 { font-family: 'Cinzel', serif; font-size: 1.3em; letter-spacing: 4px; text-transform: uppercase; margin: 0 0 14px; color: var(--accent); }
+.invite-choice-actions { display: flex; flex-direction: column; gap: 10px; margin: 22px 0 18px; }
+.invite-choice-actions button { padding: 14px 20px; font-size: 1em; letter-spacing: 2px; }
+.invite-choice-hint { font-size: 0.85em; line-height: 1.5; margin: 0 0 20px; }
+.invite-choice-cancel { background: transparent; border: none; color: var(--text-dim); font-size: 0.8em; cursor: pointer; letter-spacing: 1px; padding: 6px; }
+.invite-choice-cancel:hover { color: var(--text); background: transparent; }
+
+/* ─── CHAT ────────────────────────────────────────────────── */
+.chat-toggle {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    z-index: 210;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    color: var(--text-mid);
+    padding: 10px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.5);
+}
+.chat-toggle:hover { color: var(--accent); }
+.chat-toggle.open { right: 320px; }
+/* Global button:active sets transform: translateY(1px), which fights with the
+   -50% Y translation used to center this button and makes it visibly jump
+   every time it's clicked. Preserve the centering transform on press. */
+.chat-toggle:active { transform: translateY(-50%); }
+.drawing-toggle:active { transform: translateY(-50%); }
+.chat-unread-badge {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    background: var(--accent);
+    color: var(--bg-deep);
+    font-size: 0.65em;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    letter-spacing: 0;
+}
+.chat-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 320px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 30px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    z-index: 209;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+}
+.chat-panel.open { transform: translateX(0); }
+.chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+    position: relative;
+}
+.chat-header h3 { font-size: 0.95em; letter-spacing: 3px; text-transform: uppercase; color: var(--text); margin: 0; font-family: 'Cinzel', serif; }
+.chat-header .close-btn {
+    position: static;
+    width: 28px;
+    height: 28px;
+}
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.chat-empty { color: var(--text-faint); font-size: 0.85em; font-style: italic; text-align: center; padding-top: 40px; }
+.chat-msg {
+    padding: 6px 10px;
+    background: var(--bg-deep);
+    border-radius: 4px;
+    border-left: 2px solid var(--border);
+    font-size: 0.88em;
+    line-height: 1.35;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.chat-msg.mine { border-left-color: var(--accent); }
+.chat-msg.spectator { border-left-color: var(--text-faint); background: rgba(255,255,255,0.02); }
+.chat-msg-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.chat-msg-user { font-family: 'Cinzel', serif; letter-spacing: 1px; font-size: 0.72em; color: var(--accent); text-transform: uppercase; }
+.chat-msg.spectator .chat-msg-user { color: var(--text-faint); }
+.chat-msg-time { font-size: 0.65em; color: var(--text-faint); font-family: monospace; }
+.chat-msg-text { color: var(--text); white-space: pre-wrap; }
+.chat-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border-soft);
+    flex-shrink: 0;
+}
+.chat-input {
+    flex: 1;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 0.9em;
+    resize: none;
+}
+.chat-input:focus { outline: none; border-color: var(--accent-dim); }
+.chat-send-btn { padding: 6px 12px; font-size: 0.75em; }
+
+/* ─── ACTION LOG PANEL ─────────────────────────────────────── */
+.action-log-toggle {
+    position: fixed;
+    top: calc(50% + 64px);
+    right: 0;
+    transform: translateY(0);
+    z-index: 208;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    color: var(--text-mid);
+    padding: 10px 8px;
+    cursor: pointer;
+}
+.action-log-toggle:hover { color: var(--accent); }
+.action-log-toggle:active { transform: translateY(0); }
+.action-log-toggle.open { right: 340px; }
+.action-log-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 340px;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 30px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    z-index: 207;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+}
+.action-log-panel.open { transform: translateX(0); }
+.action-log-messages { flex: 1; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+.action-log-entry { display: flex; gap: 8px; align-items: baseline; padding: 4px 6px; border-left: 2px solid var(--border); background: var(--bg-deep); border-radius: 2px; font-size: 0.82em; line-height: 1.3; }
+.action-log-entry.type-turnStart,
+.action-log-entry.type-turnEnd { border-left-color: var(--accent); }
+.action-log-entry.type-victory { border-left-color: gold; background: rgba(255, 215, 0, 0.08); }
+.action-log-entry.type-startGame { border-left-color: var(--accent); }
+.action-log-time { font-family: monospace; font-size: 0.7em; color: var(--text-faint); flex-shrink: 0; }
+.action-log-text { color: var(--text); word-wrap: break-word; overflow-wrap: break-word; min-width: 0; }
+
+@media (max-width: 900px) {
+    .action-log-panel { width: 85vw; max-width: 340px; }
+    .action-log-toggle.open { right: min(85vw, 340px); }
+}
+
+/* ─── SPECTATOR LIST POPOVER ───────────────────────────────── */
+.spectator-count-wrapper { position: relative; display: inline-block; }
+.spectator-count { background: transparent; border: 1px solid var(--border-soft); color: var(--text-dim); font-size: 0.75em; padding: 3px 8px; border-radius: 2px; cursor: pointer; font-style: italic; font-family: inherit; }
+.spectator-count:hover { color: var(--accent); border-color: var(--accent-dim); }
+.spectator-list-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 180px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 4px;
+    z-index: 220;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+}
+.spectator-list-head { font-family: 'Cinzel', serif; font-size: 0.7em; letter-spacing: 2px; text-transform: uppercase; color: var(--text-mid); padding: 4px 12px 6px; border-bottom: 1px solid var(--border-soft); margin-bottom: 4px; }
+.spectator-list-row { padding: 6px 12px; font-size: 0.85em; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.spectator-list-row.offline { color: var(--text-faint); }
+.spectator-list-row .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
+.spectator-list-row .dot.online { background: #4caf50; }
+
+/* ─── REVEALED HAND VIEWER ─────────────────────────────────── */
+.revealed-hand-modal { max-width: 860px; width: 95%; }
+.revealed-hand-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 8px 0; }
+.revealed-hand-card { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.revealed-hand-card img { width: 100%; max-width: 180px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+.revealed-hand-name { font-size: 0.8em; color: var(--text-mid); text-align: center; font-family: 'Cinzel', serif; }
+
+/* ─── VICTORY OVERLAY ──────────────────────────────────────── */
+.victory-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    background: radial-gradient(ellipse at center, rgba(40, 20, 0, 0.85) 0%, rgba(0, 0, 0, 0.92) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    animation: victoryFade 0.6s ease-out;
+}
+.victory-content {
+    text-align: center;
+    color: gold;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.6), 0 4px 16px rgba(0, 0, 0, 0.9);
+    animation: victoryRise 0.8s ease-out;
+}
+.victory-crown { font-size: 5em; animation: victoryBounce 1.5s ease-in-out infinite; }
+.victory-label { font-family: 'Cinzel', serif; font-size: 3em; letter-spacing: 8px; text-transform: uppercase; margin-top: 8px; }
+.victory-name { font-family: 'Cinzel', serif; font-size: 2.4em; color: #fff; letter-spacing: 4px; margin-top: 12px; }
+.victory-sub { font-family: 'EB Garamond', serif; font-size: 1.1em; color: var(--text-mid); font-style: italic; margin-top: 8px; letter-spacing: 1px; }
+@keyframes victoryFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes victoryRise {
+    from { transform: translateY(40px) scale(0.8); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes victoryBounce {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    50% { transform: translateY(-12px) rotate(5deg); }
+}
+
+/* ─── GUIDE / HOW-TO-PLAY ─────────────────────────────────── */
+.guide-modal {
+    max-width: 640px;
+    width: 90%;
+}
+.guide-body {
+    min-height: 280px;
+    padding: 4px 2px 12px;
+    font-size: 0.95em;
+    line-height: 1.55;
+    color: var(--text);
+}
+.guide-body p { margin: 0 0 14px; }
+.guide-body ul { margin: 0 0 14px 18px; padding: 0; }
+.guide-body li { margin: 0 0 6px; }
+.guide-body strong { color: var(--text); }
+.guide-body em { color: var(--accent); font-style: italic; }
+.guide-body kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 0.85em;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    box-shadow: 0 1px 0 var(--border);
+    color: var(--text-mid);
+    margin: 0 1px;
+}
+.guide-lede {
+    font-size: 1.05em;
+    color: var(--text-mid);
+}
+.guide-tip {
+    background: rgba(255,255,255,0.03);
+    border-left: 2px solid var(--accent);
+    padding: 8px 12px;
+    border-radius: 2px;
+    font-size: 0.9em;
+    color: var(--text-mid);
+}
+.guide-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+    margin-top: 8px;
+}
+.guide-arrow {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 0.95em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+}
+.guide-arrow:hover:not(:disabled) { background: var(--bg-panel); border-color: var(--accent-dim); color: var(--accent); }
+.guide-arrow:disabled { opacity: 0.3; cursor: default; }
+.guide-dots {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.guide-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+}
+.guide-dot:hover { background: var(--text-dim); transform: scale(1.2); }
+.guide-dot.active { background: var(--accent); transform: scale(1.2); }
+
+/* Spectator badge in topbar */
+.spectator-badge {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    color: var(--text-faint);
+    letter-spacing: 3px;
+    font-size: 0.8em;
+    padding: 4px 10px;
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-transform: uppercase;
+}
+.spectator-count {
+    font-size: 0.75em;
+    color: var(--text-faint);
+    font-style: italic;
+}
+
+@media (max-width: 900px) {
+    .chat-panel { width: 85vw; max-width: 340px; }
+    .chat-toggle.open { right: min(85vw, 340px); }
+}
+
 /* Touch devices: Disable hover zoom entirely (overrides desktop pointer hover) */
 @media (hover: none) {
     .card-zoom-wrapper { display: none !important; }
+
+    /* Suppress the iOS/Android long-press "save image" / "copy link" callout
+       and text-selection highlight inside the game board so dragging cards
+       and players isn't constantly interrupted by the system context menu or
+       an accidental text selection. Interactive text (inputs, textareas,
+       editable cells) still needs to be selectable, so we re-enable it
+       explicitly. */
+    .game-board,
+    .game-board img,
+    .card,
+    .card img,
+    .player-zone,
+    .drawing-layer,
+    .lobby-page {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .game-board img,
+    .card img {
+        /* Belt + suspenders: some Android browsers still drag images natively. */
+        -webkit-user-drag: none;
+        user-drag: none;
+        pointer-events: none;
+    }
+    /* Re-enable selection on actual text inputs/editables so the user can still
+       type notes, counter names, etc. */
+    .game-board input,
+    .game-board textarea,
+    .game-board [contenteditable="true"],
+    .modal input,
+    .modal textarea {
+        -webkit-user-select: text;
+        user-select: text;
+        -webkit-touch-callout: default;
+    }
 }

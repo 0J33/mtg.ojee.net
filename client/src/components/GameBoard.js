@@ -11,10 +11,13 @@ import ContextMenu from './ContextMenu';
 import LibrarySearch from './LibrarySearch';
 import ManaCost from './ManaCost';
 import CounterModal from './CounterModal';
+import Chat from './Chat';
+import Guide from './Guide';
+import ActionLog from './ActionLog';
 import { useDialog } from './Dialog';
-import { useEscapeKey, useIsTouchDevice } from '../utils';
+import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 
-export default function GameBoard({ user, gameState, roomCode, onLeave, revealedCard, onDismissReveal }) {
+export default function GameBoard({ user, gameState, roomCode, isSpectator, onLeave, revealedCard, onDismissReveal, revealedHand, onDismissRevealedHand }) {
     const dialog = useDialog();
     const isTouch = useIsTouchDevice();
     const [showSearch, setShowSearch] = useState(null); // null, 'token', 'add'
@@ -38,6 +41,13 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
     const [compactMode, setCompactMode] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [counterModalCard, setCounterModalCard] = useState(null); // card object whose counters are being edited
+    const [roomCodeRevealed, setRoomCodeRevealed] = useState(false); // room code hidden by default; click to show
+    const [roomCodeCopied, setRoomCodeCopied] = useState(false);
+    const [chatOpen, setChatOpen] = useState(false);
+    const [guideOpen, setGuideOpen] = useState(false);
+    const [actionLogOpen, setActionLogOpen] = useState(false);
+    const [showSpectatorList, setShowSpectatorList] = useState(false);
+    const [victoryAnim, setVictoryAnim] = useState(null); // { username, ts }
 
     // Find the freshest version of the maximized card from current gameState
     // (so notes/counters reflect immediately without needing a useEffect race)
@@ -77,6 +87,16 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
         };
         socket.on('notification', handler);
         return () => socket.off('notification', handler);
+    }, []);
+
+    // Victory event — show a fullscreen animation overlay for ~6s.
+    useEffect(() => {
+        const handler = (payload) => {
+            setVictoryAnim(payload);
+            setTimeout(() => setVictoryAnim(null), 6500);
+        };
+        socket.on('victory', handler);
+        return () => socket.off('victory', handler);
     }, []);
 
     const toggleSelect = useCallback((id) => {
@@ -241,6 +261,27 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
             };
         });
 
+        const isSelfMenu = player.userId === user.id;
+
+        // Items only meaningful for your own menu: auto-untap toggle and
+        // reveal-hand actions. Others see commander damage / kick / infect etc.
+        const selfOnlyItems = isSelfMenu ? [
+            { divider: true },
+            {
+                label: `Auto-untap on turn start: ${player.autoUntap !== false ? 'ON' : 'OFF'}`,
+                onClick: () => socket.emit('setAutoUntap', { value: !(player.autoUntap !== false) }),
+            },
+            { divider: true },
+            {
+                label: 'Reveal hand to all',
+                onClick: () => socket.emit('revealHand', { targetPlayerIds: 'all' }, () => {}),
+            },
+            ...gameState.players.filter(p => p.userId !== user.id).map(p => ({
+                label: `Reveal hand to ${p.username}`,
+                onClick: () => socket.emit('revealHand', { targetPlayerIds: [p.userId] }, () => {}),
+            })),
+        ] : [];
+
         const items = [
             { label: 'Add Counter', onClick: () => handleAddCounter(player.userId) },
             { divider: true },
@@ -265,6 +306,7 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                 label: 'Reset Commander Deaths',
                 onClick: () => socket.emit('setCommanderDeaths', { targetPlayerId: player.userId, value: 0 }),
             }] : []),
+            ...selfOnlyItems,
             ...(isHost && player.userId !== user.id ? [
                 { divider: true },
                 {
@@ -290,14 +332,21 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
         const fromPlayer = gameState.players.find(p => p.userId === fromId);
         const current = target?.commanderDamageFrom?.[fromId] || 0;
         const input = await dialog.prompt(
-            `Commander damage from ${fromPlayer?.username || '?'} to ${target?.username || '?'}\nCurrent: ${current}/21\nEnter amount to add (negative to remove). Affects life total.`,
+            `Commander damage from ${fromPlayer?.username || '?'} to ${target?.username || '?'}\nCurrent: ${fmtNum(current)}/21\nEnter amount to add (negative to remove, "∞" for infinite). Affects life total.`,
             '1',
-            { title: 'Commander damage', inputType: 'number' }
+            { title: 'Commander damage' }
         );
         if (input === null) return;
-        const delta = parseInt(input);
-        if (isNaN(delta)) return;
-        const newDamage = Math.max(0, current + delta);
+        // Accept "∞"/"inf" or a plain delta.
+        const s = String(input).trim().toLowerCase();
+        let newDamage;
+        if (s === '∞' || s === 'inf' || s === 'infinity') {
+            newDamage = INFINITE;
+        } else {
+            const delta = parseInt(s);
+            if (isNaN(delta)) return;
+            newDamage = isInfinite(current) ? INFINITE : Math.max(0, current + delta);
+        }
         socket.emit('setCommanderDamage', { fromPlayerId: fromId, toPlayerId: toId, damage: newDamage });
     };
 
@@ -305,14 +354,20 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
         const target = gameState.players.find(p => p.userId === toId);
         const current = target?.infect || 0;
         const input = await dialog.prompt(
-            `Poison counters on ${target?.username || '?'}\nCurrent: ${current}/10\nEnter amount to add (negative to remove). 10 = death.`,
+            `Poison counters on ${target?.username || '?'}\nCurrent: ${fmtNum(current)}/10\nEnter amount to add (negative to remove, "∞" for infinite). 10 = death.`,
             '1',
-            { title: 'Infect / poison', inputType: 'number' }
+            { title: 'Infect / poison' }
         );
         if (input === null) return;
-        const delta = parseInt(input);
-        if (isNaN(delta)) return;
-        const newAmount = Math.max(0, current + delta);
+        const s = String(input).trim().toLowerCase();
+        let newAmount;
+        if (s === '∞' || s === 'inf' || s === 'infinity') {
+            newAmount = INFINITE;
+        } else {
+            const delta = parseInt(s);
+            if (isNaN(delta)) return;
+            newAmount = isInfinite(current) ? INFINITE : Math.max(0, current + delta);
+        }
         socket.emit('setInfect', { toPlayerId: toId, amount: newAmount });
     };
 
@@ -321,49 +376,105 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
         if (!name) return;
         const target = gameState.players.find(p => p.userId === playerId);
         const current = target?.counters?.[name] || 0;
-        const valStr = await dialog.prompt(`Value for ${name}?`, (current + 1).toString(), { title: 'Counter value', inputType: 'number' });
+        const valStr = await dialog.prompt(`Value for ${name}?`, fmtNum(current + 1), { title: 'Counter value' });
         if (valStr === null) return;
-        const val = parseInt(valStr);
+        const val = parseGameValue(valStr);
         if (!isNaN(val)) socket.emit('setPlayerCounter', { targetPlayerId: playerId, counter: name, value: val });
     };
 
     const gameStarted = !!gameState.started;
     const myMulliganCount = me?.mulliganCount || 0;
-    const canMulligan = !gameStarted || myMulliganCount < 2;
+    // Mulligan sequence: initial draw 7 → mulligan 1 draws 7 → 2 draws 6 →
+    // 3 draws 5 → blocked. Allow up to 3 mulligans total.
+    const canMulligan = !gameStarted || myMulliganCount < 3;
 
     return (
         <div className={`game-board ${compactMode ? 'compact-mode' : ''}`}>
             {/* Top bar */}
             <div className="game-topbar">
                 <div className="topbar-left">
-                    <span className="room-code">Room: {roomCode || gameState.roomCode}</span>
+                    <button
+                        type="button"
+                        className={`room-code ${roomCodeRevealed ? 'revealed' : 'hidden'}`}
+                        title={roomCodeRevealed ? 'Click to copy invite link' : 'Click to reveal room code'}
+                        onClick={async () => {
+                            const code = roomCode || gameState.roomCode;
+                            if (!roomCodeRevealed) {
+                                setRoomCodeRevealed(true);
+                                return;
+                            }
+                            // Already revealed — a second click copies the invite link.
+                            try {
+                                const url = `${window.location.origin}/invite/${code}`;
+                                await navigator.clipboard?.writeText(url);
+                                setRoomCodeCopied(true);
+                                setTimeout(() => setRoomCodeCopied(false), 1500);
+                            } catch (err) {
+                                console.warn('[room-code] copy failed:', err);
+                            }
+                        }}
+                    >
+                        Room: {roomCodeRevealed ? (roomCode || gameState.roomCode) : '••••••'}
+                        {roomCodeCopied && <span className="room-code-copied"> copied</span>}
+                    </button>
                     <span className="turn-info">
                         Turn: <strong>{turnPlayer?.username || '?'}</strong>
                     </span>
-                    {gameStarted && (
+                    {gameStarted && !isSpectator && (
                         <button onClick={handleNextTurn} className="small-btn turn-end-btn">End Turn</button>
+                    )}
+                    {isSpectator && <span className="spectator-badge">Spectating</span>}
+                    {gameState.spectators && gameState.spectators.length > 0 && (
+                        <span className="spectator-count-wrapper">
+                            <button
+                                className="spectator-count"
+                                type="button"
+                                onClick={() => setShowSpectatorList(v => !v)}
+                                title="Click to see who's watching"
+                            >
+                                👁 {gameState.spectators.length} watching
+                            </button>
+                            {showSpectatorList && (
+                                <div className="spectator-list-popover" onMouseLeave={() => setShowSpectatorList(false)}>
+                                    <div className="spectator-list-head">Spectators</div>
+                                    {gameState.spectators.map(s => (
+                                        <div key={s.userId} className={`spectator-list-row ${s.connected ? 'online' : 'offline'}`}>
+                                            <span className={`dot ${s.connected ? 'online' : 'offline'}`} />
+                                            {s.username}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </span>
                     )}
                 </div>
                 <div className="topbar-right">
-                    {!gameStarted && isHost && (
+                    {/* Spectators don't get any game-action buttons — they can
+                        only view, chat, and open the guide. All mutating events
+                        are also rejected server-side as a backstop. */}
+                    {!isSpectator && !gameStarted && isHost && (
                         <button onClick={handleStartGame} className="primary-btn small-btn">Start Game</button>
                     )}
-                    {!gameStarted && (
+                    {!isSpectator && !gameStarted && (
                         <button onClick={handleLoadDeck} className="small-btn">Load Deck</button>
                     )}
-                    {gameStarted && (
+                    {!isSpectator && gameStarted && (
                         <>
                             <button onClick={handleUntapAll} className="small-btn">Untap All</button>
                             <button onClick={handleUndo} className="small-btn">Undo</button>
                             <button onClick={() => setShowSearch('token')} className="small-btn">Tokens</button>
                             <button onClick={() => setShowSearch('add')} className="small-btn">Search</button>
                             <button onClick={handleViewLibrary} className="small-btn">View Deck</button>
-                            <button onClick={handleMulligan} className="small-btn" disabled={!canMulligan} title={canMulligan ? `Mulligan (${7 - myMulliganCount - 1} cards next)` : 'No more mulligans'}>Mulligan</button>
+                            <button onClick={handleMulligan} className="small-btn" disabled={!canMulligan} title={canMulligan ? `Mulligan (draws ${Math.max(5, 8 - (myMulliganCount + 1))} next)` : 'No more mulligans'}>Mulligan</button>
                             <button onClick={() => setShowDicePicker(true)} className="small-btn">Roll</button>
                             <button onClick={() => setCustomCardModal(true)} className="small-btn">Custom</button>
                         </>
                     )}
-                    <button onClick={() => setBgModal(true)} className="small-btn">BG</button>
+                    {!isSpectator && (
+                        <button onClick={() => setBgModal(true)} className="small-btn">BG</button>
+                    )}
+                    <button onClick={() => setGuideOpen(true)} className="small-btn" title="How to play">Guide</button>
+                    <button onClick={() => setActionLogOpen(o => !o)} className="small-btn" title="Action log">Log</button>
                     <label className="compact-toggle small-btn" title="Toggle compact layout">
                         <input type="checkbox" checked={compactMode} onChange={e => setCompactMode(e.target.checked)} />
                         Compact
@@ -395,6 +506,7 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                                     compact={compactMode && !isSelf}
                                     isCurrentTurn={idx === gameState.turnIndex}
                                     touchMode={isTouch}
+                                    spectating={isSpectator}
                                 />
                             </div>
                         );
@@ -419,8 +531,10 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                 })()}
             </div>
 
-            {/* Selection action bar */}
-            {selectedIds.size > 0 && (
+            {/* Selection action bar — hidden for spectators, since all the
+                actions it exposes mutate shared state and the server would
+                reject them anyway. */}
+            {!isSpectator && selectedIds.size > 0 && (
                 <div className={`selection-bar ${isTouch ? 'touch-toolbar' : ''}`}>
                     <span className="selection-count">
                         {selectedIds.size === 1 && firstSelectedCard
@@ -433,10 +547,15 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                             <button onClick={() => setMaximizedCard(firstSelectedCard)}>View</button>
                             <button onClick={() => setCounterModalCard(firstSelectedCard)}>+Counter</button>
                             <button onClick={() => setNoteEditor({ instanceId: firstSelectedCard.instanceId })}>Note</button>
-                            <button onClick={() => socket.emit('flipCard', { instanceId: firstSelectedCard.instanceId })}>Flip</button>
-                            <button onClick={() => socket.emit('toggleFaceDown', { instanceId: firstSelectedCard.instanceId })}>
-                                {firstSelectedCard.faceDown ? 'Face up' : 'Face down'}
-                            </button>
+                            {firstSelectedCard.backImageUri ? (
+                                <button onClick={() => socket.emit('flipCard', { instanceId: firstSelectedCard.instanceId })}>
+                                    {firstSelectedCard.flipped ? 'Front' : 'Back'}
+                                </button>
+                            ) : (
+                                <button onClick={() => socket.emit('toggleFaceDown', { instanceId: firstSelectedCard.instanceId })}>
+                                    {firstSelectedCard.faceDown ? 'Face up' : 'Face down'}
+                                </button>
+                            )}
                             <button onClick={() => socket.emit('revealCard', { instanceId: firstSelectedCard.instanceId, targetPlayerIds: 'all' })}>Reveal</button>
                         </>
                     )}
@@ -451,12 +570,67 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                 </div>
             )}
 
-            {/* Drawing overlay */}
+            {/* Drawing overlay — spectators see everyone's strokes but can't
+                draw. Pass a no-op toggle + forced-off enabled so the canvas is
+                purely read-only and the toggle button is hidden by CSS below. */}
             <DrawingCanvas
                 drawings={gameState.drawings}
-                enabled={drawingEnabled}
-                onToggle={() => setDrawingEnabled(!drawingEnabled)}
+                enabled={!isSpectator && drawingEnabled}
+                onToggle={isSpectator ? () => {} : (() => setDrawingEnabled(!drawingEnabled))}
+                hideToggle={isSpectator}
             />
+
+            {/* Chat — always rendered, collapsible */}
+            <Chat
+                messages={gameState.chat || []}
+                currentUserId={user.id}
+                open={chatOpen}
+                onToggle={() => setChatOpen(o => !o)}
+            />
+
+            {/* Action log — slide-in side panel, visible to players and spectators */}
+            <ActionLog
+                history={gameState.actionHistory || []}
+                players={gameState.players}
+                open={actionLogOpen}
+                onToggle={() => setActionLogOpen(o => !o)}
+            />
+
+            {/* Guide / How-to-play */}
+            {guideOpen && <Guide onClose={() => setGuideOpen(false)} />}
+
+            {/* Revealed hand viewer — fired by handRevealed socket event */}
+            {revealedHand && (
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onDismissRevealedHand(); }}>
+                    <div className="modal revealed-hand-modal">
+                        <div className="modal-header">
+                            <h3>{revealedHand.revealedByName || 'Someone'} revealed their hand</h3>
+                            <button className="close-btn" onClick={onDismissRevealedHand}>x</button>
+                        </div>
+                        <div className="revealed-hand-grid">
+                            {(revealedHand.cards || []).length === 0 && <div className="muted">Empty hand.</div>}
+                            {(revealedHand.cards || []).map((c, i) => (
+                                <div key={c.instanceId || i} className="revealed-hand-card">
+                                    {c.imageUri && <img src={c.imageUri} alt={c.name} />}
+                                    <div className="revealed-hand-name">{c.name}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Victory animation overlay */}
+            {victoryAnim && (
+                <div className="victory-overlay">
+                    <div className="victory-content">
+                        <div className="victory-crown">👑</div>
+                        <div className="victory-label">Victory</div>
+                        <div className="victory-name">{victoryAnim.username}</div>
+                        <div className="victory-sub">is the last player standing</div>
+                    </div>
+                </div>
+            )}
 
             {/* Modals */}
             {showSearch && <CardSearch mode={showSearch} onClose={() => setShowSearch(null)} />}
@@ -465,11 +639,12 @@ export default function GameBoard({ user, gameState, roomCode, onLeave, revealed
                     card={liveMaximizedCard}
                     onClose={() => setMaximizedCard(null)}
                     onClickCard={(c) => setMaximizedCard(c)}
-                    onAddNote={(instanceId) => setNoteEditor({ instanceId })}
-                    onAddCounter={(c) => setCounterModalCard(c)}
+                    onAddNote={isSpectator ? undefined : (instanceId) => setNoteEditor({ instanceId })}
+                    onAddCounter={isSpectator ? undefined : (c) => setCounterModalCard(c)}
                     allPlayers={gameState.players}
                     userId={user.id}
                     currentZone={liveMaximizedInfo?.zone}
+                    readOnly={isSpectator}
                 />
             )}
             {noteEditor && <NoteEditor instanceId={noteEditor.instanceId} onClose={() => setNoteEditor(null)} />}

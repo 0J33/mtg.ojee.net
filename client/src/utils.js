@@ -1,5 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 
+// Must match server's gameState.INFINITE sentinel. Values at or above this
+// threshold render as "∞" in the UI so combo players can express infinite
+// resources (life, poison counters, commander damage, etc.) without tripping
+// JSON serialization (JSON can't encode JS Infinity).
+export const INFINITE = 9999;
+
+export function isInfinite(v) {
+    return typeof v === 'number' && v >= INFINITE;
+}
+
+// Format a numeric value for display — returns "∞" for values at/above the
+// infinite threshold, or the number as-is. Accepts null/undefined and returns
+// a dash for those.
+export function fmtNum(v) {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'number' && v >= INFINITE) return '∞';
+    if (typeof v === 'number' && v <= -INFINITE) return '-∞';
+    return String(v);
+}
+
+// Parse user input for a game-value field. Accepts numbers, or strings like
+// "∞" / "inf" / "infinity". Returns a number (INFINITE for infinite input),
+// or NaN if the input can't be parsed.
+export function parseGameValue(input) {
+    if (input === null || input === undefined) return NaN;
+    if (typeof input === 'number') return input;
+    const s = String(input).trim().toLowerCase();
+    if (s === '') return NaN;
+    if (s === '∞' || s === 'inf' || s === 'infinity' || s === 'infinite') return INFINITE;
+    const n = parseInt(s, 10);
+    return isNaN(n) ? NaN : n;
+}
+
 export function v4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = (Math.random() * 16) | 0;

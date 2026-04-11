@@ -4,9 +4,9 @@ import Card from './Card';
 import ContextMenu from './ContextMenu';
 import NoteEditor from './NoteEditor';
 import CounterModal from './CounterModal';
-import { useEscapeKey, useHorizontalWheel } from '../utils';
+import { useEscapeKey, useHorizontalWheel, fmtNum, parseGameValue, isInfinite, INFINITE } from '../utils';
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating }) {
     const [contextMenu, setContextMenu] = useState(null);
     const [expandedZone, setExpandedZone] = useState(null);
     const [editingLife, setEditingLife] = useState(false);
@@ -29,6 +29,14 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     };
 
     const handleCardClick = (e, card) => {
+        // Spectators can only view cards — skip selection logic entirely and
+        // go straight to the maximized viewer.
+        if (spectating) {
+            e.preventDefault();
+            e.stopPropagation();
+            onMaximizeCard(card);
+            return;
+        }
         if (e.shiftKey || e.ctrlKey || e.metaKey) {
             e.preventDefault();
             e.stopPropagation();
@@ -51,6 +59,9 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     const handleCardContext = (e, card, zone) => {
         e.preventDefault();
         e.stopPropagation();
+        // Spectators don't get a card context menu — everything in it mutates
+        // state that the server would reject anyway.
+        if (spectating) return;
         // On touch devices the right-click context menu is unreachable; the
         // sticky bottom toolbar is the equivalent. Suppress the menu so a
         // long-press doesn't open something with no good way to dismiss it.
@@ -78,8 +89,28 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: z }),
             })),
             { divider: true },
-            { label: card.flipped ? 'Flip to front' : 'Flip to back', onClick: () => socket.emit('flipCard', { instanceId: card.instanceId }) },
-            { label: card.faceDown ? 'Turn face-up' : 'Turn face-down', onClick: () => socket.emit('toggleFaceDown', { instanceId: card.instanceId }) },
+            // Unified "Flip" action — for double-faced cards, swap sides;
+            // otherwise toggle face-down. Cards that are both DFC and need to
+            // be face-down (morph shenanigans) can still be force-face-down via
+            // the extra item below.
+            (() => {
+                const hasBack = !!card.backImageUri;
+                if (hasBack) {
+                    return {
+                        label: card.flipped ? 'Flip to front' : 'Flip to back',
+                        onClick: () => socket.emit('flipCard', { instanceId: card.instanceId }),
+                    };
+                }
+                return {
+                    label: card.faceDown ? 'Turn face-up' : 'Turn face-down',
+                    onClick: () => socket.emit('toggleFaceDown', { instanceId: card.instanceId }),
+                };
+            })(),
+            // Edge case: DFC card that also needs the generic face-down back
+            ...(card.backImageUri ? [{
+                label: card.faceDown ? 'Turn face-up' : 'Turn face-down',
+                onClick: () => socket.emit('toggleFaceDown', { instanceId: card.instanceId }),
+            }] : []),
             { divider: true },
             { label: 'Reveal to all', onClick: () => socket.emit('revealCard', { instanceId: card.instanceId, targetPlayerIds: 'all' }) },
             ...allPlayers.filter(p => p.userId !== userId).map(p => ({
@@ -106,17 +137,22 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     };
 
     const handleLifeClick = () => {
+        if (spectating) return;
         setEditingLife(true);
-        setLifeInput(player.life.toString());
+        setLifeInput(isInfinite(player.life) ? '∞' : String(player.life));
     };
 
     const handleLifeSubmit = () => {
-        const val = parseInt(lifeInput);
+        if (spectating) { setEditingLife(false); return; }
+        const val = parseGameValue(lifeInput);
         if (!isNaN(val)) socket.emit('setLife', { targetPlayerId: player.userId, life: val });
         setEditingLife(false);
     };
 
-    const adjustLife = (amount) => socket.emit('adjustLife', { targetPlayerId: player.userId, amount });
+    const adjustLife = (amount) => {
+        if (spectating) return;
+        socket.emit('adjustLife', { targetPlayerId: player.userId, amount });
+    };
 
     const handleDragStart = (e, card, zone) => {
         e.dataTransfer.setData('application/json', JSON.stringify({
@@ -186,11 +222,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     {lethalCmdDmg ? 'KILLED BY COMMANDER' : lethalInfect ? 'POISONED' : 'ELIMINATED'}
                 </div>
             )}
-            <div className="player-header" onContextMenu={onPlayerContextMenu}>
+            <div className="player-header" onContextMenu={spectating ? undefined : onPlayerContextMenu}>
                 <span className={`player-name ${player.connected ? 'online' : 'offline'}`}>
                     {player.username}
                 </span>
-                {touchMode && (
+                {touchMode && !spectating && (
                     <button
                         className="player-options-btn"
                         title="Player options"
@@ -210,21 +246,24 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 )}
 
                 <div className="life-counter">
-                    <button onClick={() => adjustLife(-1)}>-</button>
+                    {!spectating && <button onClick={() => adjustLife(-1)}>-</button>}
                     {editingLife ? (
                         <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
                             value={lifeInput}
                             onChange={e => setLifeInput(e.target.value)}
                             onBlur={handleLifeSubmit}
                             onKeyDown={e => e.key === 'Enter' && handleLifeSubmit()}
                             autoFocus
                             className="life-input"
+                            placeholder="# or ∞"
+                            title="Enter a number or ∞/inf for infinite"
                         />
                     ) : (
-                        <span className="life-value" onClick={handleLifeClick}>{player.life}</span>
+                        <span className="life-value" onClick={handleLifeClick}>{fmtNum(player.life)}</span>
                     )}
-                    <button onClick={() => adjustLife(1)}>+</button>
+                    {!spectating && <button onClick={() => adjustLife(1)}>+</button>}
                 </div>
 
                 {/* Commander damage next to HP, full names */}
@@ -234,7 +273,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                             const from = allPlayers.find(p => p.userId === fromId);
                             return (
                                 <span key={fromId} className={`cmd-dmg-badge ${dmg >= 21 ? 'lethal' : ''}`} title={`Commander damage from ${from?.username}`}>
-                                    {from?.username || '?'}: {dmg}/21
+                                    {from?.username || '?'}: {fmtNum(dmg)}/21
                                 </span>
                             );
                         })}
@@ -245,7 +284,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 {totalInfect > 0 && (
                     <div className="infect-inline">
                         <span className={`infect-total ${lethalInfect ? 'lethal' : ''}`} title="Poison counters">
-                            ☣ {totalInfect}/10
+                            ☣ {fmtNum(totalInfect)}/10
                         </span>
                     </div>
                 )}
@@ -253,9 +292,9 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 <div className="player-counters">
                     {Object.entries(player.counters || {}).filter(([, v]) => v > 0).map(([name, val]) => (
                         <span key={name} className="player-counter-badge" title={name}
-                            onClick={() => socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: val + 1 })}
-                            onContextMenu={(e) => { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: Math.max(0, val - 1) }); }}>
-                            {name}: {val}
+                            onClick={spectating ? undefined : () => socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : val + 1 })}
+                            onContextMenu={spectating ? (e) => e.preventDefault() : (e) => { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : Math.max(0, val - 1) }); }}>
+                            {name}: {fmtNum(val)}
                         </span>
                     ))}
                 </div>
@@ -348,6 +387,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             <HandZone
                 player={player}
                 isOwner={isOwner}
+                spectating={spectating}
                 renderZoneCards={renderZoneCards}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'hand')}
@@ -456,14 +496,16 @@ function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow }) {
     );
 }
 
-function HandZone({ player, isOwner, renderZoneCards, onDragOver, onDrop }) {
+function HandZone({ player, isOwner, spectating, renderZoneCards, onDragOver, onDrop }) {
     const ref = useHorizontalWheel();
+    // Spectators see every player's hand, not just their own (which they don't have).
+    const showHand = isOwner || spectating;
     return (
         <div className="zone hand-zone" onDragOver={onDragOver} onDrop={onDrop}>
             <div className="zone-label">
                 Hand ({player.zones.handCount ?? player.zones.hand?.length ?? 0})
             </div>
-            {isOwner && (
+            {showHand && (
                 <div ref={ref} className="zone-cards hand-cards">{renderZoneCards(player.zones.hand, 'hand')}</div>
             )}
         </div>
