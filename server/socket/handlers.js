@@ -129,6 +129,9 @@ function broadcastToRoom(io, room, event, data, excludeSocketId = null) {
 const SPECTATOR_ALLOWED_EVENTS = new Set([
     'joinRoom', 'joinRoomAsSpectator', 'leaveRoom',
     'sendChatMessage',
+    // Cursor sharing is purely visual / ephemeral, so spectators can take part
+    // (they point at things while they chat). It's not in the mutation set.
+    'cursorMove',
     'disconnect', 'disconnecting',
 ]);
 
@@ -245,6 +248,37 @@ module.exports = function registerSocketHandlers(io) {
             socket.join(roomCode);
             broadcastRoomState(io, room);
             callback?.({ success: true, state: getRoomStateForPlayer(room, userId, { isSpectator: true }) });
+        });
+
+        // Live cursor sharing — rebroadcast a normalized (0..1) cursor
+        // position to everyone else in the room. Not persisted, not snapshotted,
+        // not saved to Mongo. The sender's client throttles emits; we just
+        // fan-out. Each packet carries the drawer's aspectRatio so receivers
+        // can letterbox it the same way drawings do.
+        socket.on('cursorMove', ({ x, y, aspectRatio }) => {
+            const room = getRoom(currentRoom);
+            if (!room) return;
+            // Cheap sanity clamp — a malicious client can't spam us with NaN.
+            if (typeof x !== 'number' || typeof y !== 'number' || !isFinite(x) || !isFinite(y)) return;
+            const nx = Math.max(0, Math.min(1, x));
+            const ny = Math.max(0, Math.min(1, y));
+            let ar = typeof aspectRatio === 'number' && isFinite(aspectRatio) ? aspectRatio : undefined;
+            if (ar !== undefined) ar = Math.max(0.1, Math.min(10, ar));
+            // Look up username from player or spectator record — cursors should
+            // show whoever it was from, not just a socket id.
+            const player = getPlayerInRoom(room, currentUserId);
+            const spec = getSpectatorInRoom(room, currentUserId);
+            const sender = player || spec;
+            const username = sender?.username || 'Someone';
+            broadcastToRoom(io, room, 'cursorMove', {
+                userId: currentUserId,
+                username,
+                isSpectator: !player,
+                x: nx,
+                y: ny,
+                aspectRatio: ar,
+                ts: Date.now(),
+            }, socket.id);
         });
 
         socket.on('sendChatMessage', ({ text }, callback) => {
@@ -1273,11 +1307,17 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         // ─── DRAWING ────────────────────────────────────────────────────
-        socket.on('drawStroke', ({ strokeId, points, color, size }) => {
+        socket.on('drawStroke', ({ strokeId, points, color, size, aspectRatio }) => {
             const room = getRoom(currentRoom);
             if (!room) return;
 
-            const stroke = { strokeId: strokeId || uuidv4(), playerId: currentUserId, points, color, size };
+            // Clamp aspectRatio to a sane range so a bad client can't store
+            // garbage that breaks rendering elsewhere. 0.1..10 covers every
+            // practical portrait/landscape device shape.
+            let ar = typeof aspectRatio === 'number' && isFinite(aspectRatio) ? aspectRatio : undefined;
+            if (ar !== undefined) ar = Math.max(0.1, Math.min(10, ar));
+
+            const stroke = { strokeId: strokeId || uuidv4(), playerId: currentUserId, points, color, size, aspectRatio: ar };
             room.drawings.push(stroke);
             broadcastToRoom(io, room, 'newStroke', stroke, socket.id);
         });

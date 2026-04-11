@@ -45,17 +45,54 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
         }
     }, [drawings]);
 
-    // Stroke points are stored as normalized 0-1 coordinates so they're consistent across screen sizes.
+    // Given the canvas dimensions and a stroke's aspect ratio (from the
+    // drawer's canvas at record time), compute a "draw rectangle" — the
+    // largest rectangle of that aspect ratio that fits centered inside the
+    // current canvas. Strokes are rendered inside this rectangle so shapes
+    // stay geometrically true regardless of the viewer's canvas shape.
+    //
+    // If the stroke has no aspectRatio (legacy strokes from before this
+    // feature, or the in-progress local stroke rendered on its own canvas),
+    // we fall back to the full canvas — same as the old per-axis behavior.
+    const computeStrokeRect = (canvasW, canvasH, strokeAR) => {
+        if (!strokeAR || !isFinite(strokeAR) || strokeAR <= 0) {
+            return { offsetX: 0, offsetY: 0, rectW: canvasW, rectH: canvasH };
+        }
+        const canvasAR = canvasW / canvasH;
+        let rectW, rectH;
+        if (canvasAR > strokeAR) {
+            // Canvas is wider than the stroke's native shape → bars on sides.
+            rectH = canvasH;
+            rectW = rectH * strokeAR;
+        } else {
+            // Canvas is taller than the stroke's native shape → bars top/bottom.
+            rectW = canvasW;
+            rectH = rectW / strokeAR;
+        }
+        return {
+            offsetX: (canvasW - rectW) / 2,
+            offsetY: (canvasH - rectH) / 2,
+            rectW,
+            rectH,
+        };
+    };
+
+    // Stroke points are stored as normalized 0-1 coordinates relative to the
+    // drawer's canvas, plus the drawer's aspect ratio. On render we map them
+    // into a letterboxed rect that preserves that aspect ratio.
     const drawStroke = (ctx, stroke) => {
         if (!stroke.points || stroke.points.length < 1) return;
-        const w = ctx.canvas.width;
-        const h = ctx.canvas.height;
+        const { offsetX, offsetY, rectW, rectH } = computeStrokeRect(
+            ctx.canvas.width,
+            ctx.canvas.height,
+            stroke.aspectRatio,
+        );
         ctx.beginPath();
         ctx.strokeStyle = stroke.color || '#ff0000';
         ctx.lineWidth = stroke.size || 3;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        const px = (p) => ({ x: p.x * w, y: p.y * h });
+        const px = (p) => ({ x: offsetX + p.x * rectW, y: offsetY + p.y * rectH });
         if (stroke.points.length === 1) {
             const p = px(stroke.points[0]);
             ctx.arc(p.x, p.y, ctx.lineWidth / 2, 0, Math.PI * 2);
@@ -123,29 +160,37 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
         };
     }, []);
 
-    // Hit-test: does the given normalized point (0-1 coords) fall within
-    // `tolerance` pixels of any segment of the stroke? We convert to pixel
-    // space using the current canvas dims for an intuitive tolerance radius.
+    // Hit-test: does the eraser cursor (given as 0-1 local canvas coords)
+    // fall within `tolerance` pixels of any segment of the stroke? The stroke
+    // is rendered in a letterboxed rectangle matching its own aspect ratio,
+    // so we have to project stroke points into the same pixel space the
+    // renderer uses — not just multiply by canvas width/height directly.
     const strokeHit = useCallback((stroke, nx, ny, tolerancePx) => {
         const canvas = canvasRef.current;
         if (!canvas || !stroke.points || stroke.points.length === 0) return false;
         const w = canvas.width;
         const h = canvas.height;
+        // Eraser cursor position in pixel space (relative to our own canvas).
         const px = nx * w;
         const py = ny * h;
+        // Stroke-specific draw rectangle (matches the renderer's math so the
+        // hit region always aligns with what the user actually sees).
+        const { offsetX, offsetY, rectW, rectH } = computeStrokeRect(w, h, stroke.aspectRatio);
+        const toPixelX = (p) => offsetX + p.x * rectW;
+        const toPixelY = (p) => offsetY + p.y * rectH;
         // Combine stroke's own thickness with the eraser tolerance so thicker
         // strokes are easier to catch.
         const radius = tolerancePx + (stroke.size || 3) / 2;
         const r2 = radius * radius;
         const pts = stroke.points;
         if (pts.length === 1) {
-            const dx = pts[0].x * w - px;
-            const dy = pts[0].y * h - py;
+            const dx = toPixelX(pts[0]) - px;
+            const dy = toPixelY(pts[0]) - py;
             return dx * dx + dy * dy <= r2;
         }
         for (let i = 1; i < pts.length; i++) {
-            const ax = pts[i - 1].x * w, ay = pts[i - 1].y * h;
-            const bx = pts[i].x * w, by = pts[i].y * h;
+            const ax = toPixelX(pts[i - 1]), ay = toPixelY(pts[i - 1]);
+            const bx = toPixelX(pts[i]), by = toPixelY(pts[i]);
             const dx = bx - ax, dy = by - ay;
             const lenSq = dx * dx + dy * dy;
             let t = lenSq > 0 ? ((px - ax) * dx + (py - ay) * dy) / lenSq : 0;
@@ -155,6 +200,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
             if (ex * ex + ey * ey <= r2) return true;
         }
         return false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // When in eraser mode, find strokes under the cursor and mark them for
@@ -240,7 +286,12 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
         const points = currentStrokeRef.current;
         if (points.length > 0) {
             const strokeId = Date.now().toString(36) + Math.random().toString(36).slice(2);
-            const stroke = { strokeId, points: [...points], color, size: brushSize };
+            // Capture the current canvas aspect ratio so receivers can render
+            // the stroke in a letterboxed rect of the same shape. Points are
+            // 0-1 normalized against the local canvas as before.
+            const canvas = canvasRef.current;
+            const aspectRatio = canvas ? canvas.width / canvas.height : undefined;
+            const stroke = { strokeId, points: [...points], color, size: brushSize, aspectRatio };
             // Add to local cache immediately so it stays visible
             localStrokesRef.current.push(stroke);
             socket.emit('drawStroke', stroke);

@@ -1323,6 +1323,44 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .invite-choice-cancel { background: transparent; border: none; color: var(--text-dim); font-size: 0.8em; cursor: pointer; letter-spacing: 1px; padding: 6px; }
 .invite-choice-cancel:hover { color: var(--text); background: transparent; }
 
+/* ─── LIVE CURSOR OVERLAY ─────────────────────────────────── */
+.cursors-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Below chat/action-log side panels (209-210) and drawings (200) but
+       above the game board content so cursors float over cards. */
+    z-index: 195;
+    overflow: hidden;
+}
+.cursor-marker {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* transform handles placement so we get smooth sub-pixel motion */
+    transition: opacity 0.2s linear;
+    display: flex;
+    align-items: flex-start;
+    will-change: transform, opacity;
+    pointer-events: none;
+}
+.cursor-label {
+    background: var(--cursor-color, #888);
+    color: #000;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 2px;
+    margin-left: 14px;
+    margin-top: 12px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    font-weight: 700;
+}
+.cursor-marker.spec .cursor-label { opacity: 0.8; font-style: italic; }
+
 /* ─── CHAT ────────────────────────────────────────────────── */
 .chat-toggle {
     position: fixed;

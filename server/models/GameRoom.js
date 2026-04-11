@@ -75,6 +75,13 @@ const strokeSchema = new mongoose.Schema({
     points: [{ x: Number, y: Number }],
     color: { type: String, default: '#ffffff' },
     size: { type: Number, default: 3 },
+    // Aspect ratio (width / height) of the drawer's canvas at the time the
+    // stroke was made. The renderer uses this to letterbox the stroke into a
+    // rectangle of the same shape on every client — so a circle drawn on a
+    // landscape desktop stays a circle on a portrait phone instead of being
+    // squashed into an ellipse. Optional for backward compat; strokes missing
+    // this field render with the old full-canvas behavior.
+    aspectRatio: { type: Number },
 }, { _id: false });
 
 const chatMessageSchema = new mongoose.Schema({

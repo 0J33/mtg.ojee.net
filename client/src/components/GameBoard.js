@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import socket from '../socket';
 import { decks, customCards } from '../api';
 import PlayerZone from './PlayerZone';
@@ -14,6 +14,7 @@ import CounterModal from './CounterModal';
 import Chat from './Chat';
 import Guide from './Guide';
 import ActionLog from './ActionLog';
+import Cursors from './Cursors';
 import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 
@@ -48,6 +49,18 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [actionLogOpen, setActionLogOpen] = useState(false);
     const [showSpectatorList, setShowSpectatorList] = useState(false);
     const [victoryAnim, setVictoryAnim] = useState(null); // { username, ts }
+    // Live cursor sharing. Only meaningful for non-touch + non-compact desktop
+    // users because compact mode and mobile have layouts that don't line up
+    // with the default desktop grid. Persisted so the user's preference
+    // survives reloads.
+    const [cursorShareEnabled, setCursorShareEnabled] = useState(() => {
+        try { return localStorage.getItem('mtg_cursorShare') !== '0'; }
+        catch (_) { return true; }
+    });
+    const gameBoardRef = useRef(null);
+    // Eligibility is derived from runtime state — changes when compactMode
+    // toggles or when the input device flips (rare). The isTouch check is
+    // from useIsTouchDevice() already declared below.
 
     // Find the freshest version of the maximized card from current gameState
     // (so notes/counters reflect immediately without needing a useEffect race)
@@ -98,6 +111,70 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         socket.on('victory', handler);
         return () => socket.off('victory', handler);
     }, []);
+
+    // Non-touch + non-compact desktop users see AND broadcast cursors. Mobile
+    // layouts don't line up with desktop, and compact mode rearranges opponent
+    // zones into a thin strip — either case would put shared cursors at
+    // misleading positions, so they're excluded on both ends.
+    const cursorsEligible = !isTouch && !compactMode && cursorShareEnabled;
+
+    // Persist the cursor-share preference so reloads keep it.
+    useEffect(() => {
+        try { localStorage.setItem('mtg_cursorShare', cursorShareEnabled ? '1' : '0'); } catch (_) {}
+    }, [cursorShareEnabled]);
+
+    // Throttled mousemove broadcaster. Emits at most once per MOVE_THROTTLE ms
+    // to avoid flooding the socket. Coordinates are 0..1 normalized to the
+    // game-board DOM rect and carried alongside the sender's aspect ratio so
+    // receivers can letterbox identically to drawings.
+    useEffect(() => {
+        if (!cursorsEligible) return;
+        const el = gameBoardRef.current;
+        if (!el) return;
+        const MOVE_THROTTLE = 50; // ms → ~20 fps
+        let lastSent = 0;
+        let pendingTimer = null;
+        let lastEvent = null;
+
+        const emit = (e) => {
+            const rect = el.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return;
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            if (x < 0 || x > 1 || y < 0 || y > 1) return;
+            socket.emit('cursorMove', { x, y, aspectRatio: rect.width / rect.height });
+        };
+
+        const onMove = (e) => {
+            const now = Date.now();
+            const since = now - lastSent;
+            if (since >= MOVE_THROTTLE) {
+                lastSent = now;
+                emit(e);
+                return;
+            }
+            // Schedule a trailing emit so the last position before the cursor
+            // stops moving still lands on receivers — otherwise a fast flick
+            // followed by stillness leaves the remote cursor mid-flick.
+            lastEvent = e;
+            if (!pendingTimer) {
+                pendingTimer = setTimeout(() => {
+                    pendingTimer = null;
+                    if (lastEvent) {
+                        lastSent = Date.now();
+                        emit(lastEvent);
+                        lastEvent = null;
+                    }
+                }, MOVE_THROTTLE - since);
+            }
+        };
+
+        el.addEventListener('mousemove', onMove);
+        return () => {
+            el.removeEventListener('mousemove', onMove);
+            if (pendingTimer) clearTimeout(pendingTimer);
+        };
+    }, [cursorsEligible]);
 
     const toggleSelect = useCallback((id) => {
         setSelectedIds(prev => {
@@ -389,7 +466,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const canMulligan = !gameStarted || myMulliganCount < 3;
 
     return (
-        <div className={`game-board ${compactMode ? 'compact-mode' : ''}`}>
+        <div ref={gameBoardRef} className={`game-board ${compactMode ? 'compact-mode' : ''}`}>
             {/* Top bar */}
             <div className="game-topbar">
                 <div className="topbar-left">
@@ -475,6 +552,12 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     )}
                     <button onClick={() => setGuideOpen(true)} className="small-btn" title="How to play">Guide</button>
                     <button onClick={() => setActionLogOpen(o => !o)} className="small-btn" title="Action log">Log</button>
+                    {!isTouch && (
+                        <label className="compact-toggle small-btn" title="Share cursor with other desktop players (non-compact only)">
+                            <input type="checkbox" checked={cursorShareEnabled} onChange={e => setCursorShareEnabled(e.target.checked)} />
+                            Cursor
+                        </label>
+                    )}
                     <label className="compact-toggle small-btn" title="Toggle compact layout">
                         <input type="checkbox" checked={compactMode} onChange={e => setCompactMode(e.target.checked)} />
                         Compact
@@ -595,6 +678,13 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 open={actionLogOpen}
                 onToggle={() => setActionLogOpen(o => !o)}
             />
+
+            {/* Live cursor overlay — only rendered for eligible (non-touch +
+                non-compact) viewers. Incoming events are still received by
+                everyone but the component won't mount outside eligibility. */}
+            {cursorsEligible && (
+                <Cursors containerRef={gameBoardRef} currentUserId={user.id} />
+            )}
 
             {/* Guide / How-to-play */}
             {guideOpen && <Guide onClose={() => setGuideOpen(false)} />}
