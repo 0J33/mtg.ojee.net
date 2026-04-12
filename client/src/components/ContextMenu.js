@@ -5,14 +5,26 @@ export default function ContextMenu({ x, y, items, onClose }) {
     const ref = useRef();
     const [pos, setPos] = useState(null);
 
-    // Synchronously measure and clamp before paint
+    // Synchronously measure and clamp before paint. If the menu is taller
+    // than the viewport, it gets max-height + scroll from CSS — just pin it
+    // near the top so the user can scroll through all items.
     useLayoutEffect(() => {
         if (!ref.current) return;
         const rect = ref.current.getBoundingClientRect();
         const w = rect.width || 200;
-        const h = rect.height || items.length * 30;
+        const h = Math.min(rect.height || items.length * 28, window.innerHeight - 20);
         const left = Math.max(4, Math.min(x, window.innerWidth - w - 4));
-        const top = Math.max(4, Math.min(y, window.innerHeight - h - 4));
+        // Prefer opening downward from the click point. If that would push
+        // the bottom off-screen, open upward instead. If THAT also doesn't
+        // fit, pin to top:10 and rely on overflow-y scroll.
+        let top;
+        if (y + h + 10 <= window.innerHeight) {
+            top = y;
+        } else if (y - h - 10 >= 0) {
+            top = y - h;
+        } else {
+            top = 10;
+        }
         setPos({ left, top });
     }, [x, y, items]);
 

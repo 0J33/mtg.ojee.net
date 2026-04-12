@@ -836,11 +836,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-revealed h3 { text-align: center; margin-bottom: 14px; color: var(--accent); }
 
 /* ─── CONTEXT MENU ────────────────────────────────────────── */
-.context-menu { position: fixed; z-index: 3000; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 4px 0; min-width: 200px; box-shadow: 0 12px 40px rgba(0,0,0,0.8); }
-.context-item { padding: 8px 16px; cursor: pointer; font-size: 0.85em; color: var(--text); font-family: 'EB Garamond', serif; }
+.context-menu { position: fixed; z-index: 3000; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; padding: 4px 0; min-width: 180px; max-height: calc(100vh - 20px); overflow-y: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.8); }
+.context-item { padding: 5px 14px; cursor: pointer; font-size: 0.8em; color: var(--text); font-family: 'EB Garamond', serif; white-space: nowrap; }
 .context-item:hover { background: var(--bg-hover); color: var(--accent); }
 .context-item.danger { color: var(--danger); }
-.context-divider { height: 1px; background: var(--border-soft); margin: 4px 0; }
+.context-divider { height: 1px; background: var(--border-soft); margin: 2px 0; }
 
 /* ─── CARD SEARCH MODAL ──────────────────────────────────── */
 .card-search-modal { max-width: 640px; max-height: 80vh; }
