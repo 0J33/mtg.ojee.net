@@ -96,7 +96,34 @@ export default function App() {
         socket.on('connect', onConnect);
         socket.on('disconnect', (reason) => console.log('[socket] DISCONNECTED reason=', reason));
         socket.on('connect_error', (err) => console.error('[socket] CONNECT ERROR:', err.message, err));
-        socket.on('gameState', (state) => setGameState(state));
+        socket.on('gameState', (state) => {
+            // The server trims actionHistory + chat from debounced broadcasts
+            // to reduce payload. If the incoming state has empty arrays, merge
+            // with the client's existing data instead of wiping it.
+            setGameState(prev => {
+                if (!prev) return state;
+                const merged = { ...state };
+                if ((!merged.actionHistory || merged.actionHistory.length === 0) && prev.actionHistory?.length > 0) {
+                    merged.actionHistory = prev.actionHistory;
+                }
+                if ((!merged.chat || merged.chat.length === 0) && prev.chat?.length > 0) {
+                    merged.chat = prev.chat;
+                }
+                return merged;
+            });
+        });
+        // Append-only action log entries (one per mutation instead of full
+        // history in every gameState broadcast).
+        socket.on('actionEntry', (entry) => {
+            setGameState(prev => {
+                if (!prev) return prev;
+                const history = prev.actionHistory || [];
+                if (history.some(a => a.actionId === entry.actionId)) return prev;
+                const next = [...history, entry];
+                if (next.length > 200) next.shift();
+                return { ...prev, actionHistory: next };
+            });
+        });
         socket.on('cardRevealed', ({ revealedBy, card }) => {
             setRevealedCard({ ...card, revealedBy });
         });
@@ -141,6 +168,7 @@ export default function App() {
             socket.off('handRevealed');
             socket.off('cardPositionUpdate');
             socket.off('newStroke');
+            socket.off('actionEntry');
             socket.off('kicked');
             socket.disconnect();
         };

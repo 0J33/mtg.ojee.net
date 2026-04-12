@@ -173,7 +173,7 @@ function checkVictory(io, room) {
     if (alive.length === 1 && room.players.length > 1) {
         const winner = alive[0];
         room.winnerUserId = winner.userId;
-        addAction(room, winner.userId, 'victory', { player: winner.username });
+        addAndBroadcastAction(io, room, winner.userId, 'victory', { player: winner.username });
         broadcastToRoom(io, room, 'victory', {
             userId: winner.userId,
             username: winner.username,
@@ -191,7 +191,7 @@ function checkVictory(io, room) {
         const teamName = teamMeta?.name || teamId;
         const teamLabel = `Team ${teamName}`;
         room.winnerUserId = `team:${teamId}`;
-        addAction(room, alive[0].userId, 'victory', { player: teamLabel });
+        addAndBroadcastAction(io, room, alive[0].userId, 'victory', { player: teamLabel });
         broadcastToRoom(io, room, 'victory', {
             userId: `team:${teamId}`,
             username: teamLabel,
@@ -200,23 +200,72 @@ function checkVictory(io, room) {
     }
 }
 
+// ─── DEBOUNCED BROADCAST ────────────────────────────────────────────
+// Instead of sending a full gameState on every single mutation, we debounce
+// into one broadcast per BROADCAST_DEBOUNCE_MS. Rapid-fire events (e.g. 10
+// cards moving in quick succession) collapse into a single large payload
+// instead of 10 separate ones. The full-state broadcast also strips
+// actionHistory + chat (see below) to reduce payload size — those are sent
+// append-only via dedicated events.
+const BROADCAST_DEBOUNCE_MS = 80;
+const pendingBroadcasts = new Map(); // roomCode → timer
+
 function broadcastRoomState(io, room) {
+    const code = room.roomCode;
+    // If there's already a pending broadcast for this room, skip — the
+    // timer will fire and send the latest state.
+    if (pendingBroadcasts.has(code)) return;
+    const timer = setTimeout(() => {
+        pendingBroadcasts.delete(code);
+        broadcastRoomStateImmediate(io, room);
+    }, BROADCAST_DEBOUNCE_MS);
+    pendingBroadcasts.set(code, timer);
+}
+
+// Force an immediate broadcast (used for initial join, reconnect, etc).
+function broadcastRoomStateImmediate(io, room) {
+    // Cancel any pending debounce for this room so we don't double-send.
+    const pending = pendingBroadcasts.get(room.roomCode);
+    if (pending) { clearTimeout(pending); pendingBroadcasts.delete(room.roomCode); }
+
     for (const player of room.players) {
         if (player.socketId) {
-            io.to(player.socketId).emit('gameState', getRoomStateForPlayer(room, player.userId));
+            const state = getRoomStateForPlayer(room, player.userId);
+            // Trim: strip actionHistory + chat from regular broadcasts.
+            // They're sent append-only (actionEntry / chatMessage events).
+            // The FULL history is only sent on initial join.
+            state.actionHistory = [];
+            state.chat = [];
+            io.to(player.socketId).emit('gameState', state);
         }
     }
-    // Spectators get a state flagged isSpectator — hands are visible, UI goes read-only.
-    // If the spectator has set a perspective, pass it through so they only see that player's hand.
     for (const spec of (room.spectators || [])) {
         if (spec.socketId) {
-            io.to(spec.socketId).emit('gameState', getRoomStateForPlayer(room, spec.userId, {
+            const state = getRoomStateForPlayer(room, spec.userId, {
                 isSpectator: true,
                 spectatorPerspectiveOf: spec.perspectiveOf || null,
-            }));
+            });
+            state.actionHistory = [];
+            state.chat = [];
+            io.to(spec.socketId).emit('gameState', state);
         }
     }
     checkVictory(io, room);
+}
+
+// Send a full state INCLUDING actionHistory + chat. Used only on initial
+// join / reconnect so the client gets the complete picture once.
+function broadcastFullStateToSocket(io, room, socketId, userId, opts = {}) {
+    io.to(socketId).emit('gameState', getRoomStateForPlayer(room, userId, opts));
+}
+
+// Wrapper around addAction that also broadcasts the entry to all clients
+// as an append-only event so they don't need the full actionHistory array
+// in every gameState payload.
+function addAndBroadcastAction(io, room, playerId, type, data) {
+    const action = addAction(room, playerId, type, data);
+    broadcastToRoom(io, room, 'actionEntry', action);
+    return action;
 }
 
 function broadcastToRoom(io, room, event, data, excludeSocketId = null) {
@@ -465,7 +514,7 @@ module.exports = function registerSocketHandlers(io) {
                 if (kickedSocket) kickedSocket.leave(currentRoom);
             }
             room.players.splice(idx, 1);
-            addAction(room, currentUserId, 'kickPlayer', { kicked: kicked.username });
+            addAndBroadcastAction(io, room, currentUserId, 'kickPlayer', { kicked: kicked.username });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -559,7 +608,7 @@ module.exports = function registerSocketHandlers(io) {
             // Shuffle library
             shuffleArray(player.zones.library);
 
-            addAction(room, currentUserId, 'loadDeck', { deckName: deckData.name });
+            addAndBroadcastAction(io, room, currentUserId, 'loadDeck', { deckName: deckData.name });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -585,7 +634,7 @@ module.exports = function registerSocketHandlers(io) {
             // turn-start draw specifically.
             if (num > 0) player.drewThisTurn = true;
 
-            addAction(room, currentUserId, 'drawCards', { count: num });
+            addAndBroadcastAction(io, room, currentUserId, 'drawCards', { count: num });
             broadcastRoomState(io, room);
             callback?.({ success: true, drawn });
         });
@@ -631,7 +680,7 @@ module.exports = function registerSocketHandlers(io) {
             // Tokens cease to exist when they leave the battlefield (MTG rule
             // 111.8). Don't push them into graveyard/exile/hand — just drop.
             if (card.isToken && fromZone === 'battlefield' && toZone !== 'battlefield') {
-                addAction(room, currentUserId, 'moveCard', {
+                addAndBroadcastAction(io, room, currentUserId, 'moveCard', {
                     cardName: card.name, fromZone, toZone: '(destroyed — token)',
                     fromPlayer: sourcePlayer.username,
                     toPlayer: (targetPlayerId ? getPlayerInRoom(room, targetPlayerId)?.username : sourcePlayer.username) || '',
@@ -669,7 +718,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
 
-            addAction(room, currentUserId, 'moveCard', {
+            addAndBroadcastAction(io, room, currentUserId, 'moveCard', {
                 cardName: card.name, fromZone, toZone,
                 fromPlayer: sourcePlayer.username,
                 toPlayer: targetPlayer.username,
@@ -686,7 +735,7 @@ module.exports = function registerSocketHandlers(io) {
                 for (const card of player.zones.battlefield) {
                     if (card.instanceId === instanceId) {
                         card.tapped = !card.tapped;
-                        addAction(room, currentUserId, 'tapCard', { cardName: card.name, tapped: card.tapped });
+                        addAndBroadcastAction(io, room, currentUserId, 'tapCard', { cardName: card.name, tapped: card.tapped });
                         broadcastRoomState(io, room);
                         return callback?.({ success: true, tapped: card.tapped });
                     }
@@ -710,7 +759,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
             if (count > 0) {
-                addAction(room, currentUserId, 'bulkTap', { count, tapped });
+                addAndBroadcastAction(io, room, currentUserId, 'bulkTap', { count, tapped });
                 broadcastRoomState(io, room);
             }
             callback?.({ success: true, count });
@@ -757,7 +806,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
             if (moved > 0) {
-                addAction(room, currentUserId, 'bulkMove', { count: moved, toZone });
+                addAndBroadcastAction(io, room, currentUserId, 'bulkMove', { count: moved, toZone });
                 broadcastRoomState(io, room);
             }
             callback?.({ success: true, count: moved });
@@ -853,7 +902,7 @@ module.exports = function registerSocketHandlers(io) {
                     const card = zone.find(c => c.instanceId === instanceId);
                     if (card) {
                         card.flipped = !card.flipped;
-                        addAction(room, currentUserId, 'flipCard', { cardName: card.name });
+                        addAndBroadcastAction(io, room, currentUserId, 'flipCard', { cardName: card.name });
                         broadcastRoomState(io, room);
                         return callback?.({ success: true });
                     }
@@ -871,7 +920,7 @@ module.exports = function registerSocketHandlers(io) {
                     const card = zone.find(c => c.instanceId === instanceId);
                     if (card) {
                         card.faceDown = !card.faceDown;
-                        addAction(room, currentUserId, 'toggleFaceDown', { cardName: card.faceDown ? '(face-down card)' : card.name });
+                        addAndBroadcastAction(io, room, currentUserId, 'toggleFaceDown', { cardName: card.faceDown ? '(face-down card)' : card.name });
                         broadcastRoomState(io, room);
                         return callback?.({ success: true });
                     }
@@ -904,7 +953,7 @@ module.exports = function registerSocketHandlers(io) {
             if (!player) return callback?.({ error: 'Not in room' });
 
             shuffleArray(player.zones.library);
-            addAction(room, currentUserId, 'shuffleLibrary', {});
+            addAndBroadcastAction(io, room, currentUserId, 'shuffleLibrary', {});
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -935,7 +984,7 @@ module.exports = function registerSocketHandlers(io) {
                 timestamp: Date.now(),
             };
             broadcastToRoom(io, room, 'rollResult', event);
-            addAction(room, currentUserId, 'rollDice', { sides: numSides, count: numDice, results });
+            addAndBroadcastAction(io, room, currentUserId, 'rollDice', { sides: numSides, count: numDice, results });
             callback?.({ success: true, ...event });
         });
 
@@ -961,7 +1010,7 @@ module.exports = function registerSocketHandlers(io) {
                 timestamp: Date.now(),
             };
             broadcastToRoom(io, room, 'rollResult', event);
-            addAction(room, currentUserId, 'flipCoin', { count: numCoins, results });
+            addAndBroadcastAction(io, room, currentUserId, 'flipCoin', { count: numCoins, results });
             callback?.({ success: true, ...event });
         });
 
@@ -1002,7 +1051,7 @@ module.exports = function registerSocketHandlers(io) {
             // to put the card in hand without touching library order.
             if (shuffle) shuffleArray(player.zones.library);
 
-            addAction(room, currentUserId, 'tutor', { cardName: card.name, toZone: dest, shuffled: !!shuffle });
+            addAndBroadcastAction(io, room, currentUserId, 'tutor', { cardName: card.name, toZone: dest, shuffled: !!shuffle });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1031,7 +1080,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
             // Spectators always see hands anyway, so no need to send to them.
-            addAction(room, currentUserId, 'revealHand', {
+            addAndBroadcastAction(io, room, currentUserId, 'revealHand', {
                 player: player.username,
                 handCount: cards.length,
                 to: targetPlayerIds === 'all' ? 'all' : `${targets.length} player(s)`,
@@ -1056,7 +1105,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
 
-            addAction(room, currentUserId, 'mill', { count: num, cards: milled });
+            addAndBroadcastAction(io, room, currentUserId, 'mill', { count: num, cards: milled });
             broadcastRoomState(io, room);
             callback?.({ success: true, milled });
         });
@@ -1070,7 +1119,7 @@ module.exports = function registerSocketHandlers(io) {
 
             const num = Math.min(count || 1, player.zones.library.length);
             const cards = player.zones.library.slice(0, num);
-            addAction(room, currentUserId, 'scry', { count: num });
+            addAndBroadcastAction(io, room, currentUserId, 'scry', { count: num });
             // Only send to the requesting player
             callback?.({ success: true, cards });
         });
@@ -1128,7 +1177,7 @@ module.exports = function registerSocketHandlers(io) {
                 player.zones.library = [...remaining, ...ordered];
             }
 
-            addAction(room, currentUserId, 'batchToLibrary', {
+            addAndBroadcastAction(io, room, currentUserId, 'batchToLibrary', {
                 count: ordered.length,
                 position: pos,
             });
@@ -1156,7 +1205,7 @@ module.exports = function registerSocketHandlers(io) {
             // Don't mutate yet — the client will follow up with a peekResolve
             // call naming which card to exile. We return a snapshot of the
             // cards with their instanceIds so the client can display and pick.
-            addAction(room, currentUserId, 'peekLibraryTop', {
+            addAndBroadcastAction(io, room, currentUserId, 'peekLibraryTop', {
                 target: target.username,
                 count: n,
             });
@@ -1201,7 +1250,7 @@ module.exports = function registerSocketHandlers(io) {
             exiled.y = 0;
             caster.zones.exile.push(exiled);
 
-            addAction(room, currentUserId, 'peekResolve', {
+            addAndBroadcastAction(io, room, currentUserId, 'peekResolve', {
                 target: target.username,
                 caster: caster.username,
                 exiledCardName: exiled.name,
@@ -1259,7 +1308,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
 
-            addAction(room, currentUserId, 'revealCard', {
+            addAndBroadcastAction(io, room, currentUserId, 'revealCard', {
                 cardName: foundCard.name,
                 to: targetPlayerIds === 'all' ? 'all' : `${targets.length} player(s)`,
             });
@@ -1288,7 +1337,7 @@ module.exports = function registerSocketHandlers(io) {
             const oldLife = player.life;
             player.life = clampGameValue(life);
             propagateSharedTeamLife(room, player);
-            addAction(room, currentUserId, 'setLife', { target: player.username, from: oldLife, to: player.life });
+            addAndBroadcastAction(io, room, currentUserId, 'setLife', { target: player.username, from: oldLife, to: player.life });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1307,7 +1356,7 @@ module.exports = function registerSocketHandlers(io) {
                 player.life = clampGameValue((player.life || 0) + (typeof amount === 'number' ? amount : 0));
             }
             propagateSharedTeamLife(room, player);
-            addAction(room, currentUserId, 'adjustLife', { target: player.username, amount, newLife: player.life });
+            addAndBroadcastAction(io, room, currentUserId, 'adjustLife', { target: player.username, amount, newLife: player.life });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1320,7 +1369,7 @@ module.exports = function registerSocketHandlers(io) {
 
             if (typeof player.counters !== 'object') player.counters = {};
             player.counters[counter] = clampGameValue(value, { allowNegative: false });
-            addAction(room, currentUserId, 'setPlayerCounter', { target: player.username, counter, value: player.counters[counter] });
+            addAndBroadcastAction(io, room, currentUserId, 'setPlayerCounter', { target: player.username, counter, value: player.counters[counter] });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1338,7 +1387,7 @@ module.exports = function registerSocketHandlers(io) {
             } else {
                 card.counters[counter] = clamped;
             }
-            addAction(room, currentUserId, 'setCardCounter', { cardName: card.name, counter, value: clamped });
+            addAndBroadcastAction(io, room, currentUserId, 'setCardCounter', { cardName: card.name, counter, value: clamped });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1359,7 +1408,7 @@ module.exports = function registerSocketHandlers(io) {
             const target = getPlayerInRoom(room, toPlayerId);
             if (!target) return callback?.({ error: 'Target not found' });
             target.infect = clampGameValue(amount, { allowNegative: false });
-            addAction(room, currentUserId, 'setInfect', { to: target.username, amount: target.infect });
+            addAndBroadcastAction(io, room, currentUserId, 'setInfect', { to: target.username, amount: target.infect });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1382,7 +1431,7 @@ module.exports = function registerSocketHandlers(io) {
                 target.life = clampGameValue((target.life || 0) - delta);
             }
 
-            addAction(room, currentUserId, 'setCommanderDamage', { from: fromPlayerId, to: target.username, damage: clamped, lifeAdjusted: applyToLife !== false ? -delta : 0 });
+            addAndBroadcastAction(io, room, currentUserId, 'setCommanderDamage', { from: fromPlayerId, to: target.username, damage: clamped, lifeAdjusted: applyToLife !== false ? -delta : 0 });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1395,7 +1444,7 @@ module.exports = function registerSocketHandlers(io) {
 
             player.commanderDeaths++;
             player.commanderTax = player.commanderDeaths * 2;
-            addAction(room, currentUserId, 'commanderDied', { player: player.username, deaths: player.commanderDeaths });
+            addAndBroadcastAction(io, room, currentUserId, 'commanderDied', { player: player.username, deaths: player.commanderDeaths });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1408,7 +1457,7 @@ module.exports = function registerSocketHandlers(io) {
 
             player.commanderDeaths = Math.max(0, value || 0);
             player.commanderTax = player.commanderDeaths * 2;
-            addAction(room, currentUserId, 'setCommanderDeaths', { player: player.username, deaths: player.commanderDeaths });
+            addAndBroadcastAction(io, room, currentUserId, 'setCommanderDeaths', { player: player.username, deaths: player.commanderDeaths });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1428,7 +1477,7 @@ module.exports = function registerSocketHandlers(io) {
             }
 
             target.designations[designation] = value;
-            addAction(room, currentUserId, 'setDesignation', { target: target.username, designation, value });
+            addAndBroadcastAction(io, room, currentUserId, 'setDesignation', { target: target.username, designation, value });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1447,7 +1496,7 @@ module.exports = function registerSocketHandlers(io) {
                 tokens.push(token);
             }
 
-            addAction(room, currentUserId, 'createToken', { name: cardData.name, count: count || 1 });
+            addAndBroadcastAction(io, room, currentUserId, 'createToken', { name: cardData.name, count: count || 1 });
             broadcastRoomState(io, room);
             callback?.({ success: true, tokens });
         });
@@ -1472,7 +1521,7 @@ module.exports = function registerSocketHandlers(io) {
             });
             player.zones.battlefield.push(card);
 
-            addAction(room, currentUserId, 'createCustomCard', { name });
+            addAndBroadcastAction(io, room, currentUserId, 'createCustomCard', { name });
             broadcastRoomState(io, room);
             callback?.({ success: true, card });
         });
@@ -1532,7 +1581,7 @@ module.exports = function registerSocketHandlers(io) {
             // Log the turn ending explicitly — lets the action log show a
             // clean "X ended their turn" → "Y's turn begins" sequence.
             if (endingPlayer) {
-                addAction(room, currentUserId, 'turnEnd', { player: endingPlayer.username });
+                addAndBroadcastAction(io, room, currentUserId, 'turnEnd', { player: endingPlayer.username });
             }
 
             // Extra-turn queue check. If the head of the queue belongs to a
@@ -1545,7 +1594,7 @@ module.exports = function registerSocketHandlers(io) {
                 const idx = room.players.findIndex(p => p.userId === head.ownerId);
                 if (idx !== -1 && !isPlayerEliminated(room.players[idx])) {
                     nextPlayerIdx = idx;
-                    addAction(room, currentUserId, 'extraTurnPop', { player: room.players[idx].username });
+                    addAndBroadcastAction(io, room, currentUserId, 'extraTurnPop', { player: room.players[idx].username });
                     break;
                 }
             }
@@ -1579,7 +1628,7 @@ module.exports = function registerSocketHandlers(io) {
             // does it manually with the cast-from-exile flow).
             const ready = tickSuspendCounters(room, newPlayer);
             for (const r of ready) {
-                addAction(room, newPlayer.userId, 'suspendReady', { cardName: r.name });
+                addAndBroadcastAction(io, room, newPlayer.userId, 'suspendReady', { cardName: r.name });
             }
 
             // Auto-untap respects the new player's per-player toggle. Default
@@ -1593,7 +1642,7 @@ module.exports = function registerSocketHandlers(io) {
                 // Only log if anything was actually untapped — "auto-untapped 0
                 // cards" is noise in the action log.
                 if (untapped > 0) {
-                    addAction(room, newPlayer.userId, 'autoUntap', { player: newPlayer.username, count: untapped });
+                    addAndBroadcastAction(io, room, newPlayer.userId, 'autoUntap', { player: newPlayer.username, count: untapped });
                 }
             }
 
@@ -1604,7 +1653,7 @@ module.exports = function registerSocketHandlers(io) {
                 newPlayer.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
             }
 
-            addAction(room, currentUserId, 'turnStart', { player: newPlayer?.username });
+            addAndBroadcastAction(io, room, currentUserId, 'turnStart', { player: newPlayer?.username });
             broadcastToRoom(io, room, 'notification', {
                 type: 'turn',
                 message: `${newPlayer?.username || '?'}'s turn`,
@@ -1635,7 +1684,7 @@ module.exports = function registerSocketHandlers(io) {
             const roll = 1 + Math.floor(Math.random() * 20);
             player.firstPlayerRoll = roll;
             player.mulliganReady = true;
-            addAction(room, currentUserId, 'rollForFirstPlayer', { player: player.username, roll });
+            addAndBroadcastAction(io, room, currentUserId, 'rollForFirstPlayer', { player: player.username, roll });
 
             // Broadcast the individual roll as a dice toast for animation.
             broadcastToRoom(io, room, 'rollResult', {
@@ -1664,12 +1713,12 @@ module.exports = function registerSocketHandlers(io) {
                     const winnerIdx = room.players.findIndex(p => p.userId === winner.userId);
                     room.mulliganPhase = false;
                     room.turnIndex = winnerIdx;
-                    addAction(room, currentUserId, 'firstPlayerRoll', {
+                    addAndBroadcastAction(io, room, currentUserId, 'firstPlayerRoll', {
                         rolls: room.players.map(p => `${p.username}:${p.firstPlayerRoll}`).join(', '),
                         winner: winner.username,
                         winningRoll: winner.firstPlayerRoll,
                     });
-                    addAction(room, currentUserId, 'turnStart', { player: winner.username });
+                    addAndBroadcastAction(io, room, currentUserId, 'turnStart', { player: winner.username });
                     broadcastToRoom(io, room, 'notification', {
                         type: 'first-player',
                         message: `${winner.username} rolled ${max} and goes first`,
@@ -1687,7 +1736,7 @@ module.exports = function registerSocketHandlers(io) {
                     for (const p of room.players) {
                         if (tiedIds.has(p.userId)) p.firstPlayerRoll = null;
                     }
-                    addAction(room, currentUserId, 'firstPlayerTiebreak', {
+                    addAndBroadcastAction(io, room, currentUserId, 'firstPlayerTiebreak', {
                         tied: tied.map(p => p.username).join(', '),
                         roll: max,
                     });
@@ -1710,7 +1759,7 @@ module.exports = function registerSocketHandlers(io) {
             const player = getPlayerInRoom(room, currentUserId);
             if (!player) return callback?.({ error: 'Not in room' });
             player.autoUntap = !!value;
-            addAction(room, currentUserId, 'setAutoUntap', { value: !!value });
+            addAndBroadcastAction(io, room, currentUserId, 'setAutoUntap', { value: !!value });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1741,7 +1790,7 @@ module.exports = function registerSocketHandlers(io) {
             for (const card of player.zones.battlefield) {
                 card.tapped = false;
             }
-            addAction(room, currentUserId, 'untapAll', {});
+            addAndBroadcastAction(io, room, currentUserId, 'untapAll', {});
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1760,7 +1809,7 @@ module.exports = function registerSocketHandlers(io) {
                 card.tapped = true;
                 tapped++;
             }
-            addAction(room, currentUserId, 'tapAll', { count: tapped, landsOnly });
+            addAndBroadcastAction(io, room, currentUserId, 'tapAll', { count: tapped, landsOnly });
             broadcastRoomState(io, room);
             callback?.({ success: true, count: tapped });
         });
@@ -1820,7 +1869,7 @@ module.exports = function registerSocketHandlers(io) {
                 player.zones.hand.push(player.zones.library.shift());
             }
 
-            addAction(room, currentUserId, 'mulligan', { handSize: drawCount, mulliganNumber: player.mulliganCount });
+            addAndBroadcastAction(io, room, currentUserId, 'mulligan', { handSize: drawCount, mulliganNumber: player.mulliganCount });
             broadcastToRoom(io, room, 'notification', {
                 type: 'mulligan',
                 message: `${player.username} mulled to ${drawCount}${player.mulliganBottomPending > 0 ? ` (bottom ${player.mulliganBottomPending})` : ''}`,
@@ -1905,7 +1954,7 @@ module.exports = function registerSocketHandlers(io) {
                 return callback?.({ error: 'Nothing to undo' });
             }
             restoreSnapshot(room, snapshot);
-            addAction(room, currentUserId, 'undo', { undoStackSize: room.undoStack?.length || 0 });
+            addAndBroadcastAction(io, room, currentUserId, 'undo', { undoStackSize: room.undoStack?.length || 0 });
             broadcastRoomState(io, room);
             callback?.({ success: true, undoStackSize: room.undoStack?.length || 0 });
         });
@@ -1953,7 +2002,7 @@ module.exports = function registerSocketHandlers(io) {
                 // "<player> drew 7" for each seat instead of silently filling
                 // hands.
                 if (drawnCount > 0) {
-                    addAction(room, player.userId, 'initialDraw', { player: player.username, count: drawnCount });
+                    addAndBroadcastAction(io, room, player.userId, 'initialDraw', { player: player.username, count: drawnCount });
                 }
             }
 
@@ -1971,8 +2020,8 @@ module.exports = function registerSocketHandlers(io) {
                 p.drewThisTurn = false;
                 p.landsPlayedThisTurn = 0;
             }
-            addAction(room, currentUserId, 'startGame', { players: room.players.length });
-            addAction(room, currentUserId, 'mulliganPhaseStart', { players: room.players.length });
+            addAndBroadcastAction(io, room, currentUserId, 'startGame', { players: room.players.length });
+            addAndBroadcastAction(io, room, currentUserId, 'mulliganPhaseStart', { players: room.players.length });
             // Single notification — the old "Game started — X goes first"
             // banner referenced a `firstPlayer` variable that no longer
             // exists, because the first player is decided later when the
@@ -2001,7 +2050,7 @@ module.exports = function registerSocketHandlers(io) {
             const delta = parseInt(amount ?? 1, 10);
             if (isNaN(delta)) return callback?.({ error: 'Invalid amount' });
             player.manaPool[color] = Math.max(0, (player.manaPool[color] || 0) + delta);
-            addAction(room, currentUserId, 'addMana', { player: player.username, color, amount: delta });
+            addAndBroadcastAction(io, room, currentUserId, 'addMana', { player: player.username, color, amount: delta });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2012,7 +2061,7 @@ module.exports = function registerSocketHandlers(io) {
             const player = getPlayerInRoom(room, targetPlayerId || currentUserId);
             if (!player) return callback?.({ error: 'Player not found' });
             player.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
-            addAction(room, currentUserId, 'clearManaPool', { player: player.username });
+            addAndBroadcastAction(io, room, currentUserId, 'clearManaPool', { player: player.username });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2044,7 +2093,7 @@ module.exports = function registerSocketHandlers(io) {
             }
             card.tapped = true;
             card.tappedFor = produced.join('');
-            addAction(room, currentUserId, 'tapForMana', { cardName: card.name, mana: produced.join('') });
+            addAndBroadcastAction(io, room, currentUserId, 'tapForMana', { cardName: card.name, mana: produced.join('') });
             broadcastRoomState(io, room);
             callback?.({ success: true, produced });
         });
@@ -2077,7 +2126,7 @@ module.exports = function registerSocketHandlers(io) {
                 const target = findCardAnywhere(room, logValue);
                 if (target) logValue = target.name;
             }
-            addAction(room, currentUserId, 'setCardField', { cardName: card.name, field, value: logValue });
+            addAndBroadcastAction(io, room, currentUserId, 'setCardField', { cardName: card.name, field, value: logValue });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2108,7 +2157,7 @@ module.exports = function registerSocketHandlers(io) {
                 notes: [],
             });
             player.zones.battlefield.push(clone);
-            addAction(room, currentUserId, 'cloneCard', { cardName: original.name });
+            addAndBroadcastAction(io, room, currentUserId, 'cloneCard', { cardName: original.name });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2126,7 +2175,7 @@ module.exports = function registerSocketHandlers(io) {
             card.returnZone = 'hand';
             if (!player.zones.foretell) player.zones.foretell = [];
             player.zones.foretell.push(card);
-            addAction(room, currentUserId, 'foretell', { cardName: card.name, player: player.username });
+            addAndBroadcastAction(io, room, currentUserId, 'foretell', { cardName: card.name, player: player.username });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2144,7 +2193,7 @@ module.exports = function registerSocketHandlers(io) {
             card.faceDown = false;
             card.returnZone = null;
             player.zones.battlefield.push(card);
-            addAction(room, currentUserId, 'castForetold', { cardName: card.name });
+            addAndBroadcastAction(io, room, currentUserId, 'castForetold', { cardName: card.name });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2168,7 +2217,7 @@ module.exports = function registerSocketHandlers(io) {
             card.returnZone = exileAfter ? 'exile' : null;
             card.faceDown = false;
             player.zones.battlefield.push(card);
-            addAction(room, currentUserId, 'castFromZone', {
+            addAndBroadcastAction(io, room, currentUserId, 'castFromZone', {
                 cardName: card.name,
                 fromZone,
                 exileAfter: !!exileAfter,
@@ -2207,7 +2256,7 @@ module.exports = function registerSocketHandlers(io) {
                     }
                 }
             }
-            addAction(room, currentUserId, 'proliferate', { count: n });
+            addAndBroadcastAction(io, room, currentUserId, 'proliferate', { count: n });
             broadcastRoomState(io, room);
             callback?.({ success: true, count: n });
         });
@@ -2220,7 +2269,7 @@ module.exports = function registerSocketHandlers(io) {
             if (!target) return callback?.({ error: 'Player not found' });
             if (!Array.isArray(room.extraTurns)) room.extraTurns = [];
             room.extraTurns.push({ ownerId: target.userId, ownerName: target.username, source: currentUserId });
-            addAction(room, currentUserId, 'queueExtraTurn', { player: target.username });
+            addAndBroadcastAction(io, room, currentUserId, 'queueExtraTurn', { player: target.username });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2256,7 +2305,7 @@ module.exports = function registerSocketHandlers(io) {
                 instanceId: instanceId || null,
                 ts: Date.now(),
             });
-            addAction(room, currentUserId, 'stackPush', { cardName: name });
+            addAndBroadcastAction(io, room, currentUserId, 'stackPush', { cardName: name });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2268,7 +2317,7 @@ module.exports = function registerSocketHandlers(io) {
             const i = typeof index === 'number' ? index : room.stack.length - 1;
             if (i < 0 || i >= room.stack.length) return callback?.({ error: 'Invalid index' });
             const [resolved] = room.stack.splice(i, 1);
-            addAction(room, currentUserId, 'stackPop', { cardName: resolved?.name });
+            addAndBroadcastAction(io, room, currentUserId, 'stackPop', { cardName: resolved?.name });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2277,7 +2326,7 @@ module.exports = function registerSocketHandlers(io) {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             room.stack = [];
-            addAction(room, currentUserId, 'stackClear', {});
+            addAndBroadcastAction(io, room, currentUserId, 'stackClear', {});
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2295,7 +2344,7 @@ module.exports = function registerSocketHandlers(io) {
                 oracleText: (oracleText || '').slice(0, 500),
                 ts: Date.now(),
             });
-            addAction(room, currentUserId, 'addEmblem', { player: player.username, name });
+            addAndBroadcastAction(io, room, currentUserId, 'addEmblem', { player: player.username, name });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2339,7 +2388,7 @@ module.exports = function registerSocketHandlers(io) {
             if (newSettings.startingLife !== undefined && !room.started) {
                 for (const p of room.players) p.life = room.settings.startingLife;
             }
-            addAction(room, currentUserId, 'updateRoomSettings', {});
+            addAndBroadcastAction(io, room, currentUserId, 'updateRoomSettings', {});
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2350,7 +2399,7 @@ module.exports = function registerSocketHandlers(io) {
             const player = getPlayerInRoom(room, currentUserId);
             if (!player) return callback?.({ error: 'Not in room' });
             player.handSizeEnforce = !!value;
-            addAction(room, currentUserId, 'setHandSizeEnforce', { value: !!value });
+            addAndBroadcastAction(io, room, currentUserId, 'setHandSizeEnforce', { value: !!value });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2360,7 +2409,7 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
             if (room.hostId !== currentUserId) return callback?.({ error: 'Only host can change this' });
             room.sharedTeamLife = !!value;
-            addAction(room, currentUserId, 'setSharedTeamLife', { value: !!value });
+            addAndBroadcastAction(io, room, currentUserId, 'setSharedTeamLife', { value: !!value });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2388,7 +2437,7 @@ module.exports = function registerSocketHandlers(io) {
             // Drop life to 0 visually so the existing death-banner / dead
             // styling kicks in without us needing a separate path.
             player.life = 0;
-            addAction(room, currentUserId, 'concede', { player: player.username });
+            addAndBroadcastAction(io, room, currentUserId, 'concede', { player: player.username });
             broadcastToRoom(io, room, 'notification', {
                 type: 'concede',
                 message: `${player.username} conceded`,
@@ -2406,7 +2455,7 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
             const target = getPlayerInRoom(room, targetPlayerId);
             if (!target) return callback?.({ error: 'Player not found' });
-            addAction(room, currentUserId, 'browseLibraryFull', { target: target.username });
+            addAndBroadcastAction(io, room, currentUserId, 'browseLibraryFull', { target: target.username });
             callback?.({ success: true, library: target.zones.library });
         });
 
@@ -2435,7 +2484,7 @@ module.exports = function registerSocketHandlers(io) {
                     });
                 }
             }
-            addAction(room, currentUserId, 'revealHand', {
+            addAndBroadcastAction(io, room, currentUserId, 'revealHand', {
                 player: player.username,
                 handCount: cards.length,
                 to: targetPlayerIds === 'all' ? 'all' : `${targets.length} player(s)`,
@@ -2464,7 +2513,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
             player.mulliganBottomPending = 0;
-            addAction(room, currentUserId, 'mulliganBottom', { player: player.username, count: instanceIds.length });
+            addAndBroadcastAction(io, room, currentUserId, 'mulliganBottom', { player: player.username, count: instanceIds.length });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2510,7 +2559,7 @@ module.exports = function registerSocketHandlers(io) {
             owner.zones.battlefield.splice(ownerIdx, 1);
             card.controllerOriginal = untilEndOfTurn ? owner.userId : null;
             caster.zones.battlefield.push(card);
-            addAction(room, currentUserId, 'takeControl', {
+            addAndBroadcastAction(io, room, currentUserId, 'takeControl', {
                 cardName: card.name, from: owner.username, untilEndOfTurn: !!untilEndOfTurn,
             });
             broadcastRoomState(io, room);
@@ -2546,7 +2595,7 @@ module.exports = function registerSocketHandlers(io) {
                 player.zones[dest].push(card);
             }
             if (shuffle) shuffleArray(player.zones.library);
-            addAction(room, currentUserId, 'tutor', {
+            addAndBroadcastAction(io, room, currentUserId, 'tutor', {
                 cardName: card.name, toZone: dest, shuffled: !!shuffle,
             });
             broadcastRoomState(io, room);
