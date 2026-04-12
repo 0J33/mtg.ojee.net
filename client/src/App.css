@@ -297,6 +297,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     overflow-y: auto;
     padding: 20px 0;
 }
+/* CardMaximized overrides z-index so clicking a card inside another modal
+   (like the tutor/library search) pops the zoomed view above, not behind. */
+.card-max-overlay { z-index: 3000; }
+/* Reveal events (handRevealed, Gonti peek resolver) should surface on top
+   of any other modal the viewer might be in the middle of — otherwise a
+   reveal that arrives while someone is tutoring is effectively invisible. */
+.reveal-top { z-index: 2500 !important; }
+
+/* Library search multi-select toolbar */
+.library-select-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    margin: 8px 0 10px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+}
+.library-select-toolbar label { display: inline-flex; gap: 4px; align-items: center; font-size: 0.85em; color: var(--text-mid); }
+.library-card-entry.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Gonti peek & exile modal — identical grid to reveal hand but with a
+   per-card "Exile this" action. */
+.peek-exile-modal { max-width: 860px; width: 95%; }
 .modal {
     background: var(--bg-panel);
     border: 1px solid var(--border);
@@ -1405,6 +1430,72 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .custom-card-mode-picker label strong { color: var(--text); }
 
+/* ─── MULLIGAN PHASE TOPBAR INDICATOR ─────────────────────── */
+.mulligan-phase-info {
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    font-family: 'Cinzel', serif;
+    font-style: normal;
+}
+.mulligan-phase-info strong { color: var(--text); }
+.mulligan-my-roll {
+    font-family: 'Cinzel', serif;
+    font-size: 0.85em;
+    color: var(--text-mid);
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+.mulligan-my-roll strong { color: gold; font-size: 1.1em; }
+
+/* Animated dice roll toast — big centered number that flickers through
+   random values while rolling, then locks with a gold glow when settled. */
+.dice-toast {
+    text-align: center;
+    padding: 10px 18px 12px;
+    min-width: 180px;
+}
+.dice-toast .dice-big {
+    font-family: 'Cinzel', serif;
+    font-size: 2.6em;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1;
+    margin-top: 6px;
+    color: gold;
+    text-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+    transition: transform 0.25s ease, color 0.2s ease;
+}
+.dice-toast.rolling .dice-big {
+    color: var(--text);
+    text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+    animation: diceShake 0.1s infinite ease-in-out;
+}
+.dice-toast.settled .dice-big {
+    transform: scale(1.15);
+    animation: diceLock 0.6s ease-out;
+}
+.dice-label {
+    font-size: 0.7em;
+    color: var(--text-faint);
+    font-style: italic;
+    letter-spacing: 1px;
+}
+@keyframes diceShake {
+    0%, 100% { transform: translate(-1px, -1px) rotate(-2deg); }
+    25% { transform: translate(1px, 1px) rotate(2deg); }
+    50% { transform: translate(-1px, 1px) rotate(-1deg); }
+    75% { transform: translate(1px, -1px) rotate(1deg); }
+}
+@keyframes diceLock {
+    0% { transform: scale(1.5); text-shadow: 0 0 40px gold; }
+    100% { transform: scale(1.15); text-shadow: 0 0 12px rgba(255, 215, 0, 0.5); }
+}
+
 /* ─── TURN-START NUDGE GLOW ───────────────────────────────── */
 /* Applied to the Draw button when the current-turn player hasn't drawn yet,
    and to land cards in hand when they haven't played a land yet. Pulsing
@@ -1629,7 +1720,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .action-log-entry.type-victory { border-left-color: gold; background: rgba(255, 215, 0, 0.08); }
 .action-log-entry.type-startGame { border-left-color: var(--accent); }
 .action-log-entry.type-autoUntap,
-.action-log-entry.type-initialDraw { border-left-color: var(--text-faint); opacity: 0.85; font-style: italic; }
+.action-log-entry.type-initialDraw,
+.action-log-entry.type-setMulliganReady,
+.action-log-entry.type-mulliganPhaseStart { border-left-color: var(--text-faint); opacity: 0.85; font-style: italic; }
+.action-log-entry.type-firstPlayerRoll { border-left-color: gold; }
 .action-log-time { font-family: monospace; font-size: 0.7em; color: var(--text-faint); flex-shrink: 0; }
 .action-log-text { color: var(--text); word-wrap: break-word; overflow-wrap: break-word; min-width: 0; }
 
@@ -1853,4 +1947,344 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
         user-select: text;
         -webkit-touch-callout: default;
     }
+}
+
+/* ─── Big-batch additions (mana pool, new card states, new zones, modals,
+   stack panel, brush preview, etc). All additive — original layout untouched. */
+
+/* Mana pool widget — sits inside the player header */
+.mana-pool-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    margin-left: 6px;
+}
+.mana-pool-pip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    user-select: none;
+}
+.mana-pool-pip .mana-sym-img { width: 14px; height: 14px; }
+.mana-pool-count { font-size: 11px; font-weight: 600; }
+.mana-pool-clear {
+    background: transparent;
+    color: var(--text-faint, #888);
+    border: 0;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+}
+.mana-pool-clear:hover { color: #ff8888; }
+
+/* New card-state badges */
+.card-damage-badge,
+.card-suspend-badge,
+.card-goad-badge,
+.card-temp-control-badge {
+    position: absolute;
+    z-index: 5;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-weight: 600;
+    pointer-events: none;
+    line-height: 1.2;
+}
+.card-damage-badge { top: 2px; left: 2px; background: #c0392b; }
+.card-suspend-badge { top: 2px; right: 2px; background: #8e44ad; }
+.card-goad-badge { bottom: 2px; left: 2px; background: #d35400; }
+.card-temp-control-badge { bottom: 2px; right: 2px; background: #2980b9; }
+
+.card.phased-out img { opacity: 0.35; filter: grayscale(0.6); }
+.card.attacking { box-shadow: 0 0 0 2px #e74c3c, 0 0 12px rgba(231, 76, 60, 0.5); }
+.card.temp-controlled { box-shadow: 0 0 0 2px #2980b9; }
+
+/* New zone strips — same compact look as graveyard/exile */
+.foretell-zone .zone-label,
+.sideboard-zone .zone-label,
+.companions-zone .zone-label,
+.emblem-zone .zone-label {
+    background: rgba(0, 0, 0, 0.4);
+}
+.emblem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.emblem-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+.emblem-name { flex: 1; }
+.emblem-remove {
+    background: transparent;
+    border: 0;
+    color: #ff8888;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 4px;
+}
+
+/* Stack panel — floating top-center, auto-shows when non-empty */
+.stack-panel {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 15, 25, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 8px 12px;
+    z-index: 800;
+    min-width: 220px;
+    max-width: 320px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+.stack-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.stack-panel-head strong { flex: 1; }
+.stack-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.stack-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    font-size: 12px;
+}
+.stack-entry.top { background: rgba(120, 200, 255, 0.18); }
+.stack-entry-name { flex: 1; font-weight: 600; }
+.stack-entry-caster { font-size: 10px; }
+
+/* Extra turn / stack indicators in topbar */
+.extra-turn-indicator,
+.stack-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    margin-left: 6px;
+    font-size: 12px;
+    background: rgba(120, 200, 255, 0.18);
+    border-radius: 8px;
+}
+
+/* Settings modal */
+.settings-modal {
+    max-width: 520px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+.settings-section {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 0;
+}
+.settings-section strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--accent, #88aaff);
+}
+.settings-section label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+    font-size: 12px;
+}
+.settings-section label input[type="number"],
+.settings-section label input[type="text"] {
+    flex: 1;
+    max-width: 140px;
+    padding: 4px 8px;
+}
+.settings-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.settings-row .small-btn.active {
+    background: var(--accent, #88aaff);
+    color: #000;
+}
+
+/* Mana picker modal */
+.mana-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+}
+.mana-pick-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text, #ddd);
+}
+.mana-pick-btn.picked {
+    background: rgba(120, 200, 255, 0.25);
+    border-color: rgba(120, 200, 255, 0.6);
+}
+.mana-pick-btn .mana-sym-img { width: 18px; height: 18px; }
+.mana-picker-summary {
+    text-align: center;
+    margin: 8px 0;
+    font-weight: 600;
+}
+
+/* Card field editor — small modal */
+.small-modal {
+    max-width: 320px;
+}
+
+/* Browse library modal */
+.browse-library-modal {
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+/* Reveal hand picker — clickable cards */
+.revealed-hand-card.selected {
+    outline: 3px solid var(--accent, #88aaff);
+    outline-offset: -3px;
+}
+.bottom-order-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #88aaff;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 10px;
+}
+.reveal-target-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.reveal-target-row select {
+    flex: 1;
+    padding: 4px 8px;
+}
+
+/* Brush preview circle inside drawing canvas */
+.brush-preview {
+    position: absolute;
+    border: 2px solid #ff0000;
+    border-radius: 50%;
+    pointer-events: none;
+    box-sizing: border-box;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+    z-index: 1100;
+}
+
+/* Avatar dot in player header */
+.player-avatar-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+/* Conceded badge */
+.conceded-badge {
+    color: #ff8888;
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+/* Chat DM tag */
+.chat-msg-dm-tag {
+    color: #88aaff;
+    font-size: 10px;
+    margin-left: 4px;
+}
+.chat-msg.dm {
+    background: rgba(136, 170, 255, 0.08);
+    border-left: 2px solid #88aaff;
+    padding-left: 6px;
+}
+.chat-input-col {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+.chat-target-select {
+    padding: 4px 6px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--text, #ddd);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+/* Spectator perspective dropdown — sits next to the spectator-badge */
+.spec-perspective-select {
+    margin-left: 6px;
+    padding: 2px 6px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--text, #ddd);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    max-width: 180px;
+}
+
+/* Tutor-to-battlefield options row in LibrarySearch */
+.library-bf-options {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 8px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    font-size: 12px;
+}
+.library-bf-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
 }

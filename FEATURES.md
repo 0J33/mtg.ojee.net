@@ -63,9 +63,78 @@ Full list of what the app does, grouped by area.
 - player counters: poison, energy, experience, custom-named
 - designations (visual only, no rules enforcement): monarch, initiative, city's blessing, day/night
 - custom backgrounds per player zone
+- **damage marked on creatures** (clears at end of turn)
+- **phasing** — toggle phased-out state (faded/grayscale visual)
+- **goad marker** — orange ⚔ badge on the creature
+- **suspend / time counters** — purple ⌛ badge, auto-ticks down at start of incoming player's turn
+- **concede button** in your own player menu — drops you to 0 life, fires victory check
+- **per-player hand-size enforcement** — opt-in nudge at end of turn if you're over the limit
+
+## mana pool
+
+- **mana pool widget** in each player header — colored pips per WUBRG + colorless
+- right-click a basic land → "Tap for mana" — auto-detects color from name/type, taps the land, adds to your pool
+- right-click a non-basic land → opens the **mana picker** modal so you choose which colors it produces (e.g. WG for Stomping Ground)
+- click a pool pip to spend one of that color, shift-click to add one back, × button to empty the pool
+- pool clears automatically at the start of your next turn
+
+## stack, extra turns, emblems
+
+- **the stack** — server holds a LIFO of pushed spells, the floating stack panel renders top→bottom with the top entry highlighted, click Resolve to pop or Clear to wipe
+- **extra-turn queue** — push extra turns onto the queue from any player's context menu; the next `nextTurn` consumes the queue head before advancing
+- **emblem zone** — per-player free-form emblem list (name + oracle text), only renders when non-empty
+- **proliferate** — one click on your own player menu adds 1 to every counter on every permanent and player
+
+## new card actions
+
+- **clone** any battlefield card — creates a token-marked duplicate
+- **cast from graveyard / exile / foretell** with optional auto-exile-after for flashback / escape / jump-start
+- **foretell** a card from hand — moves it to a face-down foretell pile, "Cast (foretold)" later
+- **take control of an opponent's card** — permanent or until end of turn (auto-revert at EOT cleanup)
+- card field editor for damage / suspend counters via context menu
+- end-of-turn cleanup wipes damage, reverts temp-control, and clears attack markers
+
+## sideboard, companions, foretell zones
+
+- decks with sideboards / companions now load those into in-game zones (item 5)
+- **conditional rendering**: each new zone strip only appears in the player UI when it has cards in it, so the original 3-zone (Graveyard/Exile/Library) layout is unchanged for everyone else
+- right-click cards in sideboard → move into hand / battlefield like any other zone
+
+## teams
+
+- **per-player teamId** + team list in room state
+- **shared life across teammates** — host toggle in Settings; adjustLife/setLife propagate to every teammate so the team is one number
+- **team victory** — `checkVictory` fires when only one team has any non-eliminated player
+
+## game settings (host)
+
+- ⚙ button in topbar opens a Settings modal usable mid-game
+- format presets: commander, brawl, modern, oathbreaker, free
+- starting life, commander damage lethal, max players, hand-size limit
+- mulligan rules: **Vancouver** (legacy 7→7→6→5), **London** (always 7, bottom N), **Free7** (7→7→6→5→4)
+- shared team life toggle
+- per-player avatar color picker
+- per-player team ID assignment
+
+## hand & library tools
+
+- **reveal SPECIFIC cards from hand** — pick which cards to show, target one or all opponents
+- **browse opponent's full library** — Bribery / Acquire / wish-style — searchable, click "Take" to pull a card to your battlefield
+- **London-mulligan bottoming** — auto-prompts when `mulliganBottomPending > 0`, pick N cards in order, they go to the bottom
+
+## avatars & DMs
+
+- **per-player avatar color** — small dot next to the username, picked from a 16-color palette by default (deterministic from userId), customizable via Settings
+- **direct messages in chat** — pick a target from the dropdown, message gets `→ Recipient` tag and a blue left border, only delivered to sender + recipient
+
+## drawing improvements
+
+- **brush size preview circle** follows your cursor while drawing is active so you see the actual radius before committing
+- color of the preview matches your pen color (or white for the eraser)
 
 ## turns
 
+- **mulligan phase** at the start: everyone draws 7 and can mulligan freely, each player clicks Ready when done, then the server rolls a d20 per player and the highest roll takes turn 1 (rolls shown as toasts to the whole table)
 - turn indicator in the topbar showing whose turn it is
 - **only the current turn player** (or host for afk cases) can end the turn
 - **eliminated players auto-skipped** when advancing turns (life ≤ 0, 21+ commander damage, 10+ poison)
@@ -89,6 +158,7 @@ Full list of what the app does, grouped by area.
 
 - desktop players see each other's mouse cursors in real time
 - per-user color via stable hash of userid
+- **cursor recolors to match your pen color when drawing is active** so everyone can see who's painting what
 - username label next to each cursor
 - auto-fade after 3 seconds of no movement
 - throttled to ~20fps with a trailing emit so fast flicks still land

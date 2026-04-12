@@ -61,13 +61,19 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const hasCounters = counterEntries.length > 0;
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
     const hasEffects = hasCounters || hasNotes;
+    const damage = typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
+    const phasedOut = !!card.phasedOut;
+    const suspendCount = typeof card.suspendCounters === 'number' && card.suspendCounters > 0 ? card.suspendCounters : 0;
+    const goaded = !!card.goaded;
+    const attacking = !!card.attackingPlayerId;
+    const tempControlled = !!card.controllerOriginal;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (
         <>
             <div
                 ref={cardRef}
-                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''}`}
+                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''}`}
                 onClick={onClick}
                 onContextMenu={onContextMenu}
                 onMouseEnter={handleMouseEnter}
@@ -83,6 +89,12 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                     draggable={false}
                 />
                 {hasEffects && <div className="effect-indicator" title="Has counters/notes">!</div>}
+                {/* Damage marker — wears off at end of turn server-side */}
+                {damage > 0 && <div className="card-damage-badge" title={`${damage} damage marked`}>{damage}</div>}
+                {/* Suspend counters — tick down each upkeep server-side */}
+                {suspendCount > 0 && <div className="card-suspend-badge" title={`${suspendCount} time counter(s)`}>⌛{suspendCount}</div>}
+                {goaded && <div className="card-goad-badge" title="Goaded — must attack">⚔</div>}
+                {tempControlled && <div className="card-temp-control-badge" title="Under temporary control (returns end of turn)">↶</div>}
             </div>
 
             {/* Hover zoom + side effects panel */}

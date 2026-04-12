@@ -31,6 +31,14 @@ const cardInstanceSchema = new mongoose.Schema({
     customCardAuthorUsername: { type: String, default: null },
     customCardOriginId: { type: String, default: null },
     customCardOwnerId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    // Combat / state extras (added in big batch). All optional.
+    damage: { type: Number, default: 0 },
+    phasedOut: { type: Boolean, default: false },
+    suspendCounters: { type: Number, default: 0 },
+    goaded: { type: Boolean, default: false },
+    attackingPlayerId: { type: String, default: null },
+    controllerOriginal: { type: String, default: null },
+    returnZone: { type: String, default: null },
 }, { _id: false });
 
 const playerStateSchema = new mongoose.Schema({
@@ -67,9 +75,17 @@ const playerStateSchema = new mongoose.Schema({
         graveyard: [cardInstanceSchema],
         exile: [cardInstanceSchema],
         commandZone: [cardInstanceSchema],
+        sideboard: [cardInstanceSchema],
+        companions: [cardInstanceSchema],
+        foretell: [cardInstanceSchema],
+        emblems: [{ type: mongoose.Schema.Types.Mixed }],
     },
     teamId: { type: String, default: null },
     mulliganCount: { type: Number, default: 0 },
+    mulliganBottomPending: { type: Number, default: 0 },
+    handSizeEnforce: { type: Boolean, default: false },
+    avatarColor: { type: String, default: null },
+    conceded: { type: Boolean, default: false },
 }, { _id: false });
 
 const strokeSchema = new mongoose.Schema({
@@ -116,12 +132,18 @@ const gameRoomSchema = new mongoose.Schema({
         useCommanderDamage: { type: Boolean, default: true },
         commanderDamageLethal: { type: Number, default: 21 },
         maxPlayers: { type: Number, default: 8 },
+        format: { type: String, default: 'commander' },
+        mulliganRules: { type: String, default: 'vancouver' },
+        handSizeLimit: { type: Number, default: 7 },
     },
     teams: [{
         teamId: { type: String },
         name: { type: String },
         sharedLife: { type: Number, default: null },
     }],
+    sharedTeamLife: { type: Boolean, default: false },
+    stack: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    extraTurns: { type: [mongoose.Schema.Types.Mixed], default: [] },
     started: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
     lastActivity: { type: Date, default: Date.now },

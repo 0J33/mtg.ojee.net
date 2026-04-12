@@ -12,12 +12,14 @@ import socket from '../socket';
  *   onNewMessage — called when a chat message arrives while the panel is hidden,
  *                  so the parent can show an unread-badge on the toggle button
  */
-export default function Chat({ messages: historyMessages, currentUserId, open, onToggle }) {
+export default function Chat({ messages: historyMessages, currentUserId, open, onToggle, players }) {
     // Local mirror of messages so we can append newly received ones without
     // waiting for the next full gameState broadcast.
     const [messages, setMessages] = useState(historyMessages || []);
     const [draft, setDraft] = useState('');
     const [unread, setUnread] = useState(0);
+    // DM target — null = public chat, otherwise userId of the recipient.
+    const [dmTarget, setDmTarget] = useState(null);
     const listRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -61,11 +63,11 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
     const send = useCallback(() => {
         const text = draft.trim();
         if (!text) return;
-        socket.emit('sendChatMessage', { text }, (res) => {
+        socket.emit('sendChatMessage', { text, toUserId: dmTarget || undefined }, (res) => {
             if (res?.error) console.warn('[chat] send failed:', res.error);
         });
         setDraft('');
-    }, [draft]);
+    }, [draft, dmTarget]);
 
     const handleKeyDown = (e) => {
         // Enter sends, Shift+Enter inserts a newline.
@@ -108,24 +110,35 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
                     {messages.map(m => (
                         <div
                             key={m.id}
-                            className={`chat-msg ${m.userId === currentUserId ? 'mine' : ''} ${m.isSpectator ? 'spectator' : ''}`}
+                            className={`chat-msg ${m.userId === currentUserId ? 'mine' : ''} ${m.isSpectator ? 'spectator' : ''} ${m.toUserId ? 'dm' : ''}`}
                         >
                             <div className="chat-msg-meta">
                                 <span className="chat-msg-user">{m.username}{m.isSpectator && ' [spec]'}</span>
+                                {m.toUserId && (
+                                    <span className="chat-msg-dm-tag" title="Direct message">→ {m.toUsername || 'DM'}</span>
+                                )}
                                 <span className="chat-msg-time">{fmtTime(m.ts)}</span>
                             </div>
                             <div className="chat-msg-text">{m.text}</div>
                         </div>
                     ))}
                 </div>
-                <div className="chat-input-row">
+                <div className="chat-input-row chat-input-col">
+                    {Array.isArray(players) && players.length > 1 && (
+                        <select className="chat-target-select" value={dmTarget || ''} onChange={e => setDmTarget(e.target.value || null)}>
+                            <option value="">All (public)</option>
+                            {players.filter(p => p.userId !== currentUserId).map(p => (
+                                <option key={p.userId} value={p.userId}>DM → {p.username}</option>
+                            ))}
+                        </select>
+                    )}
                     <textarea
                         ref={inputRef}
                         className="chat-input"
                         value={draft}
                         onChange={e => setDraft(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Message..."
+                        placeholder={dmTarget ? 'Whisper...' : 'Message...'}
                         rows={2}
                         maxLength={500}
                     />

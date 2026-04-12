@@ -6,7 +6,47 @@ import NoteEditor from './NoteEditor';
 import CounterModal from './CounterModal';
 import { useEscapeKey, useHorizontalWheel, fmtNum, parseGameValue, isInfinite, INFINITE } from '../utils';
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted }) {
+// Color order used by the mana pool widget — matches the WUBRG convention
+// most MTG players expect, with colorless on the right.
+const MANA_COLORS = ['W', 'U', 'B', 'R', 'G', 'C'];
+
+// Pool widget — small inline strip in the player header. Shows each color
+// only when its count > 0; clicking subtracts one (mana spent), shift-click
+// adds one (manual fix-up). Owner-only interaction.
+function ManaPoolWidget({ pool, isOwner, playerId, spectating }) {
+    if (!pool) return null;
+    const totals = MANA_COLORS.map(c => [c, pool[c] || 0]);
+    const anyMana = totals.some(([, v]) => v > 0);
+    if (!anyMana && !isOwner) return null;
+    const adjust = (color, delta) => {
+        if (spectating) return;
+        socket.emit('addMana', { targetPlayerId: playerId, color, amount: delta });
+    };
+    return (
+        <div className="mana-pool-widget" title="Mana pool — click to spend, shift-click to add">
+            {totals.filter(([, v]) => v > 0).map(([c, v]) => (
+                <span
+                    key={c}
+                    className={`mana-pool-pip mana-${c}`}
+                    onClick={isOwner ? (e) => adjust(c, e.shiftKey ? 1 : -1) : undefined}
+                    onContextMenu={isOwner ? (e) => { e.preventDefault(); adjust(c, 1); } : undefined}
+                >
+                    <img src={`https://svgs.scryfall.io/card-symbols/${c}.svg`} alt={c} className="mana-sym-img" />
+                    <span className="mana-pool-count">{v}</span>
+                </span>
+            ))}
+            {isOwner && anyMana && (
+                <button
+                    className="mana-pool-clear"
+                    title="Empty mana pool"
+                    onClick={() => socket.emit('clearManaPool', { targetPlayerId: playerId })}
+                >×</button>
+            )}
+        </div>
+    );
+}
+
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onAddEmblem, onShowEmblem, onShowCardFieldEditor, onTakeControl, onCastFromZone, onTapForMana, onForetellCard, onCastForetold }) {
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -86,41 +126,146 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             ...(card.bfRow ? [{ label: 'Display in: Auto', onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: null }) }] : []),
         ] : [];
 
+        // ─── Big batch additions: zone-aware menu items ────────────────
+        // Tap-for-mana — battlefield only, cards that don't have tappedFor.
+        // For non-basic lands the server returns requiresPicker; the client
+        // then opens the ManaPicker modal.
+        const tapManaItems = (zone === 'battlefield' && !card.tapped) ? [
+            { label: 'Tap for mana', onClick: () => onTapForMana?.(card) },
+        ] : [];
+
+        // Cast from non-battlefield zones with optional auto-exile.
+        const castFromZoneItems = (zone === 'graveyard' || zone === 'exile' || zone === 'foretell') ? [
+            { divider: true },
+            ...(zone === 'foretell' ? [
+                { label: 'Cast (foretold)', onClick: () => onCastForetold?.(card) },
+            ] : [
+                { label: 'Cast → battlefield', onClick: () => onCastFromZone?.(card, zone, false) },
+                { label: 'Cast → exile after (flashback / escape)', onClick: () => onCastFromZone?.(card, zone, true) },
+            ]),
+        ] : [];
+
+        // Foretell from hand
+        const foretellItems = (zone === 'hand') ? [
+            { label: 'Foretell', onClick: () => onForetellCard?.(card) },
+        ] : [];
+
+        // Stack push — only from hand (cast a spell). Adds the card to the
+        // room-level stack so other players see what you're casting before
+        // you actually drag it onto the battlefield. Pure tool, no resolution.
+        const stackPushItems = (zone === 'hand' && player.userId === userId) ? [
+            { label: 'Push to stack', onClick: () => socket.emit('stackPush', {
+                name: card.name,
+                imageUri: card.imageUri,
+                oracleText: card.oracleText,
+                manaCost: card.manaCost,
+                instanceId: card.instanceId,
+            }) },
+        ] : [];
+
+        // Adventure cards — front face is the creature, "adventure" face is an
+        // instant/sorcery printed below it. Detected by layout === 'adventure'
+        // or the legacy " // " name pattern. "Cast adventure" pushes the
+        // adventure side to the stack and exiles the card; the player can then
+        // cast it from exile as the creature later (which is the MTG rule).
+        const isAdventure = card.layout === 'adventure'
+            || (typeof card.name === 'string' && card.name.includes(' // ')
+                && /Adventure/i.test(card.typeLine || ''));
+        const adventureName = isAdventure && card.name?.includes(' // ')
+            ? card.name.split(' // ')[1]
+            : null;
+        const adventureItems = (zone === 'hand' && isAdventure && adventureName && player.userId === userId) ? [
+            { label: `Cast adventure: ${adventureName}`, onClick: () => {
+                socket.emit('stackPush', {
+                    name: `${adventureName} (adventure)`,
+                    imageUri: card.imageUri,
+                    oracleText: card.oracleText,
+                    manaCost: '',
+                    instanceId: card.instanceId,
+                });
+                // After resolving, the card goes to exile per MTG rules. It
+                // can then be cast as the creature side from exile via the
+                // existing "Cast → battlefield" menu item on the exile zone.
+                socket.emit('moveCard', {
+                    instanceId: card.instanceId,
+                    fromZone: 'hand',
+                    toZone: 'exile',
+                });
+            }},
+        ] : [];
+
+        // Combat declaration — only on YOUR OWN battlefield creatures.
+        // Adds an "Attack → <opponent>" submenu, plus "Stop attacking" if the
+        // card is currently marked. The marker auto-clears at end of turn via
+        // server-side cleanup.
+        const combatItems = (zone === 'battlefield' && player.userId === userId) ? [
+            { divider: true },
+            ...allPlayers.filter(p => p.userId !== userId).map(p => ({
+                label: `Attack → ${p.username}${card.attackingPlayerId === p.userId ? ' ✓' : ''}`,
+                onClick: () => socket.emit('setCardField', {
+                    instanceId: card.instanceId,
+                    field: 'attackingPlayerId',
+                    value: p.userId,
+                }),
+            })),
+            ...(card.attackingPlayerId ? [{
+                label: 'Stop attacking',
+                onClick: () => socket.emit('setCardField', {
+                    instanceId: card.instanceId,
+                    field: 'attackingPlayerId',
+                    value: null,
+                }),
+            }] : []),
+        ] : [];
+
+        // Battlefield-only state actions
+        const stateActionItems = (zone === 'battlefield') ? [
+            { divider: true },
+            { label: card.phasedOut ? 'Phase in' : 'Phase out', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'phasedOut', value: !card.phasedOut }) },
+            { label: card.goaded ? 'Remove goad' : 'Goad', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'goaded', value: !card.goaded }) },
+            { label: `Mark damage... (${card.damage || 0})`, onClick: () => onShowCardFieldEditor?.(card, 'damage') },
+            { label: `Suspend counters... (${card.suspendCounters || 0})`, onClick: () => onShowCardFieldEditor?.(card, 'suspendCounters') },
+            { label: 'Clone (token)', onClick: () => onCloneCard?.(card) },
+            ...(card.controllerOriginal ? [
+                { label: 'Return to original owner', onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: 'battlefield', toZone: 'battlefield', targetPlayerId: card.controllerOriginal }) },
+            ] : []),
+            // Take control on opponent's cards only — drawn from this player's
+            // userId vs the card-owner's userId via the player param.
+            ...(player.userId !== userId ? [
+                { label: 'Take control (until end of turn)', onClick: () => onTakeControl?.(card, true) },
+                { label: 'Take control (permanent)', onClick: () => onTakeControl?.(card, false) },
+            ] : []),
+        ] : [];
+
         const items = [
             { label: `View: ${card.name || 'Face-down'}`, onClick: () => onMaximizeCard(card) },
             {
                 label: card.tapped ? 'Untap' : 'Tap',
                 onClick: () => socket.emit('tapCard', { instanceId: card.instanceId }),
             },
+            ...tapManaItems,
+            ...foretellItems,
+            ...stackPushItems,
+            ...adventureItems,
             ...bfRowItems,
+            ...stateActionItems,
+            ...combatItems,
+            ...castFromZoneItems,
             { divider: true },
             ...zones.filter(z => z !== zone).map(z => ({
                 label: `Move to ${z === 'commandZone' ? 'Command Zone' : z}`,
                 onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: z }),
             })),
             { divider: true },
-            // Unified "Flip" action — for double-faced cards, swap sides;
-            // otherwise toggle face-down. Cards that are both DFC and need to
-            // be face-down (morph shenanigans) can still be force-face-down via
-            // the extra item below.
-            (() => {
-                const hasBack = !!card.backImageUri;
-                if (hasBack) {
-                    return {
-                        label: card.flipped ? 'Flip to front' : 'Flip to back',
-                        onClick: () => socket.emit('flipCard', { instanceId: card.instanceId }),
-                    };
-                }
-                return {
-                    label: card.faceDown ? 'Turn face-up' : 'Turn face-down',
-                    onClick: () => socket.emit('toggleFaceDown', { instanceId: card.instanceId }),
-                };
-            })(),
-            // Edge case: DFC card that also needs the generic face-down back
-            ...(card.backImageUri ? [{
-                label: card.faceDown ? 'Turn face-up' : 'Turn face-down',
-                onClick: () => socket.emit('toggleFaceDown', { instanceId: card.instanceId }),
-            }] : []),
+            // Single unified "Flip" action. DFC cards swap sides; one-sided
+            // cards toggle face-down. One button for everything.
+            {
+                label: 'Flip',
+                onClick: () => socket.emit(
+                    card.backImageUri ? 'flipCard' : 'toggleFaceDown',
+                    { instanceId: card.instanceId },
+                ),
+            },
             { divider: true },
             { label: 'Reveal to all', onClick: () => socket.emit('revealCard', { instanceId: card.instanceId, targetPlayerIds: 'all' }) },
             ...allPlayers.filter(p => p.userId !== userId).map(p => ({
@@ -237,8 +382,16 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 </div>
             )}
             <div className="player-header" onContextMenu={spectating ? undefined : onPlayerContextMenu}>
+                {player.avatarColor && (
+                    <span
+                        className="player-avatar-dot"
+                        style={{ background: player.avatarColor }}
+                        title={player.username}
+                    />
+                )}
                 <span className={`player-name ${player.connected ? 'online' : 'offline'}`}>
                     {player.username}
+                    {player.conceded && <span className="conceded-badge" title="Conceded"> · conceded</span>}
                 </span>
                 {touchMode && !spectating && (
                     <button
@@ -320,6 +473,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     {player.designations?.citysBlessing && <span className="designation-badge blessing" title="City's Blessing">Blessing</span>}
                     {player.designations?.dayNight && <span className="designation-badge daynight" title="Day/Night">{player.designations.dayNight}</span>}
                 </div>
+
+                {/* Mana pool — small inline widget. Hidden when empty for opponents,
+                    always shown (with the clear button hidden) for owner. */}
+                <ManaPoolWidget pool={player.manaPool} isOwner={isOwner} playerId={player.userId} spectating={spectating} />
             </div>
 
             {/* Battlefield split into card-type rows; lands sit beside command zone */}
@@ -425,6 +582,62 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                         <div className="zone-cards expanded">{renderZoneCards(player.zones.exile, 'exile')}</div>
                     )}
                 </div>
+
+                {/* Conditional new zones — only render when they have content,
+                    so existing 4-zone (Graveyard / Exile / Library) layouts are
+                    visually unchanged for users who don't use these. */}
+                {(player.zones.foretellCount > 0 || (player.zones.foretell && player.zones.foretell.length > 0)) && (
+                    <div className="zone foretell-zone"
+                        onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'foretell')}
+                        onClick={() => setExpandedZone(expandedZone === 'foretell' ? null : 'foretell')}>
+                        <div className="zone-label">Foretell ({player.zones.foretellCount ?? player.zones.foretell?.length ?? 0})</div>
+                        {expandedZone === 'foretell' && isOwner && (
+                            <div className="zone-cards expanded">{renderZoneCards(player.zones.foretell, 'foretell')}</div>
+                        )}
+                    </div>
+                )}
+                {(player.zones.sideboardCount > 0 || (player.zones.sideboard && player.zones.sideboard.length > 0)) && (
+                    <div className="zone sideboard-zone"
+                        onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'sideboard')}
+                        onClick={() => setExpandedZone(expandedZone === 'sideboard' ? null : 'sideboard')}>
+                        <div className="zone-label">Sideboard ({player.zones.sideboardCount ?? player.zones.sideboard?.length ?? 0})</div>
+                        {expandedZone === 'sideboard' && isOwner && (
+                            <div className="zone-cards expanded">{renderZoneCards(player.zones.sideboard, 'sideboard')}</div>
+                        )}
+                    </div>
+                )}
+                {(player.zones.companionsCount > 0 || (player.zones.companions && player.zones.companions.length > 0)) && (
+                    <div className="zone companions-zone"
+                        onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'companions')}
+                        onClick={() => setExpandedZone(expandedZone === 'companions' ? null : 'companions')}>
+                        <div className="zone-label">Wishboard ({player.zones.companionsCount ?? player.zones.companions?.length ?? 0})</div>
+                        {expandedZone === 'companions' && isOwner && (
+                            <div className="zone-cards expanded">{renderZoneCards(player.zones.companions, 'companions')}</div>
+                        )}
+                    </div>
+                )}
+                {Array.isArray(player.zones.emblems) && player.zones.emblems.length > 0 && (
+                    <div className="zone emblem-zone"
+                        onClick={() => setExpandedZone(expandedZone === 'emblems' ? null : 'emblems')}>
+                        <div className="zone-label">Emblems ({player.zones.emblems.length})</div>
+                        {expandedZone === 'emblems' && (
+                            <div className="zone-cards expanded emblem-list">
+                                {player.zones.emblems.map(em => (
+                                    <div key={em.id} className="emblem-entry" title={em.oracleText}>
+                                        <span className="emblem-name">{em.name}</span>
+                                        {isOwner && (
+                                            <button
+                                                className="emblem-remove"
+                                                onClick={(e) => { e.stopPropagation(); socket.emit('removeEmblem', { targetPlayerId: player.userId, emblemId: em.id }); }}
+                                            >×</button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="zone library-zone"
                     onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'library')}>
                     <div className="zone-label"

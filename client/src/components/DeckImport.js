@@ -11,6 +11,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
     const [text, setText] = useState('');
     const [deckName, setDeckName] = useState('');
     const [shareCode, setShareCode] = useState('');
+    const [moxfieldUrl, setMoxfieldUrl] = useState('');
     // Copy = new CustomCard records owned by me, fully independent.
     // Link = keep the original author's ownership; their edits propagate to
     // my deck automatically.
@@ -111,6 +112,38 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
         });
     };
 
+    // Moxfield URL import — server-side fetch goes through moxfieldClient.js,
+    // which enforces the rate limit + secret UA handling. Returns the same
+    // shape as the text import (commanders/companions/mainboard/sideboard/notFound)
+    // so we feed it into the existing preview/commander-pick flow.
+    const handleMoxfieldImport = async () => {
+        setError('');
+        const url = moxfieldUrl.trim();
+        if (!url) { setError('Enter a Moxfield deck URL'); return; }
+        if (!/moxfield\.com\/decks\//.test(url)) {
+            setError('That doesn\'t look like a Moxfield deck URL');
+            return;
+        }
+        setLoading(true);
+        try {
+            const data = await imports.moxfield(url);
+            if (data.error) {
+                setError(data.error);
+                setLoading(false);
+                return;
+            }
+            // Auto-fill deck name from the URL slug if user hasn't set one
+            if (!deckName) {
+                const slug = url.match(/moxfield\.com\/decks\/([A-Za-z0-9_-]+)/)?.[1];
+                if (slug) setDeckName(`Moxfield ${slug.slice(0, 8)}`);
+            }
+            setPreview(data);
+        } catch (err) {
+            setError(err.message || 'Import failed');
+        }
+        setLoading(false);
+    };
+
     // Share-code import: server has already stored the full deck snapshot, so
     // we just POST the code and it returns the created deck. No commander-pick
     // step, no preview — the share already has everything resolved.
@@ -149,7 +182,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                         <div className="tab-row">
                             <button className={mode === 'paste' ? 'active' : ''} onClick={() => { setMode('paste'); setError(''); }}>Paste Text</button>
                             <button className={mode === 'share' ? 'active' : ''} onClick={() => { setMode('share'); setError(''); }}>Share Code</button>
-                            <button className="disabled-tab" disabled title="Moxfield blocks API access with Cloudflare. Use Paste Text with 'Copy as plain text' from Moxfield's export menu.">Moxfield URL</button>
+                            <button className={mode === 'moxfield' ? 'active' : ''} onClick={() => { setMode('moxfield'); setError(''); }}>Moxfield URL</button>
                         </div>
 
                         {mode === 'paste' && (
@@ -244,6 +277,35 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                                 {error && <div className="error">{error}</div>}
                                 <button onClick={handleShareImport} disabled={loading || !shareCode.trim()} className="primary-btn">
                                     {loading ? 'Importing...' : 'Import from Share Code'}
+                                </button>
+                            </>
+                        )}
+
+                        {mode === 'moxfield' && (
+                            <>
+                                <input
+                                    type="text"
+                                    placeholder="Deck name (optional)"
+                                    value={deckName}
+                                    onChange={e => setDeckName(e.target.value)}
+                                />
+                                <p className="muted import-instructions">
+                                    Paste a public Moxfield deck URL — e.g.
+                                    <code> https://www.moxfield.com/decks/abc123XYZ</code>.
+                                    The server fetches the deck through Moxfield's official API
+                                    (rate-limited, so back-to-back imports may take a few seconds).
+                                </p>
+                                <input
+                                    type="text"
+                                    placeholder="https://www.moxfield.com/decks/..."
+                                    value={moxfieldUrl}
+                                    onChange={e => setMoxfieldUrl(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleMoxfieldImport()}
+                                    autoFocus
+                                />
+                                {error && <div className="error">{error}</div>}
+                                <button onClick={handleMoxfieldImport} disabled={loading || !moxfieldUrl.trim()} className="primary-btn">
+                                    {loading ? 'Importing...' : 'Import from Moxfield'}
                                 </button>
                             </>
                         )}

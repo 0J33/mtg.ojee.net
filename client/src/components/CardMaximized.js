@@ -32,8 +32,12 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
         setHoverThumb({ url: imageUri, x, y });
     };
 
-    return (
-        <div className="modal-overlay">
+    // Portal to body with an elevated z-index so the maximized card always
+    // renders ABOVE any other modal — e.g. if you click a card in the tutor
+    // / library search, the zoomed view appears on top of that modal instead
+    // of behind it.
+    return createPortal(
+        <div className="modal-overlay card-max-overlay">
             <div className="card-maximized">
                 <img src={largeUrl} alt={card.name} />
                 <div className="card-max-info">
@@ -120,15 +124,16 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                 <button className="small-btn" onClick={() => socket.emit('tapCard', { instanceId: card.instanceId })}>
                                     {card.tapped ? 'Untap' : 'Tap'}
                                 </button>
-                                {card.backImageUri ? (
-                                    <button className="small-btn" onClick={() => socket.emit('flipCard', { instanceId: card.instanceId })}>
-                                        {card.flipped ? 'Front' : 'Back'}
-                                    </button>
-                                ) : (
-                                    <button className="small-btn" onClick={() => socket.emit('toggleFaceDown', { instanceId: card.instanceId })}>
-                                        {card.faceDown ? 'Face up' : 'Face down'}
-                                    </button>
-                                )}
+                                <button
+                                    className="small-btn"
+                                    onClick={() => socket.emit(
+                                        card.backImageUri ? 'flipCard' : 'toggleFaceDown',
+                                        { instanceId: card.instanceId },
+                                    )}
+                                    title="Flip — swaps sides on double-faced cards, otherwise toggles face-down"
+                                >
+                                    Flip
+                                </button>
                                 {onAddCounter && (
                                     <button className="small-btn" onClick={() => onAddCounter(card)}>+ Counter</button>
                                 )}
@@ -179,6 +184,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                 </div>,
                 document.body
             )}
-        </div>
+        </div>,
+        document.body
     );
 }

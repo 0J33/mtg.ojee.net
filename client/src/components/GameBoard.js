@@ -4,6 +4,7 @@ import { decks, customCards } from '../api';
 import PlayerZone from './PlayerZone';
 import CardSearch from './CardSearch';
 import CardMaximized from './CardMaximized';
+import Card from './Card';
 import NoteEditor from './NoteEditor';
 import DrawingCanvas from './DrawingCanvas';
 import ScryModal from './ScryModal';
@@ -62,6 +63,19 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [actionLogOpen, setActionLogOpen] = useState(false);
     const [showSpectatorList, setShowSpectatorList] = useState(false);
     const [victoryAnim, setVictoryAnim] = useState(null); // { username, ts }
+    // Big-batch modals — all hidden behind hovers/menus, no permanent UI footprint.
+    const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [manaPickerCard, setManaPickerCard] = useState(null);            // { card }
+    const [cardFieldEditor, setCardFieldEditor] = useState(null);          // { card, field }
+    const [emblemAdderTarget, setEmblemAdderTarget] = useState(null);      // playerId
+    const [browseLibraryFor, setBrowseLibraryFor] = useState(null);        // { player, library }
+    const [revealPickerOpen, setRevealPickerOpen] = useState(false);
+    const [mulliganBottomOpen, setMulliganBottomOpen] = useState(false);
+    const [stackPanelOpen, setStackPanelOpen] = useState(true); // auto-collapse?
+    // Peek & exile (Gonti-style) state: while non-null, shows a modal where
+    // the caster picks a card to exile from the target's top-N library.
+    // Shape: { targetPlayerId, targetUsername, cards: [...], count: N }
+    const [peekSession, setPeekSession] = useState(null);
     // Live cursor sharing. Only meaningful for non-touch + non-compact desktop
     // users because compact mode and mobile have layouts that don't line up
     // with the default desktop grid. Persisted so the user's preference
@@ -71,6 +85,16 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         catch (_) { return true; }
     });
     const gameBoardRef = useRef(null);
+    // Shared ref between GameBoard and DrawingCanvas so the cursor broadcaster
+    // can tag its emits with the user's current pen color. DrawingCanvas
+    // writes to this ref whenever its color / tool / enabled state changes;
+    // GameBoard reads from it inside the throttled mousemove handler without
+    // triggering rerenders.
+    const penStateRef = useRef({ enabled: false, color: '#ff0000', tool: 'pen' });
+    // Last cursor position (0..1 normalized). Used to re-emit a cursorMove
+    // immediately when the pen color changes, so viewers see the new color
+    // without having to wait for the next mouse movement.
+    const lastCursorPosRef = useRef(null);
     // Eligibility is derived from runtime state — changes when compactMode
     // toggles or when the input device flips (rare). The isTouch check is
     // from useIsTouchDevice() already declared below.
@@ -155,7 +179,13 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             const x = (e.clientX - rect.left) / rect.width;
             const y = (e.clientY - rect.top) / rect.height;
             if (x < 0 || x > 1 || y < 0 || y > 1) return;
-            socket.emit('cursorMove', { x, y, aspectRatio: rect.width / rect.height });
+            // When actively drawing with the pen, tag the cursor with the
+            // current brush color so other players see who's drawing what.
+            // Eraser uses default hash color (no tint needed).
+            const pen = penStateRef.current;
+            const color = pen.enabled && pen.tool === 'pen' ? pen.color : undefined;
+            lastCursorPosRef.current = { x, y, aspectRatio: rect.width / rect.height };
+            socket.emit('cursorMove', { x, y, aspectRatio: rect.width / rect.height, color });
         };
 
         const onMove = (e) => {
@@ -218,6 +248,32 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
     }, [revealedCard, showSearch, maximizedCard, showScry, scryCountModal, showDeckPicker, showPlayerMenu, customCardModal, bgModal, librarySearchOpen, selectedIds, onDismissReveal, clearSelection]);
+
+    // Space bar toggles tap on all selected cards. Only active when something
+    // is selected so it doesn't swallow spaces in inputs. We sniff the active
+    // element so typing in a textarea / input never gets intercepted.
+    useEffect(() => {
+        if (selectedIds.size === 0) return;
+        const handler = (e) => {
+            if (e.key !== ' ') return;
+            const tag = (document.activeElement?.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) return;
+            e.preventDefault();
+            // Flip all: if any selected card is untapped, tap everything;
+            // otherwise untap everything. Matches the behavior of the Tap
+            // button in the selection bar.
+            const ids = Array.from(selectedIds);
+            const anyUntapped = ids.some(id => {
+                const found = findCardWithZone(id);
+                return found && !found.card.tapped;
+            });
+            socket.emit('bulkTap', { instanceIds: ids, tapped: anyUntapped });
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+    // findCardWithZone reads gameState — include it via ref semantics.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedIds, gameState]);
 
     const bulkTap = (tapped) => {
         socket.emit('bulkTap', { instanceIds: Array.from(selectedIds), tapped });
@@ -361,15 +417,38 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 label: `Auto-untap on turn start: ${player.autoUntap !== false ? 'ON' : 'OFF'}`,
                 onClick: () => socket.emit('setAutoUntap', { value: !(player.autoUntap !== false) }),
             },
+            {
+                label: `Hand-size enforce: ${player.handSizeEnforce ? 'ON' : 'OFF'}`,
+                onClick: () => socket.emit('setHandSizeEnforce', { value: !player.handSizeEnforce }),
+            },
             { divider: true },
             {
-                label: 'Reveal hand to all',
+                label: 'Reveal entire hand to all',
                 onClick: () => socket.emit('revealHand', { targetPlayerIds: 'all' }, () => {}),
             },
             ...gameState.players.filter(p => p.userId !== user.id).map(p => ({
-                label: `Reveal hand to ${p.username}`,
+                label: `Reveal entire hand to ${p.username}`,
                 onClick: () => socket.emit('revealHand', { targetPlayerIds: [p.userId] }, () => {}),
             })),
+            {
+                label: 'Reveal SPECIFIC cards from hand...',
+                onClick: () => setRevealPickerOpen(true),
+            },
+            { divider: true },
+            { label: 'Proliferate', onClick: handleProliferate },
+            { label: 'Queue an extra turn', onClick: handleQueueExtraTurn },
+            { label: 'Add emblem...', onClick: () => setEmblemAdderTarget(user.id) },
+            { divider: true },
+            { label: 'Concede', danger: true, onClick: handleConcede },
+        ] : [];
+
+        // Items shown only for OPPONENTS: browse-library (Bribery), add-emblem
+        // (effects that put emblems on opponents), and the existing peek-and-exile.
+        const opponentOnlyItems = !isSelfMenu ? [
+            { divider: true },
+            { label: 'Browse full library...', onClick: () => handleBrowseLibrary(player) },
+            { label: 'Add emblem to them...', onClick: () => setEmblemAdderTarget(player.userId) },
+            { label: 'Queue extra turn for them', onClick: () => socket.emit('queueExtraTurn', { targetPlayerId: player.userId }) },
         ] : [];
 
         const items = [
@@ -387,6 +466,14 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 label: `Infect (${player.infect || 0}/10)`,
                 onClick: () => handleInfect(player.userId),
             },
+            ...(player.userId !== user.id ? [
+                { divider: true },
+                {
+                    label: 'Peek & exile (Gonti)',
+                    onClick: () => handlePeekAndExile(player),
+                },
+            ] : []),
+            ...opponentOnlyItems,
             { divider: true },
             {
                 label: `Commander Died (${player.commanderDeaths || 0})`,
@@ -461,6 +548,52 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         socket.emit('setInfect', { toPlayerId: toId, amount: newAmount });
     };
 
+    // Gonti-style: look at top N of a target player's library, let the
+    // caster pick one to exile face-down under their control, and send the
+    // rest to the bottom in random order.
+    const handlePeekAndExile = async (targetPlayer) => {
+        const countStr = await dialog.prompt(
+            `Look at the top N cards of ${targetPlayer.username}'s library. You'll pick one to exile face-down — the rest go to the bottom in a random order.`,
+            '4',
+            { title: 'Peek & exile' },
+        );
+        if (countStr === null) return;
+        const count = parseInt(countStr, 10);
+        if (isNaN(count) || count < 1) return;
+        socket.emit('peekLibraryTop', { targetPlayerId: targetPlayer.userId, count }, (res) => {
+            if (res?.error) { dialog.alert(res.error, { title: 'Peek' }); return; }
+            setPeekSession({
+                targetPlayerId: targetPlayer.userId,
+                targetUsername: targetPlayer.username,
+                cards: res.cards || [],
+                count: (res.cards || []).length,
+            });
+        });
+    };
+
+    const resolvePeek = (exileInstanceId) => {
+        if (!peekSession) return;
+        // Randomize the return order for the non-exiled cards; this is
+        // Gonti's "then put the rest on the bottom of that library in a
+        // random order" behavior.
+        const remaining = peekSession.cards
+            .filter(c => c.instanceId !== exileInstanceId)
+            .map(c => c.instanceId);
+        for (let i = remaining.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+        }
+        socket.emit('peekResolve', {
+            targetPlayerId: peekSession.targetPlayerId,
+            peekCount: peekSession.count,
+            exileInstanceId,
+            returnOrder: remaining,
+        }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Peek resolve' });
+            setPeekSession(null);
+        });
+    };
+
     const handleAddCounter = async (playerId) => {
         const name = await dialog.prompt('Counter name (e.g. poison, energy):', '', { title: 'Add counter' });
         if (!name) return;
@@ -473,10 +606,104 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     };
 
     const gameStarted = !!gameState.started;
+    const inMulliganPhase = !!gameState.mulliganPhase;
     const myMulliganCount = me?.mulliganCount || 0;
+    const myRoll = me?.firstPlayerRoll ?? null;
+    const hasRolled = myRoll !== null && myRoll !== undefined;
+    const rollCount = (gameState.players || []).filter(p => typeof p.firstPlayerRoll === 'number').length;
+    const totalPlayers = (gameState.players || []).length;
     // Mulligan sequence: initial draw 7 → mulligan 1 draws 7 → 2 draws 6 →
     // 3 draws 5 → blocked. Allow up to 3 mulligans total.
-    const canMulligan = !gameStarted || myMulliganCount < 3;
+    const canMulligan = !gameStarted || inMulliganPhase || myMulliganCount < 3;
+
+    const handleRollForFirstPlayer = () => {
+        socket.emit('rollForFirstPlayer', {}, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Roll' });
+        });
+    };
+
+    // ─── Big-batch action handlers (all wired as props into PlayerZone) ───
+    const handleTapForMana = (card) => {
+        // Try the auto path first; if the server says requiresPicker we open
+        // the ManaPicker modal so the user can pick which colors this land
+        // produces (e.g. shocklands, taplands, dual lands without producedMana).
+        socket.emit('tapForMana', { instanceId: card.instanceId }, (res) => {
+            if (res?.success) return;
+            if (res?.requiresPicker) { setManaPickerCard({ card }); return; }
+            if (res?.error) dialog.alert(res.error, { title: 'Tap for mana' });
+        });
+    };
+
+    const handleCloneCard = (card) => {
+        socket.emit('cloneCard', { instanceId: card.instanceId }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Clone' });
+        });
+    };
+
+    const handleForetell = (card) => {
+        socket.emit('foretellCard', { instanceId: card.instanceId }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Foretell' });
+        });
+    };
+
+    const handleCastForetold = (card) => {
+        socket.emit('castForetold', { instanceId: card.instanceId }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Cast foretold' });
+        });
+    };
+
+    const handleCastFromZone = (card, fromZone, exileAfter) => {
+        socket.emit('castFromZone', { instanceId: card.instanceId, fromZone, exileAfter }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Cast' });
+        });
+    };
+
+    const handleTakeControl = (card, untilEndOfTurn) => {
+        socket.emit('takeControl', { instanceId: card.instanceId, untilEndOfTurn }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Take control' });
+        });
+    };
+
+    const handleShowCardFieldEditor = (card, field) => {
+        setCardFieldEditor({ card, field });
+    };
+
+    const handleProliferate = () => {
+        socket.emit('proliferate', (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Proliferate' });
+        });
+    };
+
+    const handleConcede = async () => {
+        const ok = await dialog.confirm('Concede the game?', { title: 'Concede', danger: true, confirmLabel: 'Concede' });
+        if (!ok) return;
+        socket.emit('concede', () => {});
+    };
+
+    const handleQueueExtraTurn = () => {
+        socket.emit('queueExtraTurn', { targetPlayerId: user.id }, (res) => {
+            if (res?.error) dialog.alert(res.error, { title: 'Extra turn' });
+        });
+    };
+
+    const handleBrowseLibrary = (player) => {
+        socket.emit('browseLibraryFull', { targetPlayerId: player.userId }, (res) => {
+            if (res?.error) { dialog.alert(res.error, { title: 'Browse library' }); return; }
+            setBrowseLibraryFor({ player, library: res.library || [] });
+        });
+    };
+
+    // London-mulligan: when the server flags pending bottoming, prompt the
+    // user to pick the cards. Triggered by an effect on `me.mulliganBottomPending`.
+    useEffect(() => {
+        if (me?.mulliganBottomPending > 0 && !mulliganBottomOpen) {
+            setMulliganBottomOpen(true);
+        }
+        if (!me?.mulliganBottomPending && mulliganBottomOpen) {
+            setMulliganBottomOpen(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [me?.mulliganBottomPending]);
 
     return (
         <div ref={gameBoardRef} className={`game-board ${compactMode ? 'compact-mode' : ''}`}>
@@ -507,13 +734,70 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                         Room: {roomCodeRevealed ? (roomCode || gameState.roomCode) : '••••••'}
                         {roomCodeCopied && <span className="room-code-copied"> copied</span>}
                     </button>
-                    <span className="turn-info">
-                        Turn: <strong>{turnPlayer?.username || '?'}</strong>
-                    </span>
-                    {gameStarted && !isSpectator && (
-                        <button onClick={handleNextTurn} className="small-btn turn-end-btn">End Turn</button>
+                    {inMulliganPhase ? (
+                        <>
+                            <span className="turn-info mulligan-phase-info">
+                                Mulligan phase — <strong>{rollCount}/{totalPlayers}</strong> rolled
+                            </span>
+                            {!isSpectator && !hasRolled && (
+                                <button
+                                    onClick={handleRollForFirstPlayer}
+                                    className="small-btn primary-btn"
+                                    title="Click when your mulligans are done. Rolls a d20 for first-player order."
+                                >
+                                    Ready & Roll d20
+                                </button>
+                            )}
+                            {!isSpectator && hasRolled && (
+                                <span className="mulligan-my-roll" title="Your d20 result">
+                                    You rolled <strong>{myRoll}</strong>
+                                </span>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <span className="turn-info">
+                                Turn: <strong>{turnPlayer?.username || '?'}</strong>
+                            </span>
+                            {gameStarted && !isSpectator && (
+                                <button onClick={handleNextTurn} className="small-btn turn-end-btn">End Turn</button>
+                            )}
+                        </>
                     )}
-                    {isSpectator && <span className="spectator-badge">Spectating</span>}
+                    {/* Extra-turn indicator — shows who's queued for an extra turn next */}
+                    {Array.isArray(gameState.extraTurns) && gameState.extraTurns.length > 0 && (
+                        <span className="extra-turn-indicator" title="Extra turns queued">
+                            ↺ {gameState.extraTurns.length}: {gameState.extraTurns.map(t => t.ownerName).join(', ')}
+                            {!isSpectator && <button className="small-btn" style={{ marginLeft: 4 }} onClick={() => socket.emit('removeExtraTurn', { index: 0 })}>x</button>}
+                        </span>
+                    )}
+                    {/* Stack indicator — auto-shown when non-empty */}
+                    {Array.isArray(gameState.stack) && gameState.stack.length > 0 && (
+                        <span className="stack-indicator" title="The stack — top spell resolves first">
+                            Stack: {gameState.stack.length}
+                            <button className="small-btn" style={{ marginLeft: 4 }} onClick={() => setStackPanelOpen(o => !o)}>{stackPanelOpen ? 'Hide' : 'Show'}</button>
+                        </span>
+                    )}
+                    {isSpectator && (
+                        <>
+                            <span className="spectator-badge">Spectating</span>
+                            {/* Perspective mode — only spectators see this. Picking
+                                a player switches the spectator's view to that player's
+                                perspective (their hand visible, others hidden). Useful
+                                for coaching streams. Default: see all hands. */}
+                            <select
+                                className="spec-perspective-select"
+                                value={gameState.viewerPerspectiveOf || ''}
+                                onChange={e => socket.emit('setSpectatorPerspective', { targetPlayerId: e.target.value || null })}
+                                title="View as a specific player (their hand only)"
+                            >
+                                <option value="">View: all hands</option>
+                                {gameState.players.map(p => (
+                                    <option key={p.userId} value={p.userId}>View as: {p.username}</option>
+                                ))}
+                            </select>
+                        </>
+                    )}
                     {gameState.spectators && gameState.spectators.length > 0 && (
                         <span className="spectator-count-wrapper">
                             <button
@@ -563,6 +847,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     {!isSpectator && (
                         <button onClick={() => setBgModal(true)} className="small-btn">BG</button>
                     )}
+                    <button onClick={() => setSettingsModalOpen(true)} className="small-btn" title="Game settings">⚙</button>
                     <button onClick={() => setGuideOpen(true)} className="small-btn" title="How to play">Guide</button>
                     <button onClick={() => setActionLogOpen(o => !o)} className="small-btn" title="Action log">Log</button>
                     {!isTouch && (
@@ -604,6 +889,13 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                     touchMode={isTouch}
                                     spectating={isSpectator}
                                     gameStarted={gameStarted}
+                                    onCloneCard={handleCloneCard}
+                                    onShowCardFieldEditor={handleShowCardFieldEditor}
+                                    onTakeControl={handleTakeControl}
+                                    onCastFromZone={handleCastFromZone}
+                                    onTapForMana={handleTapForMana}
+                                    onForetellCard={handleForetell}
+                                    onCastForetold={handleCastForetold}
                                 />
                             </div>
                         );
@@ -644,15 +936,10 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             <button onClick={() => setMaximizedCard(firstSelectedCard)}>View</button>
                             <button onClick={() => setCounterModalCard(firstSelectedCard)}>+Counter</button>
                             <button onClick={() => setNoteEditor({ instanceId: firstSelectedCard.instanceId })}>Note</button>
-                            {firstSelectedCard.backImageUri ? (
-                                <button onClick={() => socket.emit('flipCard', { instanceId: firstSelectedCard.instanceId })}>
-                                    {firstSelectedCard.flipped ? 'Front' : 'Back'}
-                                </button>
-                            ) : (
-                                <button onClick={() => socket.emit('toggleFaceDown', { instanceId: firstSelectedCard.instanceId })}>
-                                    {firstSelectedCard.faceDown ? 'Face up' : 'Face down'}
-                                </button>
-                            )}
+                            <button onClick={() => socket.emit(
+                                firstSelectedCard.backImageUri ? 'flipCard' : 'toggleFaceDown',
+                                { instanceId: firstSelectedCard.instanceId },
+                            )}>Flip</button>
                             <button onClick={() => socket.emit('revealCard', { instanceId: firstSelectedCard.instanceId, targetPlayerIds: 'all' })}>Reveal</button>
                         </>
                     )}
@@ -675,6 +962,23 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 enabled={!isSpectator && drawingEnabled}
                 onToggle={isSpectator ? () => {} : (() => setDrawingEnabled(!drawingEnabled))}
                 hideToggle={isSpectator}
+                penStateRef={penStateRef}
+                onPenColorChange={(newColor) => {
+                    // Push a one-off cursorMove with the new color so other
+                    // players see the cursor recolor immediately instead of
+                    // waiting for the next mouse movement.
+                    if (!cursorsEligible) return;
+                    const pen = penStateRef.current;
+                    if (!pen.enabled || pen.tool !== 'pen') return;
+                    const last = lastCursorPosRef.current;
+                    if (!last) return;
+                    socket.emit('cursorMove', {
+                        x: last.x,
+                        y: last.y,
+                        aspectRatio: last.aspectRatio,
+                        color: newColor,
+                    });
+                }}
             />
 
             {/* Chat — always rendered, collapsible */}
@@ -683,6 +987,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 currentUserId={user.id}
                 open={chatOpen}
                 onToggle={() => setChatOpen(o => !o)}
+                players={gameState.players}
             />
 
             {/* Action log — slide-in side panel, visible to players and spectators */}
@@ -703,9 +1008,11 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             {/* Guide / How-to-play */}
             {guideOpen && <Guide onClose={() => setGuideOpen(false)} />}
 
-            {/* Revealed hand viewer — fired by handRevealed socket event */}
+            {/* Revealed hand viewer — fired by handRevealed socket event.
+                Cards open CardMaximized on click; that modal is a body-level
+                portal so it naturally renders above this one. */}
             {revealedHand && (
-                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onDismissRevealedHand(); }}>
+                <div className="modal-overlay reveal-top" onClick={(e) => { if (e.target === e.currentTarget) onDismissRevealedHand(); }}>
                     <div className="modal revealed-hand-modal">
                         <div className="modal-header">
                             <h3>{revealedHand.revealedByName || 'Someone'} revealed their hand</h3>
@@ -715,8 +1022,37 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             {(revealedHand.cards || []).length === 0 && <div className="muted">Empty hand.</div>}
                             {(revealedHand.cards || []).map((c, i) => (
                                 <div key={c.instanceId || i} className="revealed-hand-card">
-                                    {c.imageUri && <img src={c.imageUri} alt={c.name} />}
+                                    <Card
+                                        card={c}
+                                        onClick={() => setMaximizedCard(c)}
+                                    />
                                     <div className="revealed-hand-name">{c.name}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Peek & exile (Gonti) resolver. Shows the top N cards of the
+                target's library and asks the caster which to exile. */}
+            {peekSession && (
+                <div className="modal-overlay" style={{ zIndex: 1100 }}>
+                    <div className="modal peek-exile-modal">
+                        <div className="modal-header">
+                            <h3>Looking at top {peekSession.count} of {peekSession.targetUsername}'s library</h3>
+                            <button className="close-btn" onClick={() => setPeekSession(null)}>x</button>
+                        </div>
+                        <p className="muted">Pick one card to exile face-down under your control. The rest go to the bottom in random order.</p>
+                        <div className="revealed-hand-grid">
+                            {peekSession.cards.map((c) => (
+                                <div key={c.instanceId} className="revealed-hand-card">
+                                    <Card card={c} onClick={() => setMaximizedCard(c)} />
+                                    <div className="revealed-hand-name">{c.name}</div>
+                                    <button
+                                        className="small-btn primary-btn"
+                                        onClick={() => resolvePeek(c.instanceId)}
+                                    >Exile this</button>
                                 </div>
                             ))}
                         </div>
@@ -887,16 +1223,182 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             {rollResults.length > 0 && (
                 <div className="roll-results-stack">
                     {rollResults.map(r => (
-                        <div key={r.id} className="roll-result-toast">
-                            <strong>{r.playerName}</strong>{' '}
-                            {r.type === 'coin'
-                                ? `flipped ${r.count > 1 ? r.count + ' coins' : 'a coin'}: ${r.results.join(', ')}`
-                                : `rolled ${r.count}d${r.sides}: ${r.results.join(', ')}${r.count > 1 ? ' = ' + r.total : ''}`
-                            }
-                        </div>
+                        <RollToast key={r.id} result={r} />
                     ))}
                 </div>
             )}
+
+            {/* ─── Big-batch modals ─────────────────────────────────────── */}
+            {settingsModalOpen && (
+                <SettingsModal
+                    settings={gameState.settings}
+                    isHost={isHost}
+                    sharedTeamLife={!!gameState.sharedTeamLife}
+                    teams={gameState.teams || []}
+                    me={me}
+                    onClose={() => setSettingsModalOpen(false)}
+                />
+            )}
+
+            {manaPickerCard && (
+                <ManaPickerModal
+                    card={manaPickerCard.card}
+                    onClose={() => setManaPickerCard(null)}
+                    onConfirm={(colors) => {
+                        socket.emit('tapForMana', { instanceId: manaPickerCard.card.instanceId, colors }, (res) => {
+                            if (res?.error) dialog.alert(res.error, { title: 'Tap for mana' });
+                            setManaPickerCard(null);
+                        });
+                    }}
+                />
+            )}
+
+            {cardFieldEditor && (
+                <CardFieldEditorModal
+                    card={cardFieldEditor.card}
+                    field={cardFieldEditor.field}
+                    onClose={() => setCardFieldEditor(null)}
+                    onSubmit={(value) => {
+                        socket.emit('setCardField', {
+                            instanceId: cardFieldEditor.card.instanceId,
+                            field: cardFieldEditor.field,
+                            value,
+                        });
+                        setCardFieldEditor(null);
+                    }}
+                />
+            )}
+
+            {emblemAdderTarget && (
+                <EmblemAdderModal
+                    targetPlayerId={emblemAdderTarget}
+                    onClose={() => setEmblemAdderTarget(null)}
+                    onSubmit={({ name, oracleText }) => {
+                        socket.emit('addEmblem', { targetPlayerId: emblemAdderTarget, name, oracleText });
+                        setEmblemAdderTarget(null);
+                    }}
+                />
+            )}
+
+            {browseLibraryFor && (
+                <BrowseLibraryModal
+                    player={browseLibraryFor.player}
+                    library={browseLibraryFor.library}
+                    onClose={() => setBrowseLibraryFor(null)}
+                    onMaximizeCard={setMaximizedCard}
+                    onSteal={(card) => {
+                        // Move the chosen card from the target's library directly
+                        // to the requester's exile (Bribery → "put it onto the
+                        // battlefield under your control"). The user can then
+                        // drag it to battlefield manually if they prefer.
+                        socket.emit('moveCard', {
+                            instanceId: card.instanceId,
+                            fromZone: 'library',
+                            toZone: 'battlefield',
+                            targetPlayerId: user.id,
+                        });
+                        setBrowseLibraryFor(null);
+                    }}
+                />
+            )}
+
+            {revealPickerOpen && me && (
+                <RevealHandPickerModal
+                    hand={me.zones?.hand || []}
+                    targets={gameState.players.filter(p => p.userId !== user.id)}
+                    onClose={() => setRevealPickerOpen(false)}
+                    onSubmit={({ instanceIds, targetPlayerIds }) => {
+                        socket.emit('revealSpecificFromHand', { instanceIds, targetPlayerIds });
+                        setRevealPickerOpen(false);
+                    }}
+                />
+            )}
+
+            {mulliganBottomOpen && me && me.mulliganBottomPending > 0 && (
+                <MulliganBottomModal
+                    hand={me.zones?.hand || []}
+                    need={me.mulliganBottomPending}
+                    onSubmit={(instanceIds) => {
+                        socket.emit('mulliganBottom', { instanceIds }, (res) => {
+                            if (res?.error) dialog.alert(res.error, { title: 'Mulligan bottom' });
+                            else setMulliganBottomOpen(false);
+                        });
+                    }}
+                />
+            )}
+
+            {/* Stack panel (room-level). Renders inline when non-empty + open. */}
+            {Array.isArray(gameState.stack) && gameState.stack.length > 0 && stackPanelOpen && (
+                <StackPanel
+                    stack={gameState.stack}
+                    isSpectator={isSpectator}
+                    onClose={() => setStackPanelOpen(false)}
+                    onPop={(idx) => socket.emit('stackPop', { index: idx })}
+                    onClear={() => socket.emit('stackClear')}
+                />
+            )}
+        </div>
+    );
+}
+
+// Animated dice-result toast. On first render it cycles through random
+// numbers for ~700ms to fake a rolling die, then locks on the real value.
+// For coin flips and multi-die rolls (where cycling doesn't make as much
+// sense) it renders the final result immediately in the old flat style.
+function RollToast({ result: r }) {
+    const [rolling, setRolling] = React.useState(r.type === 'dice' && r.count === 1);
+    const [displayed, setDisplayed] = React.useState(() => {
+        if (r.type === 'dice' && r.count === 1) {
+            return 1 + Math.floor(Math.random() * (r.sides || 20));
+        }
+        return r.results?.[0] ?? '';
+    });
+    React.useEffect(() => {
+        if (!rolling) return;
+        // Cycle random numbers faster than the eye, then settle. The
+        // interval time increases so it feels like a die slowing down.
+        let ticks = 0;
+        const maxTicks = 12; // ~700ms at increasing intervals
+        let current = 40;
+        let stop = false;
+        const tick = () => {
+            if (stop) return;
+            ticks++;
+            if (ticks >= maxTicks) {
+                setDisplayed(r.results?.[0] ?? '?');
+                setRolling(false);
+                return;
+            }
+            setDisplayed(1 + Math.floor(Math.random() * (r.sides || 20)));
+            current = Math.min(120, current + 10);
+            setTimeout(tick, current);
+        };
+        setTimeout(tick, current);
+        return () => { stop = true; };
+    }, [rolling, r.sides, r.results]);
+
+    if (r.type === 'coin') {
+        return (
+            <div className="roll-result-toast">
+                <strong>{r.playerName}</strong>{' '}
+                flipped {r.count > 1 ? `${r.count} coins` : 'a coin'}: {r.results.join(', ')}
+            </div>
+        );
+    }
+    if (r.count > 1) {
+        return (
+            <div className="roll-result-toast">
+                <strong>{r.playerName}</strong>{' '}
+                rolled {r.count}d{r.sides}: {r.results.join(', ')} = {r.total}
+            </div>
+        );
+    }
+    return (
+        <div className={`roll-result-toast dice-toast ${rolling ? 'rolling' : 'settled'}`}>
+            <strong>{r.playerName}</strong>{' '}
+            rolled a d{r.sides}
+            {r.label ? <span className="dice-label"> — {r.label}</span> : null}
+            <div className="dice-big">{displayed}</div>
         </div>
     );
 }
@@ -1101,6 +1603,375 @@ function BackgroundModal({ onClose }) {
                     <button onClick={() => { socket.emit('setBackground', { imageUrl: null }); onClose(); }}>Clear</button>
                 </div>
             </div>
+        </div>
+    );
+}
+
+// ─── Big-batch modals (settings, mana picker, card-field editor, emblems,
+// browse library, reveal picker, mulligan bottom, stack panel). All use the
+// existing modal-overlay/modal class pattern so they pick up the existing
+// theme automatically — no new top-level layout. ─────────────────────────
+
+function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose }) {
+    useEscapeKey(onClose);
+    const [draft, setDraft] = useState({
+        startingLife: settings?.startingLife ?? 40,
+        commanderDamageLethal: settings?.commanderDamageLethal ?? 21,
+        maxPlayers: settings?.maxPlayers ?? 8,
+        format: settings?.format ?? 'commander',
+        mulliganRules: settings?.mulliganRules ?? 'vancouver',
+        handSizeLimit: settings?.handSizeLimit ?? 7,
+    });
+    const [shared, setShared] = useState(!!sharedTeamLife);
+    const [teamId, setTeamId] = useState(me?.teamId || '');
+    const [colorDraft, setColorDraft] = useState(me?.avatarColor || '#7986cb');
+
+    // Format presets — applied to draft locally; user clicks Save to commit.
+    const applyFormat = (fmt) => {
+        const presets = {
+            commander: { startingLife: 40, commanderDamageLethal: 21 },
+            brawl: { startingLife: 30, commanderDamageLethal: 21 },
+            modern: { startingLife: 20, commanderDamageLethal: 21 },
+            oathbreaker: { startingLife: 20, commanderDamageLethal: 21 },
+            free: { startingLife: 40, commanderDamageLethal: 21 },
+        };
+        const preset = presets[fmt] || presets.commander;
+        setDraft(d => ({ ...d, format: fmt, ...preset }));
+    };
+
+    const save = () => {
+        if (isHost) {
+            socket.emit('updateRoomSettings', { settings: draft });
+            socket.emit('setSharedTeamLife', { value: shared });
+        }
+        if (teamId !== (me?.teamId || '')) {
+            socket.emit('setTeam', { playerId: me?.userId, teamId: teamId || null, teamName: `Team ${teamId}` });
+        }
+        if (colorDraft && colorDraft !== me?.avatarColor) {
+            socket.emit('setAvatarColor', { color: colorDraft });
+        }
+        onClose();
+    };
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal settings-modal">
+                <div className="modal-header">
+                    <h2>Game Settings</h2>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <p className="muted" style={{ marginTop: 0 }}>
+                    Settings are pure tools — nothing is enforced. Host can change them mid-game; existing life totals stay as they are.
+                </p>
+
+                <div className="settings-section">
+                    <strong>Format</strong>
+                    <div className="settings-row">
+                        {['commander', 'brawl', 'modern', 'oathbreaker', 'free'].map(f => (
+                            <button
+                                key={f}
+                                className={`small-btn ${draft.format === f ? 'active' : ''}`}
+                                onClick={() => isHost && applyFormat(f)}
+                                disabled={!isHost}
+                            >{f}</button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="settings-section">
+                    <strong>Numbers</strong>
+                    <label>Starting life
+                        <input type="number" value={draft.startingLife} onChange={e => setDraft({ ...draft, startingLife: parseInt(e.target.value) || 0 })} disabled={!isHost} />
+                    </label>
+                    <label>Commander damage lethal
+                        <input type="number" value={draft.commanderDamageLethal} onChange={e => setDraft({ ...draft, commanderDamageLethal: parseInt(e.target.value) || 0 })} disabled={!isHost} />
+                    </label>
+                    <label>Max players
+                        <input type="number" value={draft.maxPlayers} onChange={e => setDraft({ ...draft, maxPlayers: parseInt(e.target.value) || 0 })} disabled={!isHost} />
+                    </label>
+                    <label>Hand-size limit
+                        <input type="number" value={draft.handSizeLimit} onChange={e => setDraft({ ...draft, handSizeLimit: parseInt(e.target.value) || 0 })} disabled={!isHost} />
+                    </label>
+                </div>
+
+                <div className="settings-section">
+                    <strong>Mulligan rules</strong>
+                    <div className="settings-row">
+                        {[
+                            ['vancouver', 'Vancouver (7→7→6→5)'],
+                            ['london', 'London (always 7, bottom N)'],
+                            ['free7', 'Free 7 (7→7→6→5→4)'],
+                        ].map(([k, label]) => (
+                            <button
+                                key={k}
+                                className={`small-btn ${draft.mulliganRules === k ? 'active' : ''}`}
+                                onClick={() => isHost && setDraft({ ...draft, mulliganRules: k })}
+                                disabled={!isHost}
+                            >{label}</button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="settings-section">
+                    <strong>Teams</strong>
+                    <label>
+                        <input type="checkbox" checked={shared} onChange={e => setShared(e.target.checked)} disabled={!isHost} />
+                        Shared life across teammates
+                    </label>
+                    <label>My team ID
+                        <input type="text" value={teamId} onChange={e => setTeamId(e.target.value)} placeholder="e.g. A or red" />
+                    </label>
+                    {teams?.length > 0 && (
+                        <div className="muted" style={{ fontSize: 11 }}>
+                            Existing teams: {teams.map(t => `${t.name}${t.sharedLife != null ? ` (${t.sharedLife})` : ''}`).join(', ')}
+                        </div>
+                    )}
+                </div>
+
+                <div className="settings-section">
+                    <strong>My avatar color</strong>
+                    <input type="color" value={colorDraft} onChange={e => setColorDraft(e.target.value)} />
+                </div>
+
+                <div className="modal-actions">
+                    <button onClick={onClose}>Cancel</button>
+                    <button onClick={save} className="primary-btn">Save</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ManaPickerModal({ card, onClose, onConfirm }) {
+    useEscapeKey(onClose);
+    const [picked, setPicked] = useState([]);
+    const COLORS = [['W', 'White'], ['U', 'Blue'], ['B', 'Black'], ['R', 'Red'], ['G', 'Green'], ['C', 'Colorless']];
+    const togglePick = (c) => {
+        setPicked(prev => {
+            // Allow duplicates so e.g. Cabal Coffers picking BB is two clicks.
+            const next = [...prev];
+            const idx = next.indexOf(c);
+            if (idx !== -1) next.splice(idx, 1);
+            else next.push(c);
+            return next;
+        });
+    };
+    const addOne = (c) => setPicked(prev => [...prev, c]);
+    return (
+        <div className="modal-overlay">
+            <div className="modal mana-picker-modal">
+                <div className="modal-header">
+                    <h3>Tap {card.name} for which mana?</h3>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <p className="muted">Click each color to add it (e.g. WG for a Stomping Ground). Click again to remove.</p>
+                <div className="mana-picker-grid">
+                    {COLORS.map(([c, label]) => (
+                        <button key={c} type="button" className={`mana-pick-btn ${picked.includes(c) ? 'picked' : ''}`} onClick={() => togglePick(c)}>
+                            <img src={`https://svgs.scryfall.io/card-symbols/${c}.svg`} alt={c} className="mana-sym-img" />
+                            <span>{label}</span>
+                            <button type="button" className="small-btn" onClick={(e) => { e.stopPropagation(); addOne(c); }}>+</button>
+                        </button>
+                    ))}
+                </div>
+                <div className="mana-picker-summary">
+                    Selected: {picked.length === 0 ? <span className="muted">none</span> : picked.join(' ')}
+                </div>
+                <div className="modal-actions">
+                    <button onClick={onClose}>Cancel</button>
+                    <button className="primary-btn" disabled={picked.length === 0} onClick={() => onConfirm(picked)}>Tap</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CardFieldEditorModal({ card, field, onClose, onSubmit }) {
+    useEscapeKey(onClose);
+    const initial = (card[field] ?? 0) || 0;
+    const [val, setVal] = useState(String(initial));
+    const labels = { damage: 'Marked damage', suspendCounters: 'Suspend / time counters' };
+    return (
+        <div className="modal-overlay">
+            <div className="modal small-modal">
+                <div className="modal-header">
+                    <h3>{labels[field] || field}</h3>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <p className="muted">{card.name}</p>
+                <input
+                    type="number"
+                    value={val}
+                    onChange={e => setVal(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && onSubmit(parseInt(val) || 0)}
+                    autoFocus
+                />
+                <div className="modal-actions">
+                    <button onClick={onClose}>Cancel</button>
+                    <button className="primary-btn" onClick={() => onSubmit(parseInt(val) || 0)}>Set</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function EmblemAdderModal({ targetPlayerId, onClose, onSubmit }) {
+    useEscapeKey(onClose);
+    const [name, setName] = useState('');
+    const [text, setText] = useState('');
+    return (
+        <div className="modal-overlay">
+            <div className="modal">
+                <div className="modal-header">
+                    <h3>Add emblem</h3>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <input type="text" placeholder="Emblem name (e.g. 'Teferi emblem')" value={name} onChange={e => setName(e.target.value)} autoFocus />
+                <textarea placeholder="Effect text" value={text} onChange={e => setText(e.target.value)} rows={4} />
+                <div className="modal-actions">
+                    <button onClick={onClose}>Cancel</button>
+                    <button className="primary-btn" disabled={!name.trim()} onClick={() => onSubmit({ name: name.trim(), oracleText: text.trim() })}>Add</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function BrowseLibraryModal({ player, library, onClose, onMaximizeCard, onSteal }) {
+    useEscapeKey(onClose);
+    const [filter, setFilter] = useState('');
+    const filtered = filter
+        ? library.filter(c => (c.name || '').toLowerCase().includes(filter.toLowerCase()))
+        : library;
+    return (
+        <div className="modal-overlay">
+            <div className="modal browse-library-modal">
+                <div className="modal-header">
+                    <h3>{player.username}'s library ({library.length} cards)</h3>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <input type="text" placeholder="Filter by name" value={filter} onChange={e => setFilter(e.target.value)} autoFocus />
+                <p className="muted">Click "Take" to put a card on your battlefield (Bribery / Acquire). Click the card to view it.</p>
+                <div className="revealed-hand-grid">
+                    {filtered.map(c => (
+                        <div key={c.instanceId} className="revealed-hand-card">
+                            <Card card={c} onClick={() => onMaximizeCard(c)} />
+                            <div className="revealed-hand-name">{c.name}</div>
+                            <button className="small-btn primary-btn" onClick={() => onSteal(c)}>Take</button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function RevealHandPickerModal({ hand, targets, onClose, onSubmit }) {
+    useEscapeKey(onClose);
+    const [picked, setPicked] = useState(new Set());
+    const [target, setTarget] = useState('all');
+    const toggle = (id) => {
+        setPicked(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+    return (
+        <div className="modal-overlay">
+            <div className="modal">
+                <div className="modal-header">
+                    <h3>Reveal which cards from your hand?</h3>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <div className="reveal-target-row">
+                    <label>To:</label>
+                    <select value={target} onChange={e => setTarget(e.target.value)}>
+                        <option value="all">All players</option>
+                        {targets.map(t => <option key={t.userId} value={t.userId}>{t.username}</option>)}
+                    </select>
+                </div>
+                <div className="revealed-hand-grid">
+                    {hand.map(c => (
+                        <div key={c.instanceId} className={`revealed-hand-card ${picked.has(c.instanceId) ? 'selected' : ''}`} onClick={() => toggle(c.instanceId)}>
+                            <Card card={c} />
+                            <div className="revealed-hand-name">{c.name}</div>
+                        </div>
+                    ))}
+                </div>
+                <div className="modal-actions">
+                    <button onClick={onClose}>Cancel</button>
+                    <button className="primary-btn" disabled={picked.size === 0} onClick={() => onSubmit({
+                        instanceIds: Array.from(picked),
+                        targetPlayerIds: target === 'all' ? 'all' : [target],
+                    })}>Reveal {picked.size}</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function MulliganBottomModal({ hand, need, onSubmit }) {
+    const [picked, setPicked] = useState([]);
+    const toggle = (id) => {
+        setPicked(prev => {
+            const idx = prev.indexOf(id);
+            if (idx !== -1) return prev.filter(x => x !== id);
+            if (prev.length >= need) return prev; // can't exceed
+            return [...prev, id];
+        });
+    };
+    return (
+        <div className="modal-overlay" style={{ zIndex: 1500 }}>
+            <div className="modal">
+                <div className="modal-header">
+                    <h3>Bottom {need} card(s) — London mulligan</h3>
+                </div>
+                <p className="muted">Pick {need - picked.length} more — these will go on the bottom of your library in the order you click them.</p>
+                <div className="revealed-hand-grid">
+                    {hand.map((c, i) => {
+                        const order = picked.indexOf(c.instanceId);
+                        return (
+                            <div key={c.instanceId} className={`revealed-hand-card ${order !== -1 ? 'selected' : ''}`} onClick={() => toggle(c.instanceId)}>
+                                <Card card={c} />
+                                <div className="revealed-hand-name">{c.name}</div>
+                                {order !== -1 && <div className="bottom-order-badge">#{order + 1}</div>}
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="modal-actions">
+                    <button className="primary-btn" disabled={picked.length !== need} onClick={() => onSubmit(picked)}>
+                        Bottom {picked.length}/{need}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function StackPanel({ stack, isSpectator, onClose, onPop, onClear }) {
+    return (
+        <div className="stack-panel" role="dialog" aria-label="The Stack">
+            <div className="stack-panel-head">
+                <strong>Stack ({stack.length})</strong>
+                {!isSpectator && <button className="small-btn" onClick={onClear}>Clear</button>}
+                <button className="small-btn" onClick={onClose}>Hide</button>
+            </div>
+            <ol className="stack-list">
+                {stack.slice().reverse().map((entry, i) => {
+                    const realIndex = stack.length - 1 - i;
+                    return (
+                        <li key={entry.id} className={`stack-entry ${i === 0 ? 'top' : ''}`}>
+                            <div className="stack-entry-name">{entry.name}</div>
+                            <div className="stack-entry-caster muted">{entry.casterName}</div>
+                            {!isSpectator && i === 0 && (
+                                <button className="small-btn" onClick={() => onPop(realIndex)}>Resolve</button>
+                            )}
+                        </li>
+                    );
+                })}
+            </ol>
         </div>
     );
 }

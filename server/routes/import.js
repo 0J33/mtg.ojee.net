@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { fetchMoxfieldDeck, stats: moxfieldStats } = require('../moxfieldClient');
 
 const SCRYFALL_BASE = 'https://api.scryfall.com';
 
@@ -122,43 +123,38 @@ router.post('/text', async (req, res) => {
     res.json(result);
 });
 
-// Import from Moxfield URL
+// Import from Moxfield URL.
+//
+// All outgoing Moxfield API calls go through moxfieldClient.js, which
+// enforces:
+//   - A strict 1-request-per-second global rate limit (configurable via
+//     MOXFIELD_MIN_INTERVAL_MS, defaults to 1500ms for a safety margin)
+//   - A serial request queue so concurrent user imports can never stack up
+//   - In-memory response caching so re-importing the same deck is free
+//   - Secret user-agent handling (never logged, never sent to clients)
+//
+// If the MOXFIELD_USER_AGENT env var isn't set (as is the case right now),
+// fetchMoxfieldDeck throws a 503 "not configured" error, which we translate
+// into a user-friendly message pointing at the Paste Text path instead.
 router.post('/moxfield', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'Moxfield URL required' });
 
     const match = url.match(/moxfield\.com\/decks\/([A-Za-z0-9_-]+)/);
     if (!match) return res.status(400).json({ error: 'Invalid Moxfield URL' });
-
     const deckId = match[1];
 
-    // Try multiple endpoints with browser-like headers
-    const endpoints = [
-        `https://api2.moxfield.com/v3/decks/all/${deckId}`,
-        `https://api.moxfield.com/v2/decks/all/${deckId}`,
-    ];
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': `https://moxfield.com/decks/${deckId}`,
-        'Origin': 'https://moxfield.com',
-    };
-
-    let data = null;
-    for (const endpoint of endpoints) {
-        try {
-            const response = await fetch(endpoint, { headers });
-            const text = await response.text();
-            if (response.ok && text.trim().startsWith('{')) {
-                data = JSON.parse(text);
-                break;
-            }
-        } catch (err) { /* try next */ }
-    }
-
-    if (!data) {
-        return res.status(400).json({ error: 'Moxfield blocks API access from servers. Please use the "Paste Text" option: in Moxfield, click "More" → "Export" → copy the text and paste it here.' });
+    let data;
+    try {
+        data = await fetchMoxfieldDeck(deckId);
+    } catch (err) {
+        if (err?.status === 503) {
+            return res.status(503).json({
+                error: 'Moxfield URL import is currently unavailable. Use the Paste Text tab: in Moxfield, More → Export → Copy as plain text.',
+            });
+        }
+        console.error('[moxfield import] fetch failed:', err?.message || err);
+        return res.status(502).json({ error: 'Failed to fetch from Moxfield. Try pasting the decklist as text instead.' });
     }
 
     try {
@@ -195,9 +191,15 @@ router.post('/moxfield', async (req, res) => {
 
         res.json(result);
     } catch (err) {
-        console.error('Moxfield fetch error:', err);
-        res.status(500).json({ error: 'Failed to fetch from Moxfield. Try pasting the decklist as text instead.' });
+        console.error('[moxfield import] parse failed:', err?.message || err);
+        res.status(500).json({ error: 'Failed to parse Moxfield response. Try pasting the decklist as text instead.' });
     }
+});
+
+// Diagnostics endpoint for the Moxfield client state. Useful for debugging
+// rate limits and cache behavior without leaking the UA.
+router.get('/moxfield/stats', (req, res) => {
+    res.json(moxfieldStats());
 });
 
 module.exports = router;

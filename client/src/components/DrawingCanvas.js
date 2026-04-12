@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
 
-export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle }) {
+export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle, penStateRef, onPenColorChange }) {
     useEscapeKey(() => { if (enabled) onToggle(); });
     const canvasRef = useRef(null);
     const isDrawingRef = useRef(false);
@@ -11,10 +11,36 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
     // IDs of strokes erased locally (not yet confirmed by server). Used to
     // filter them out of getAllStrokes so the user sees the erase immediately.
     const localErasedRef = useRef(new Set());
-    const [color, setColor] = useState('#ff0000');
-    const [brushSize, setBrushSize] = useState(3);
+    // Color + brush persist across sessions so you don't have to re-pick your
+    // preferred red every time you open the pen. Cursor color tracks this
+    // automatically because GameBoard reads the pen state out of a ref.
+    const [color, setColor] = useState(() => {
+        try { return localStorage.getItem('mtg_penColor') || '#ff0000'; }
+        catch (_) { return '#ff0000'; }
+    });
+    const [brushSize, setBrushSize] = useState(() => {
+        try {
+            const v = parseInt(localStorage.getItem('mtg_penBrushSize'), 10);
+            return Number.isFinite(v) && v >= 1 && v <= 12 ? v : 3;
+        } catch (_) { return 3; }
+    });
     const [tool, setTool] = useState('pen'); // 'pen' | 'eraser'
     const [, forceRerender] = useState(0);
+    // Brush preview circle — tracks the cursor while drawing is enabled so the
+    // user can see the actual stroke radius before they commit to it.
+    const [previewPos, setPreviewPos] = useState(null);
+
+    // Persist color + brush size on change.
+    useEffect(() => {
+        try { localStorage.setItem('mtg_penColor', color); } catch (_) {}
+        // Notify parent so it can push an immediate cursorMove with the new
+        // color — otherwise the color change only lands on other clients on
+        // the next mouse move.
+        onPenColorChange?.(color);
+    }, [color, onPenColorChange]);
+    useEffect(() => {
+        try { localStorage.setItem('mtg_penBrushSize', String(brushSize)); } catch (_) {}
+    }, [brushSize]);
 
     const colors = [
         '#ff0000', '#ff4488', '#ff8800', '#ffcc00', '#ffff00',
@@ -135,6 +161,16 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, [redraw]);
+
+    // Mirror current pen state (enabled + color + tool) into the parent's
+    // shared ref so GameBoard's cursor broadcaster can tag outgoing cursorMove
+    // events with the user's active brush color. Writing to a ref instead of
+    // state avoids triggering re-renders just to update the cursor tint.
+    useEffect(() => {
+        if (penStateRef) {
+            penStateRef.current = { enabled: !!enabled, color, tool };
+        }
+    }, [enabled, color, tool, penStateRef]);
 
     // Listen for incoming strokes + erase events from other players via socket
     useEffect(() => {
@@ -304,7 +340,17 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
         if (e.button !== 0) return;
         beginStroke(e.clientX, e.clientY);
     };
-    const handleMouseMove = (e) => extendStroke(e.clientX, e.clientY);
+    const handleMouseMove = (e) => {
+        if (enabled) {
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const rect = canvas.getBoundingClientRect();
+                setPreviewPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            }
+        }
+        extendStroke(e.clientX, e.clientY);
+    };
+    const handleMouseLeaveCanvas = () => { endStroke(); setPreviewPos(null); };
     const handleMouseUp = () => endStroke();
 
     // Touch handlers are attached as native listeners (not React synthetic events)
@@ -376,7 +422,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+                onMouseLeave={handleMouseLeaveCanvas}
                 style={{
                     pointerEvents: enabled ? 'auto' : 'none',
                     // When drawing is enabled, block browser's default gesture handling
@@ -384,6 +430,20 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle 
                     touchAction: enabled ? 'none' : 'auto',
                 }}
             />
+            {/* Brush preview circle — follows the cursor while pen/eraser is
+                active so the user sees the actual radius before they commit. */}
+            {enabled && previewPos && (
+                <div
+                    className="brush-preview"
+                    style={{
+                        left: previewPos.x - brushSize,
+                        top: previewPos.y - brushSize,
+                        width: brushSize * 2,
+                        height: brushSize * 2,
+                        borderColor: tool === 'eraser' ? '#ffffff' : color,
+                    }}
+                />
+            )}
             {enabled && (
                 <div className="drawing-toolbar">
                     <div className="tool-picker">

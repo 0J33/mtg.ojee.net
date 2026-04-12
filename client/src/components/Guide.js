@@ -86,11 +86,11 @@ const PAGES = [
         title: 'Turns & phases',
         body: (
             <>
+                <p><strong>Mulligan phase</strong>: after Start Game, every player draws 7 and can mulligan freely (7 → 7 → 6 → 5). Each player clicks <strong>Ready</strong> in the topbar when they're done. Once everyone is ready, the server rolls a d20 for each player — highest roll takes turn 1, with the rolls shown as toasts so the whole table sees what happened.</p>
                 <p>The <strong>turn indicator</strong> in the topbar shows whose turn it is. Only the <em>current turn player</em> (or the host) can press <strong>End Turn</strong>.</p>
                 <p>Dead/eliminated players (life ≤ 0, 21+ commander damage, 10+ poison) are <em>automatically skipped</em> on turn advance.</p>
                 <p><strong>Turn-start nudges</strong>: on your turn, the Draw button glows amber until you draw, and any land card in your hand glows until you drop your first land. Purely visual reminders — nothing is enforced, just hard to forget your land drop.</p>
                 <p><strong>Auto-untap</strong> runs at the start of your turn by default. You can turn it off per-player via the player context menu — useful for effects like "doesn't untap during your untap step". Auto-untap events appear in the action log (italic/faint) so you can always see what happened.</p>
-                <p><strong>Mulligans</strong> follow the sequence 7 → 7 → 6 → 5, then no more. After drawing your initial 7, you can mulligan up to 3 times total.</p>
                 <p><strong>Undo</strong> reverts the last mutating action (30 deep). Custom designations (Monarch, Initiative, City's Blessing, Day/Night) are in the player context menu — visual only, no automatic triggers.</p>
             </>
         ),
@@ -101,7 +101,7 @@ const PAGES = [
             <>
                 <p>The pencil icon on the <strong>left edge</strong> toggles free-hand drawing. Use it to point at things, draw arrows, circle blockers, mark combat tricks, etc.</p>
                 <p>Toolbar has a <strong>pen</strong> and <strong>eraser</strong>. The eraser removes strokes under the cursor; the pen draws in your chosen color/size. <em>Clear Mine</em> removes only your strokes; <em>Clear All</em> wipes the board.</p>
-                <p>Drawings sync live across desktop and mobile in the same room. Press <kbd>Esc</kbd> to exit drawing mode.</p>
+                <p>Drawings sync live across desktop and mobile in the same room. While the pen is active, your <strong>shared cursor</strong> also recolors to match your brush so other players can see who's drawing what. Press <kbd>Esc</kbd> to exit drawing mode.</p>
             </>
         ),
     },
@@ -149,6 +149,75 @@ const PAGES = [
         ),
     },
     {
+        title: 'Mana pool & lands',
+        body: (
+            <>
+                <p>Right-click a basic land on your battlefield → <strong>Tap for mana</strong>. The land taps and a colored pip appears in your <strong>mana pool widget</strong> in your player header.</p>
+                <p>For a non-basic land (shockland, dual, tap-land), the same action opens a small <strong>mana picker</strong> — click the colors that land produces (e.g. W and G for a Stomping Ground). The land taps and the chosen mana goes into your pool.</p>
+                <p>Click a pool pip to <strong>spend</strong> one of that color (subtract). Shift-click to add one back if you misclicked. The <strong>×</strong> at the end empties the pool. The pool also clears automatically at the start of your next turn.</p>
+                <p className="guide-tip">The mana pool is a tool, not a payment system — nothing forces you to actually spend mana to cast a spell. It just helps you remember what you've floated.</p>
+            </>
+        ),
+    },
+    {
+        title: 'New card actions (right-click)',
+        body: (
+            <>
+                <p>Every battlefield card now has a richer right-click menu:</p>
+                <ul>
+                    <li><strong>Mark damage</strong> — opens a small modal, sets a red badge in the corner. Clears at end of turn for everyone, automatically.</li>
+                    <li><strong>Suspend counters</strong> — purple ⌛ badge. Auto-decrements at the start of the suspended player's next turn; the action log says "X is ready to cast" when it hits 0.</li>
+                    <li><strong>Phase out / Phase in</strong> — visually fades the card. Doesn't actually exempt anything from targeting (no rules engine), it's just the marker.</li>
+                    <li><strong>Goad / Remove goad</strong> — orange ⚔ badge.</li>
+                    <li><strong>Clone (token)</strong> — duplicates the card as a token-marked copy.</li>
+                    <li><strong>Take control (until EOT)</strong> on opponents' cards — moves the card to your battlefield with a blue ring. End your turn and it goes back automatically.</li>
+                </ul>
+                <p>For cards in the graveyard / exile / foretell zones: <strong>Cast → battlefield</strong> moves it back. <strong>Cast → exile after</strong> moves it back AND tags the action log so you remember to send it to exile when it dies (for flashback / escape / jump-start / unearth).</p>
+                <p>For cards in your hand: <strong>Foretell</strong> moves them to a face-down foretell pile. The Foretell zone strip only shows when you actually have something there.</p>
+            </>
+        ),
+    },
+    {
+        title: 'Stack, extra turns, emblems, proliferate',
+        body: (
+            <>
+                <p><strong>The stack</strong> — when something is on the stack (pushed via the action menu or future "cast spell" wiring), a panel appears at the top of the screen showing the entries with the top one highlighted. Click <strong>Resolve</strong> on the top entry to pop it, or <strong>Clear</strong> to wipe the stack.</p>
+                <p><strong>Extra turns</strong> — right-click any player → <em>Queue extra turn</em>. A "↺ N: name" indicator appears in the topbar. The next time turns advance, the queue head plays first instead.</p>
+                <p><strong>Emblems</strong> — right-click your own player → <em>Add emblem...</em> → name + effect text. The Emblems strip only renders when non-empty. You can also add an emblem to an opponent (for cards that say "your opponent gets an emblem with...").</p>
+                <p><strong>Proliferate</strong> — right-click your own player → <em>Proliferate</em> → +1 to every existing counter on every permanent and player. The action log tells you how many counters were affected.</p>
+            </>
+        ),
+    },
+    {
+        title: 'Game settings (⚙)',
+        body: (
+            <>
+                <p>The new <strong>⚙</strong> button in the topbar opens a Settings modal. The host can change everything live, mid-game:</p>
+                <ul>
+                    <li><strong>Format presets</strong>: commander, brawl, modern, oathbreaker, free — picking one fills in starting life and commander damage.</li>
+                    <li><strong>Numbers</strong>: starting life, commander damage lethal, max players, hand-size limit.</li>
+                    <li><strong>Mulligan rules</strong>: Vancouver (legacy 7→7→6→5), London (always draw 7, bottom N), or Free 7 (free first mull).</li>
+                    <li><strong>Shared team life</strong> — when ON, every life change to a player on a team propagates to every teammate so the team is one number.</li>
+                    <li><strong>My team ID</strong> — assign yourself to a team. Combine with shared life and team victory.</li>
+                    <li><strong>Avatar color</strong> — your color dot in the player header.</li>
+                </ul>
+                <p>Non-host players see the modal in read-only mode for everything except their own team ID + avatar color.</p>
+            </>
+        ),
+    },
+    {
+        title: 'Hand & library tools',
+        body: (
+            <>
+                <p><strong>Reveal SPECIFIC cards from hand</strong> — right-click your own player → <em>Reveal SPECIFIC cards from hand</em>. Click cards in your hand to pick which to show, then choose a target (all players or one specific opponent).</p>
+                <p><strong>Browse opponent's library</strong> — right-click an opponent → <em>Browse full library</em>. Searchable list of every card; click a card to view it, click <strong>Take</strong> to pull it to your battlefield (Bribery / Acquire).</p>
+                <p><strong>Direct messages in chat</strong> — open the chat panel and pick a target from the new dropdown above the input. DMs are marked with → and a blue left border, only delivered to sender + recipient.</p>
+                <p><strong>Concede</strong> — right-click your own player → <em>Concede</em>. You go to 0 life, your seat is treated as eliminated, and the victory check fires for the remaining players.</p>
+                <p><strong>Hand-size enforce</strong> — toggle in your own player menu. When ON, ending a turn with too many cards triggers a notification (it's a nudge, not auto-discard).</p>
+            </>
+        ),
+    },
+    {
         title: 'Tips & shortcuts',
         body: (
             <>
@@ -156,13 +225,17 @@ const PAGES = [
                     <li><kbd>Esc</kbd> closes the topmost modal or clears selection / exits drawing mode</li>
                     <li><kbd>Enter</kbd> in chat sends, <kbd>Shift+Enter</kbd> is a newline</li>
                     <li>Hover a card on desktop for a zoomed preview + counters / notes panel</li>
-                    <li>Double-faced cards (MDFCs, Werewolves) show a single "Flip" action that swaps sides. Regular cards show "Face down/up" instead</li>
+                    <li>A single <strong>Flip</strong> action on every card — swaps sides on double-faced cards (MDFCs, Werewolves), toggles face-down on regular cards. One button handles both cases</li>
                     <li>When you tutor a card into your library via <strong>View Deck → Lib…</strong>, you can choose an exact position (0 = top, N = bottom, or "top"/"bottom")</li>
                     <li>The <strong>Shuffle after</strong> checkbox in View Deck is now off by default — turn it on for effects like "tutor then shuffle"</li>
                     <li>Use <strong>Custom</strong> to make a token or fake card on the fly; save it to your library via the lobby's Custom Cards manager</li>
                     <li><strong>Background (BG)</strong> sets a background image for your side of the board</li>
+                    <li>Drawing now shows a <strong>brush preview circle</strong> at your cursor so you know the actual radius before you commit a stroke</li>
+                    <li>The new <strong>conditional zones</strong> (Foretell, Sideboard, Wishboard, Emblems) only appear when they have content — your usual 3-zone strip stays clean if you don't use them</li>
+                    <li>The mana pool empties automatically at the start of your next turn — no more "wait, did I floats this last turn?"</li>
+                    <li>Eliminated and conceded players are skipped automatically on turn pass</li>
                 </ul>
-                <p>When one player is the last survivor, a 🏆 victory animation fires for the whole table.</p>
+                <p>When one player (or one team) is the last surviving group, a 🏆 victory animation fires for the whole table.</p>
                 <p className="guide-tip">
                     If anything gets weird, <strong>Undo</strong> is your friend. If it's really
                     stuck, leaving and rejoining the room restores the last server state.

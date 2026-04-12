@@ -5,16 +5,41 @@ import { useEscapeKey } from '../utils';
 import { useDialog } from './Dialog';
 
 export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initialSortMode }) {
-    useEscapeKey(onClose);
+    // Wrapper around onClose that fires a shuffleLibrary if the user opted in,
+    // before closing. Previously the shuffle was tied to each tutor call,
+    // which meant "shuffle after" actually shuffled on EVERY pull (wrong) and
+    // never on close. Now it only fires once, when the modal closes.
+    const [shuffleOnClose, setShuffleOnClose] = useState(false);
+    // Grab the latest value via a ref so the close handler (registered once
+    // via useEscapeKey) sees the current toggle state.
+    const shuffleOnCloseRef = React.useRef(false);
+    useEffect(() => { shuffleOnCloseRef.current = shuffleOnClose; }, [shuffleOnClose]);
+    const closeWithOptionalShuffle = React.useCallback(() => {
+        if (shuffleOnCloseRef.current) {
+            socket.emit('shuffleLibrary');
+        }
+        onClose?.();
+    }, [onClose]);
+    useEscapeKey(closeWithOptionalShuffle);
     const dialog = useDialog();
     const [library, setLibrary] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');
-    // Shuffle-after is now OFF by default — most tutor effects shouldn't
-    // reshuffle the library. Leaving this on by default was causing people
-    // to lose track order after pulling a specific card.
-    const [shuffleAfter, setShuffleAfter] = useState(false);
     const [sortMode, setSortMode] = useState(initialSortMode || 'order');
+    // Selection state for the "send multiple cards to library position" flow.
+    // Users pick cards via a Select button, choose top/bottom and optional
+    // random order, then commit — the cards leave the library, get reordered,
+    // and come back at the chosen position in the chosen order.
+    const [selectMode, setSelectMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState(() => new Set());
+    const [selectRandom, setSelectRandom] = useState(false);
+    // Battlefield-destination options for tutor: tapped, face-down,
+    // +1/+1 counter. Only relevant when destination is battlefield;
+    // ignored otherwise. Switches the underlying socket call from
+    // `tutorCard` to `tutorCardWithOptions` automatically.
+    const [bfTapped, setBfTapped] = useState(false);
+    const [bfFaceDown, setBfFaceDown] = useState(false);
+    const [bfPlusOne, setBfPlusOne] = useState(false);
 
     useEffect(() => {
         socket.emit('viewLibrary', (res) => {
@@ -24,11 +49,20 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
     }, []);
 
     const grab = (card, toZone, libraryPosition) => {
-        const payload = { instanceId: card.instanceId, toZone, shuffle: shuffleAfter };
+        const payload = { instanceId: card.instanceId, toZone };
         if (toZone === 'library' && libraryPosition !== undefined) {
             payload.libraryPosition = libraryPosition;
         }
-        socket.emit('tutorCard', payload, (res) => {
+        // Battlefield destination + any of the option toggles → use the
+        // extended handler. Otherwise stick with the cheaper plain `tutorCard`
+        // for full backwards-compat.
+        const useOptions = toZone === 'battlefield' && (bfTapped || bfFaceDown || bfPlusOne);
+        if (useOptions) {
+            payload.tapped = bfTapped;
+            payload.faceDown = bfFaceDown;
+            if (bfPlusOne) payload.counters = { '+1/+1': 1 };
+        }
+        socket.emit(useOptions ? 'tutorCardWithOptions' : 'tutorCard', payload, (res) => {
             if (res?.success) {
                 // Remove from local view
                 setLibrary(prev => prev.filter(c => c.instanceId !== card.instanceId));
@@ -36,25 +70,39 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
         });
     };
 
-    // Put a card back into the library at a chosen position. Prompts for
-    // "top", "bottom", or a numeric index (0 = top). Used to set up effects
-    // that let you arrange cards on top of your draw pile.
-    const grabToLibrary = async (card) => {
-        const input = await dialog.prompt(
-            `Place "${card.name}" in your library at which position?\n0 = top, ${library.length - 1} = bottom, or type "top" / "bottom".`,
-            '0',
-            { title: 'Position in library' }
-        );
-        if (input === null) return;
-        const s = String(input).trim().toLowerCase();
-        let pos;
-        if (s === 'top') pos = 0;
-        else if (s === 'bottom') pos = library.length - 1;
-        else {
-            pos = parseInt(s, 10);
-            if (isNaN(pos)) return;
+    // Toggle a card's membership in the select set. Used when the user is
+    // queueing up cards to batch-position into the library.
+    const toggleSelected = (instanceId) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(instanceId)) next.delete(instanceId);
+            else next.add(instanceId);
+            return next;
+        });
+    };
+
+    // Commit selected cards to the top or bottom of the library. Respects
+    // the "random order" toggle; otherwise the order is the user-click
+    // order (Set iteration preserves insertion order in JS).
+    const commitSelectedToLibrary = (position) => {
+        if (selectedIds.size === 0) return;
+        let ids = Array.from(selectedIds);
+        if (selectRandom) {
+            // Fisher-Yates in-place shuffle
+            for (let i = ids.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [ids[i], ids[j]] = [ids[j], ids[i]];
+            }
         }
-        grab(card, 'library', pos);
+        socket.emit('batchToLibrary', { instanceIds: ids, position }, (res) => {
+            if (res?.error) {
+                dialog.alert(res.error, { title: 'Batch to library' });
+                return;
+            }
+            setLibrary(prev => prev.filter(c => !selectedIds.has(c.instanceId)));
+            setSelectedIds(new Set());
+            setSelectMode(false);
+        });
     };
 
     const baseList = filter
@@ -75,7 +123,7 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
             <div className="modal library-search-modal">
                 <div className="modal-header">
                     <h2>Search Library ({library.length})</h2>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={closeWithOptionalShuffle}>x</button>
                 </div>
                 <div className="search-row">
                     <input
@@ -90,27 +138,92 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                         onClick={() => setSortMode(sortMode === 'alphabetical' ? 'order' : 'alphabetical')}
                         title="Toggle alphabetical sort"
                     >A→Z</button>
-                    <label className="shuffle-toggle">
-                        <input type="checkbox" checked={shuffleAfter} onChange={e => setShuffleAfter(e.target.checked)} />
-                        Shuffle after
+                    <label className="shuffle-toggle" title="Shuffle the library when you close this modal">
+                        <input type="checkbox" checked={shuffleOnClose} onChange={e => setShuffleOnClose(e.target.checked)} />
+                        Shuffle after close
                     </label>
+                    <button
+                        className={`small-btn ${selectMode ? 'primary-btn' : ''}`}
+                        onClick={() => { setSelectMode(s => !s); if (selectMode) setSelectedIds(new Set()); }}
+                        title="Select multiple cards to batch-send to top/bottom of library"
+                    >{selectMode ? 'Exit select' : 'Select…'}</button>
                 </div>
+                {/* Tutor-to-battlefield options. The checkboxes are always
+                    visible (cheap and not in the way) but they only kick in
+                    when you click "Play" — i.e. send the card to battlefield. */}
+                <div className="library-bf-options">
+                    <span className="muted" style={{ fontSize: 11 }}>When using <strong>Play</strong>:</span>
+                    <label><input type="checkbox" checked={bfTapped} onChange={e => setBfTapped(e.target.checked)} /> Tapped</label>
+                    <label><input type="checkbox" checked={bfFaceDown} onChange={e => setBfFaceDown(e.target.checked)} /> Face-down</label>
+                    <label><input type="checkbox" checked={bfPlusOne} onChange={e => setBfPlusOne(e.target.checked)} /> +1/+1 counter</label>
+                </div>
+                {selectMode && (
+                    <div className="library-select-toolbar">
+                        <span>{selectedIds.size} selected</span>
+                        <label title="Randomize order before placing">
+                            <input type="checkbox" checked={selectRandom} onChange={e => setSelectRandom(e.target.checked)} />
+                            Random order
+                        </label>
+                        <button
+                            className="small-btn primary-btn"
+                            disabled={selectedIds.size === 0}
+                            onClick={() => commitSelectedToLibrary('top')}
+                        >→ Top</button>
+                        <button
+                            className="small-btn primary-btn"
+                            disabled={selectedIds.size === 0}
+                            onClick={() => commitSelectedToLibrary('bottom')}
+                        >→ Bottom</button>
+                        <button
+                            className="small-btn"
+                            disabled={selectedIds.size === 0}
+                            onClick={() => setSelectedIds(new Set())}
+                        >Clear</button>
+                    </div>
+                )}
                 {loading ? (
                     <p className="muted">Loading library...</p>
                 ) : (
                     <div className="library-grid">
-                        {filtered.map(card => (
-                            <div key={card.instanceId} className="library-card-entry">
-                                <Card card={card} onClick={() => onMaximizeCard?.(card)} />
-                                <div className="library-card-actions">
-                                    <button onClick={() => grab(card, 'hand')} title="To hand">Hand</button>
-                                    <button onClick={() => grab(card, 'battlefield')} title="To battlefield">Play</button>
-                                    <button onClick={() => grab(card, 'graveyard')} title="To graveyard">GY</button>
-                                    <button onClick={() => grab(card, 'exile')} title="To exile">Exile</button>
-                                    <button onClick={() => grabToLibrary(card)} title="Place back in library at a chosen position">Lib…</button>
+                        {filtered.map(card => {
+                            const isPicked = selectedIds.has(card.instanceId);
+                            return (
+                                <div
+                                    key={card.instanceId}
+                                    className={`library-card-entry ${isPicked ? 'selected' : ''}`}
+                                >
+                                    <Card
+                                        card={card}
+                                        onClick={() => {
+                                            // In select mode, clicking a card toggles membership
+                                            // in the batch-to-library selection instead of
+                                            // maximizing it. Switch to maximize via the "View"
+                                            // action button below.
+                                            if (selectMode) {
+                                                toggleSelected(card.instanceId);
+                                            } else {
+                                                onMaximizeCard?.(card);
+                                            }
+                                        }}
+                                    />
+                                    {!selectMode ? (
+                                        <div className="library-card-actions">
+                                            <button onClick={() => grab(card, 'hand')} title="To hand">Hand</button>
+                                            <button onClick={() => grab(card, 'battlefield')} title="To battlefield">Play</button>
+                                            <button onClick={() => grab(card, 'graveyard')} title="To graveyard">GY</button>
+                                            <button onClick={() => grab(card, 'exile')} title="To exile">Exile</button>
+                                        </div>
+                                    ) : (
+                                        <div className="library-card-actions">
+                                            <button
+                                                onClick={() => toggleSelected(card.instanceId)}
+                                                className={isPicked ? 'primary-btn' : ''}
+                                            >{isPicked ? '✓ Picked' : 'Pick'}</button>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {filtered.length === 0 && !loading && <p className="muted">No matching cards.</p>}
                     </div>
                 )}

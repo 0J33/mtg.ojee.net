@@ -89,6 +89,10 @@ export default function Cursors({ containerRef, currentUserId }) {
                     aspectRatio: evt.aspectRatio,
                     username: evt.username || 'Player',
                     isSpectator: !!evt.isSpectator,
+                    // Optional override color when the sender is actively
+                    // drawing — makes the cursor match their brush. Falls
+                    // back to the hash-based hue below when absent.
+                    color: evt.color || null,
                     ts: evt.ts || Date.now(),
                 });
                 return next;
@@ -139,7 +143,10 @@ export default function Cursors({ containerRef, currentUserId }) {
                 y: Math.max(0, Math.min(ch - 20, py)),
                 username: c.username,
                 isSpectator: c.isSpectator,
-                hue: hueFor(userId),
+                // Prefer the sender's provided color (pen-active); fall back
+                // to the stable hash-derived hue so idle cursors still have
+                // a consistent, per-user color across sessions.
+                color: c.color || `hsl(${hueFor(userId)} 70% 55%)`,
                 opacity,
             });
         }
@@ -154,7 +161,7 @@ export default function Cursors({ containerRef, currentUserId }) {
                     style={{
                         transform: `translate(${e.x}px, ${e.y}px)`,
                         opacity: e.opacity,
-                        '--cursor-color': `hsl(${e.hue} 70% 55%)`,
+                        '--cursor-color': e.color,
                     }}
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" style={{ display: 'block', overflow: 'visible' }}>

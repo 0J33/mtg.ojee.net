@@ -7,11 +7,17 @@ it's not a rules engine, just a table. you drag cards around, flip them, track l
 ## what it does
 
 - rooms with invite links, join as player or spectator
-- build decks in the lobby or mid-game, import from moxfield with "copy as plain text"
+- build decks in the lobby or mid-game, import from moxfield (text **and** url, rate-limited)
 - custom cards with image urls, shareable across your decks
 - deck share codes — importer picks copy (independent) or link (author's edits propagate)
-- drag cards between zones, auto-untap, mulligan 7 → 7 → 6 → 5, infinite values for combos
-- chat, action log, drawing overlay with pen + eraser, live cursors, victory animation
+- drag cards between zones, mana pool with tap-for-mana, infinite values for combos
+- mulligan rules pick: vancouver, london (with bottoming), or free-7
+- damage / phasing / suspend / goad / temp-control on creatures, all clearable on end of turn
+- foretell pile, sideboard / companions / emblem zones (only render when non-empty)
+- the stack, extra-turn queue, proliferate, clone, cast-from-grave (with auto-exile-after)
+- teams with shared life and team victory detection
+- mid-game ⚙ Settings modal for starting life, format, max players, hand-size limit
+- chat with direct messages, action log, drawing overlay with pen / eraser / brush preview, live cursors, victory animation
 
 ## stack
 
@@ -47,8 +53,13 @@ register, make a room, paste a deck, play.
 
 - personal project, not built for scale. fine for a few rooms at once, not a public server.
 - no rate limiting on most routes. add some if you expose it.
-- moxfield url import is disabled — their api is cloudflare-gated. paste text works fine.
-- no rules enforcement. priority, stack, triggers, all on the players.
+- moxfield url import works via [`server/moxfieldClient.js`](server/moxfieldClient.js), which serializes every outgoing call through a single promise queue with a 10-second floor + a 5-second hard sanity backstop. requires `MOXFIELD_USER_AGENT` set in the server `.env`.
+- no rules enforcement. priority, stack, triggers, all on the players. the stack panel and mana pool are tools, not engines.
+
+## see also
+
+- [FEATURES.md](FEATURES.md) — full feature catalog grouped by area
+- [FEATURES_TEST.md](FEATURES_TEST.md) — test plan for the latest big-batch deploy
 
 ## license
 

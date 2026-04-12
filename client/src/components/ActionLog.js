@@ -72,6 +72,22 @@ function formatEntry(entry, playerNameById) {
             return `${actorName} created ${d.name || 'a custom card'}`;
         case 'mulligan':
             return `${actorName} mulled to ${d.handSize} (mull #${d.mulliganNumber})`;
+        case 'mulliganPhaseStart':
+            return `Mulligan phase started (${d.players || '?'} players)`;
+        case 'setMulliganReady':
+            return `${d.player || actorName} ${d.ready ? 'is ready' : 'un-readied'}`;
+        case 'rollForFirstPlayer':
+            return `${d.player || actorName} rolled a ${d.roll} for first player`;
+        case 'firstPlayerTiebreak':
+            return `Tie at ${d.roll}! ${d.tied || ''} re-roll`;
+        case 'firstPlayerRoll':
+            return `First player roll — ${d.rolls || ''}. ${d.winner || '?'} goes first (rolled ${d.winningRoll})`;
+        case 'batchToLibrary':
+            return `${actorName} placed ${d.count || 0} cards on ${d.position || 'top'} of their library`;
+        case 'peekLibraryTop':
+            return `${actorName} looked at the top ${d.count} of ${d.target || '?'}'s library`;
+        case 'peekResolve':
+            return `${d.caster || actorName} exiled ${d.exiledCardName || 'a card'} from ${d.target || '?'}'s library`;
         case 'nextTurn':
             return `Turn passed to ${d.turnPlayer || '?'}`;
         case 'undo':
@@ -92,6 +108,55 @@ function formatEntry(entry, playerNameById) {
             return `${actorName} flipped ${d.count} coin(s): ${(d.results || []).join(', ')}`;
         case 'victory':
             return `🏆 ${d.player || '?'} is the last player standing!`;
+        // ─── Big-batch printers ───────────────────────────────────
+        case 'addMana':
+            return `${actorName} added ${Math.abs(d.amount || 1)}× ${d.color || '?'} to mana pool`;
+        case 'clearManaPool':
+            return `${actorName} emptied mana pool`;
+        case 'tapForMana':
+            return `${actorName} tapped ${d.cardName || 'a land'} for ${d.mana || '?'}`;
+        case 'setCardField':
+            return `${actorName} set ${d.field} on ${d.cardName || 'a card'} → ${d.value}`;
+        case 'cloneCard':
+            return `${actorName} cloned ${d.cardName || 'a card'}`;
+        case 'foretell':
+            return `${actorName} foretold a card`;
+        case 'castForetold':
+            return `${actorName} cast foretold ${d.cardName || 'a card'}`;
+        case 'castFromZone':
+            return `${actorName} cast ${d.cardName || 'a card'} from ${d.fromZone}${d.exileAfter ? ' (exiles after)' : ''}`;
+        case 'proliferate':
+            return `${actorName} proliferated (${d.count || 0} counter${d.count === 1 ? '' : 's'} bumped)`;
+        case 'queueExtraTurn':
+            return `${actorName} queued an extra turn for ${d.player || '?'}`;
+        case 'extraTurnPop':
+            return `↺ Extra turn — ${d.player || '?'}`;
+        case 'stackPush':
+            return `${actorName} put ${d.cardName || 'a spell'} on the stack`;
+        case 'stackPop':
+            return `${actorName} resolved ${d.cardName || 'something'} from the stack`;
+        case 'stackClear':
+            return `${actorName} cleared the stack`;
+        case 'addEmblem':
+            return `${actorName} added emblem to ${d.player || '?'}: ${d.name || ''}`;
+        case 'updateRoomSettings':
+            return `${actorName} updated room settings`;
+        case 'concede':
+            return `${d.player || actorName} conceded`;
+        case 'mulliganBottom':
+            return `${d.player || actorName} bottomed ${d.count || 0} card(s)`;
+        case 'takeControl':
+            return `${actorName} took control of ${d.cardName || 'a card'} from ${d.from || '?'}${d.untilEndOfTurn ? ' (until EOT)' : ''}`;
+        case 'setHandSizeEnforce':
+            return `${actorName} turned hand-size enforcement ${d.value ? 'ON' : 'OFF'}`;
+        case 'setSharedTeamLife':
+            return `${actorName} turned shared team life ${d.value ? 'ON' : 'OFF'}`;
+        case 'suspendReady':
+            return `⌛ ${d.cardName || 'A suspended card'} is ready to cast`;
+        case 'browseLibraryFull':
+            return `${actorName} looked through ${d.target || '?'}'s library`;
+        case 'setBackground':
+            return `${actorName} changed their background`;
         default:
             return `${actorName} ${entry.type}`;
     }
