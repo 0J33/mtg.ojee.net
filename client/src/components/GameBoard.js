@@ -779,6 +779,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             {/* Top bar */}
             <div className="game-topbar">
                 <div className="topbar-left">
+                    <img src="https://svgs.scryfall.io/card-symbols/CHAOS.svg" alt="" className="topbar-logo" />
                     <span className="topbar-version">v{VERSION}</span>
                     <button
                         type="button"
@@ -1725,24 +1726,70 @@ function CustomCardModal({ onClose }) {
 function BackgroundModal({ onClose }) {
     useEscapeKey(onClose);
     const [url, setUrl] = useState('');
+    const [saved, setSaved] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('mtg_saved_bgs') || '[]');
+        } catch (_) { return []; }
+    });
 
-    const handleSet = () => {
-        socket.emit('setBackground', { imageUrl: url }, () => {});
+    const persist = (list) => {
+        setSaved(list);
+        try { localStorage.setItem('mtg_saved_bgs', JSON.stringify(list)); } catch (_) {}
+    };
+
+    const handleSet = (u) => {
+        const link = (u || url).trim();
+        if (!link) return;
+        socket.emit('setBackground', { imageUrl: link }, () => {});
+        // Save to history if not already there
+        if (!saved.includes(link)) persist([link, ...saved].slice(0, 20));
         onClose();
+    };
+
+    const handleRemoveSaved = (link) => {
+        persist(saved.filter(s => s !== link));
     };
 
     return (
         <div className="modal-overlay">
-            <div className="modal">
+            <div className="modal bg-modal">
                 <div className="modal-header">
                     <h2>Set Background</h2>
                     <button className="close-btn" onClick={onClose}>x</button>
                 </div>
-                <input type="text" placeholder="Image URL" value={url} onChange={e => setUrl(e.target.value)} />
+                <input
+                    type="text"
+                    placeholder="Image URL"
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSet()}
+                    autoFocus
+                />
                 <div className="modal-actions">
-                    <button onClick={handleSet} className="primary-btn">Set</button>
+                    <button onClick={() => handleSet()} className="primary-btn" disabled={!url.trim()}>Set</button>
                     <button onClick={() => { socket.emit('setBackground', { imageUrl: null }); onClose(); }}>Clear</button>
                 </div>
+                {saved.length > 0 && (
+                    <div className="bg-saved-list">
+                        <div className="bg-saved-label">Saved backgrounds</div>
+                        {saved.map((link, i) => (
+                            <div key={i} className="bg-saved-item">
+                                <img
+                                    src={link}
+                                    alt=""
+                                    className="bg-saved-thumb"
+                                    onClick={() => handleSet(link)}
+                                    title="Click to apply"
+                                />
+                                <button
+                                    className="bg-saved-remove"
+                                    onClick={() => handleRemoveSaved(link)}
+                                    title="Remove from saved"
+                                >x</button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
