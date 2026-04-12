@@ -4,7 +4,10 @@ import Card from './Card';
 import { useEscapeKey } from '../utils';
 import { useDialog } from './Dialog';
 
-export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initialSortMode }) {
+export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initialSortMode, viewMode, allZones }) {
+    // viewMode: 'library' (default) = show only the library, with tutor actions.
+    //           'deck' = show ALL zones grouped by name, alphabetical, read-only overview.
+    const isDeckView = viewMode === 'deck';
     // Wrapper around onClose that fires a shuffleLibrary if the user opted in,
     // before closing. Previously the shuffle was tied to each tutor call,
     // which meant "shuffle after" actually shuffled on EVERY pull (wrong) and
@@ -41,12 +44,30 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
     const [bfFaceDown, setBfFaceDown] = useState(false);
     const [bfPlusOne, setBfPlusOne] = useState(false);
 
+    // In deck mode, assemble cards from every zone the client already has
+    // (no socket call needed). Tag each card with its zone so we can group.
+    const [deckCards, setDeckCards] = useState([]);
     useEffect(() => {
-        socket.emit('viewLibrary', (res) => {
-            if (res?.library) setLibrary(res.library);
+        if (isDeckView && allZones) {
+            const ZONE_ORDER = ['commandZone', 'hand', 'battlefield', 'library', 'graveyard', 'exile', 'sideboard', 'companions', 'foretell'];
+            const cards = [];
+            for (const z of ZONE_ORDER) {
+                const arr = allZones[z];
+                if (!Array.isArray(arr)) continue;
+                for (const c of arr) {
+                    if (c && !c.hidden) cards.push({ ...c, _zone: z });
+                }
+            }
+            cards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            setDeckCards(cards);
             setLoading(false);
-        });
-    }, []);
+        } else {
+            socket.emit('viewLibrary', (res) => {
+                if (res?.library) setLibrary(res.library);
+                setLoading(false);
+            });
+        }
+    }, [isDeckView, allZones]);
 
     const grab = (card, toZone, libraryPosition) => {
         const payload = { instanceId: card.instanceId, toZone };
@@ -105,59 +126,71 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
         });
     };
 
+    const sourceList = isDeckView ? deckCards : library;
     const baseList = filter
-        ? library.filter(c => {
+        ? sourceList.filter(c => {
             const q = filter.toLowerCase();
             return (c.name || '').toLowerCase().includes(q)
                 || (c.typeLine || '').toLowerCase().includes(q)
                 || (c.oracleText || '').toLowerCase().includes(q);
         })
-        : library;
+        : sourceList;
 
     const filtered = sortMode === 'alphabetical'
         ? [...baseList].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
         : baseList;
 
+    // In deck view, group cards by zone for the header labels.
+    const ZONE_LABELS = {
+        commandZone: 'Command Zone', hand: 'Hand', battlefield: 'Battlefield',
+        library: 'Library', graveyard: 'Graveyard', exile: 'Exile',
+        sideboard: 'Sideboard', companions: 'Wishboard', foretell: 'Foretell',
+    };
+
     return (
         <div className="modal-overlay">
             <div className="modal library-search-modal">
                 <div className="modal-header">
-                    <h2>Search Library ({library.length})</h2>
+                    <h2>{isDeckView ? `Full Deck (${sourceList.length})` : `Library (${library.length})`}</h2>
                     <button className="close-btn" onClick={closeWithOptionalShuffle}>x</button>
                 </div>
                 <div className="search-row">
                     <input
                         type="text"
-                        placeholder="Filter by name, type, or text (e.g. creature, lightning, draw a card)"
+                        placeholder="Filter by name, type, or text"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
                         autoFocus
                     />
-                    <button
-                        className={`small-btn ${sortMode === 'alphabetical' ? 'primary-btn' : ''}`}
-                        onClick={() => setSortMode(sortMode === 'alphabetical' ? 'order' : 'alphabetical')}
-                        title="Toggle alphabetical sort"
-                    >A→Z</button>
-                    <label className="shuffle-toggle" title="Shuffle the library when you close this modal">
-                        <input type="checkbox" checked={shuffleOnClose} onChange={e => setShuffleOnClose(e.target.checked)} />
-                        Shuffle after close
-                    </label>
-                    <button
-                        className={`small-btn ${selectMode ? 'primary-btn' : ''}`}
-                        onClick={() => { setSelectMode(s => !s); if (selectMode) setSelectedIds(new Set()); }}
-                        title="Select multiple cards to batch-send to top/bottom of library"
-                    >{selectMode ? 'Exit select' : 'Select…'}</button>
+                    {!isDeckView && (
+                        <>
+                            <button
+                                className={`small-btn ${sortMode === 'alphabetical' ? 'primary-btn' : ''}`}
+                                onClick={() => setSortMode(sortMode === 'alphabetical' ? 'order' : 'alphabetical')}
+                                title="Toggle alphabetical sort"
+                            >A→Z</button>
+                            <label className="shuffle-toggle" title="Shuffle the library when you close this modal">
+                                <input type="checkbox" checked={shuffleOnClose} onChange={e => setShuffleOnClose(e.target.checked)} />
+                                Shuffle after close
+                            </label>
+                            <button
+                                className={`small-btn ${selectMode ? 'primary-btn' : ''}`}
+                                onClick={() => { setSelectMode(s => !s); if (selectMode) setSelectedIds(new Set()); }}
+                                title="Select multiple cards to batch-send to top/bottom of library"
+                            >{selectMode ? 'Exit select' : 'Select…'}</button>
+                        </>
+                    )}
                 </div>
-                {/* Tutor-to-battlefield options. The checkboxes are always
-                    visible (cheap and not in the way) but they only kick in
-                    when you click "Play" — i.e. send the card to battlefield. */}
-                <div className="library-bf-options">
-                    <span className="muted" style={{ fontSize: 11 }}>When using <strong>Play</strong>:</span>
-                    <label><input type="checkbox" checked={bfTapped} onChange={e => setBfTapped(e.target.checked)} /> Tapped</label>
-                    <label><input type="checkbox" checked={bfFaceDown} onChange={e => setBfFaceDown(e.target.checked)} /> Face-down</label>
-                    <label><input type="checkbox" checked={bfPlusOne} onChange={e => setBfPlusOne(e.target.checked)} /> +1/+1 counter</label>
-                </div>
-                {selectMode && (
+                {/* Tutor-to-battlefield options — library mode only. */}
+                {!isDeckView && (
+                    <div className="library-bf-options">
+                        <span className="muted" style={{ fontSize: 11 }}>When using <strong>Play</strong>:</span>
+                        <label><input type="checkbox" checked={bfTapped} onChange={e => setBfTapped(e.target.checked)} /> Tapped</label>
+                        <label><input type="checkbox" checked={bfFaceDown} onChange={e => setBfFaceDown(e.target.checked)} /> Face-down</label>
+                        <label><input type="checkbox" checked={bfPlusOne} onChange={e => setBfPlusOne(e.target.checked)} /> +1/+1 counter</label>
+                    </div>
+                )}
+                {!isDeckView && selectMode && (
                     <div className="library-select-toolbar">
                         <span>{selectedIds.size} selected</span>
                         <label title="Randomize order before placing">
@@ -182,8 +215,37 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                     </div>
                 )}
                 {loading ? (
-                    <p className="muted">Loading library...</p>
+                    <p className="muted">Loading...</p>
+                ) : isDeckView ? (
+                    /* ─── Deck view: cards grouped by zone ─────────────── */
+                    <div className="library-grid deck-view-grid">
+                        {(() => {
+                            let lastZone = null;
+                            const out = [];
+                            for (const card of filtered) {
+                                const z = card._zone || 'library';
+                                if (z !== lastZone) {
+                                    lastZone = z;
+                                    const count = filtered.filter(c => (c._zone || 'library') === z).length;
+                                    out.push(
+                                        <div key={`hdr-${z}`} className="deck-view-zone-header">
+                                            {ZONE_LABELS[z] || z} ({count})
+                                        </div>
+                                    );
+                                }
+                                out.push(
+                                    <div key={card.instanceId} className="library-card-entry">
+                                        <Card card={card} onClick={() => onMaximizeCard?.(card)} />
+                                        <div className="library-card-name muted">{card.name}</div>
+                                    </div>
+                                );
+                            }
+                            if (out.length === 0) out.push(<p key="empty" className="muted">No matching cards.</p>);
+                            return out;
+                        })()}
+                    </div>
                 ) : (
+                    /* ─── Library view: tutor actions per card ─────────── */
                     <div className="library-grid">
                         {filtered.map(card => {
                             const isPicked = selectedIds.has(card.instanceId);
@@ -195,10 +257,6 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                                     <Card
                                         card={card}
                                         onClick={() => {
-                                            // In select mode, clicking a card toggles membership
-                                            // in the batch-to-library selection instead of
-                                            // maximizing it. Switch to maximize via the "View"
-                                            // action button below.
                                             if (selectMode) {
                                                 toggleSelected(card.instanceId);
                                             } else {

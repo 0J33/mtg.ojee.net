@@ -2338,6 +2338,27 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     border-radius: 4px;
 }
 
+/* Deck-view zone header inside LibrarySearch */
+.deck-view-zone-header {
+    grid-column: 1 / -1;
+    font-family: 'Cinzel', serif;
+    font-size: 0.8em;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent, #88aaff);
+    border-bottom: 1px solid var(--border-soft, #333);
+    padding: 8px 4px 4px;
+    margin-top: 4px;
+}
+.library-card-name {
+    font-size: 0.7em;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
 /* Pending-action banner — pick-target mode indicator */
 .pending-action-banner {
     display: flex;

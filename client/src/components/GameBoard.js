@@ -53,6 +53,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [rollResults, setRollResults] = useState([]);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [librarySortMode, setLibrarySortMode] = useState('order'); // 'order' | 'alphabetical'
+    const [libraryViewMode, setLibraryViewMode] = useState('library'); // 'library' | 'deck'
     const [compactMode, setCompactMode] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [counterModalCard, setCounterModalCard] = useState(null); // card object whose counters are being edited
@@ -359,12 +360,24 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         });
     };
 
+    // Three distinct views:
+    // 1. View Deck (topbar) → ALL zones, alphabetical, read-only overview
+    // 2. Click Library label → library only, alphabetical
+    // 3. Tutor button → library only, draw order (for positional picks)
+    const handleViewDeck = () => {
+        setLibraryViewMode('deck');
+        setLibrarySortMode('alphabetical');
+        setLibrarySearchOpen(true);
+    };
+
     const handleViewLibrary = () => {
+        setLibraryViewMode('library');
         setLibrarySortMode('alphabetical');
         setLibrarySearchOpen(true);
     };
 
     const handleTutor = () => {
+        setLibraryViewMode('library');
         setLibrarySortMode('order');
         setLibrarySearchOpen(true);
     };
@@ -882,7 +895,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             <button onClick={handleUndo} className="small-btn">Undo</button>
                             <button onClick={() => setShowSearch('token')} className="small-btn">Tokens</button>
                             <button onClick={() => setShowSearch('add')} className="small-btn">Search</button>
-                            <button onClick={handleViewLibrary} className="small-btn">View Deck</button>
+                            <button onClick={handleViewDeck} className="small-btn">View Deck</button>
                             <button onClick={handleMulligan} className="small-btn" disabled={!canMulligan} title={canMulligan ? `Mulligan (draws ${Math.max(5, 8 - (myMulliganCount + 1))} next)` : 'No more mulligans'}>Mulligan</button>
                             <button onClick={() => setShowDicePicker(true)} className="small-btn">Roll</button>
                             <button onClick={() => setCustomCardModal(true)} className="small-btn">Custom</button>
@@ -1259,6 +1272,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     onClose={() => setLibrarySearchOpen(false)}
                     onMaximizeCard={setMaximizedCard}
                     sortMode={librarySortMode}
+                    viewMode={libraryViewMode}
+                    allZones={libraryViewMode === 'deck' && me ? me.zones : null}
                 />
             )}
             {showDicePicker && <DiceModal onClose={() => setShowDicePicker(false)} />}
