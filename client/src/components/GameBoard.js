@@ -2057,24 +2057,30 @@ function ProliferateModal({ players, onClose, onSubmit }) {
     const [items, setItems] = useState(() => {
         const list = [];
         for (const p of players) {
-            // Player counters
-            const pCounters = [];
+            // Always show every player with all standard counter types so the
+            // user has full control — can infect themselves, add energy, etc.
+            const pCounters = [
+                { name: 'poison', value: (p.counters || {}).poison || 0 },
+                { name: 'energy', value: (p.counters || {}).energy || 0 },
+                { name: 'experience', value: (p.counters || {}).experience || 0 },
+                { name: 'infect', value: p.infect || 0 },
+            ];
+            // Also include any custom counters they might have
             for (const [k, v] of Object.entries(p.counters || {})) {
-                if (v > 0) pCounters.push({ name: k, value: v });
+                if (!['poison', 'energy', 'experience'].includes(k)) {
+                    pCounters.push({ name: k, value: v || 0 });
+                }
             }
-            if ((p.infect || 0) > 0) pCounters.push({ name: 'infect', value: p.infect });
-            if (pCounters.length > 0) {
-                list.push({
-                    key: `player-${p.userId}`,
-                    label: p.username,
-                    type: 'player',
-                    id: p.userId,
-                    counters: pCounters,
-                    selected: false,
-                    chosenCounter: pCounters[0].name,
-                });
-            }
-            // Card counters on battlefield
+            list.push({
+                key: `player-${p.userId}`,
+                label: p.username,
+                type: 'player',
+                id: p.userId,
+                counters: pCounters,
+                selected: false,
+                chosenCounter: pCounters[0].name,
+            });
+            // Card counters on battlefield — show cards that have any counter
             for (const card of (p.zones?.battlefield || [])) {
                 const cEntries = Object.entries(card.counters || {}).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k, value: v }));
                 if (cEntries.length > 0) {
