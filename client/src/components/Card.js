@@ -4,6 +4,14 @@ import { OracleText } from './ManaCost';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
+// Custom skins — stored in localStorage per scryfallId. The skin URL overrides
+// the card's default image whenever set. Other players don't see your skins
+// (purely cosmetic, client-side only). Managed via "Set skin" in CardMaximized.
+function getSkin(scryfallId) {
+    if (!scryfallId) return null;
+    try { return localStorage.getItem(`mtg_skin_${scryfallId}`) || null; } catch (_) { return null; }
+}
+
 export default function Card({ card, onClick, onContextMenu, isDragging, small, showBack, draggable, onDragStart, onDragEnd, disableHover, attachedToName, attachments }) {
     const [hoverPos, setHoverPos] = useState(null);
     const [imgError, setImgError] = useState(false);
@@ -12,7 +20,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const isFaceDown = card.faceDown || showBack;
     const hasBack = !!card.backImageUri;
     const isFlipped = card.flipped && hasBack;
-    const frontImage = card.imageUri || card.customImageUrl || CARD_BACK;
+    const skin = getSkin(card.scryfallId);
+    const frontImage = skin || card.imageUri || card.customImageUrl || CARD_BACK;
     const imageUrl = isFaceDown
         ? CARD_BACK
         : isFlipped

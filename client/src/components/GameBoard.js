@@ -192,8 +192,11 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             // When actively drawing with the pen, tag the cursor with the
             // current brush color so other players see who's drawing what.
             // Eraser uses default hash color (no tint needed).
+            // When actively drawing with the pen, use the brush color. Otherwise
+            // send the user's avatar color so spectators (who aren't in the
+            // players array) still get their cursor colored correctly.
             const pen = penStateRef.current;
-            const color = pen.enabled && pen.tool === 'pen' ? pen.color : undefined;
+            const color = pen.enabled && pen.tool === 'pen' ? pen.color : (me?.avatarColor || undefined);
             lastCursorPosRef.current = { x, y, aspectRatio: rect.width / rect.height };
             socket.emit('cursorMove', { x, y, aspectRatio: rect.width / rect.height, color });
         };
@@ -1033,12 +1036,10 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             ? firstSelectedCard.name || '1 selected'
                             : `${selectedIds.size} selected`}
                     </span>
-                    {/* Single-card-only actions (only meaningful for one card at a time) */}
+                    {/* Single-card-only actions */}
                     {selectedIds.size === 1 && firstSelectedCard && (
                         <>
                             <button onClick={() => setMaximizedCard(firstSelectedCard)}>View</button>
-                            <button onClick={() => setCounterModalCard(firstSelectedCard)}>+Counter</button>
-                            <button onClick={() => setNoteEditor({ instanceId: firstSelectedCard.instanceId })}>Note</button>
                             <button onClick={() => socket.emit(
                                 firstSelectedCard.backImageUri ? 'flipCard' : 'toggleFaceDown',
                                 { instanceId: firstSelectedCard.instanceId },
@@ -1046,6 +1047,15 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             <button onClick={() => socket.emit('revealCard', { instanceId: firstSelectedCard.instanceId, targetPlayerIds: 'all' })}>Reveal</button>
                         </>
                     )}
+                    {/* Counter + Note work for any number of selected cards.
+                        For multi-select, the counter/note is applied to every
+                        selected card. */}
+                    <button onClick={() => {
+                        if (firstSelectedCard) setCounterModalCard(firstSelectedCard);
+                    }}>+Counter</button>
+                    <button onClick={() => {
+                        if (firstSelectedCard) setNoteEditor({ instanceId: firstSelectedCard.instanceId, bulkIds: selectedIds.size > 1 ? Array.from(selectedIds) : null });
+                    }}>Note</button>
                     <button onClick={() => bulkTap()}>Tap</button>
                     <button onClick={() => bulkMove('battlefield')}>→ BF</button>
                     <button onClick={() => bulkMove('hand')}>→ Hand</button>
@@ -1313,7 +1323,14 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 <CounterModal
                     card={counterModalCard}
                     onAdd={(name, val) => {
-                        socket.emit('setCardCounter', { instanceId: counterModalCard.instanceId, counter: name, value: val });
+                        // Apply to all selected cards if multi-selected,
+                        // otherwise just the one card.
+                        const targets = selectedIds.size > 1
+                            ? Array.from(selectedIds)
+                            : [counterModalCard.instanceId];
+                        for (const id of targets) {
+                            socket.emit('setCardCounter', { instanceId: id, counter: name, value: val });
+                        }
                         setCounterModalCard(null);
                     }}
                     onClose={() => setCounterModalCard(null)}

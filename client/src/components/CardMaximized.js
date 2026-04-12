@@ -11,9 +11,15 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
     const [showRevealMenu, setShowRevealMenu] = useState(false);
     const [showMoveMenu, setShowMoveMenu] = useState(false);
-    // Local toggle to preview the other side without actually flipping the
-    // card in-game. Only available when the card has a back image (DFC/MDFC).
     const [viewingBack, setViewingBack] = useState(false);
+    const [skinInput, setSkinInput] = useState('');
+    const [showSkinInput, setShowSkinInput] = useState(false);
+
+    // Check if a custom skin is set for this card
+    const currentSkin = (() => {
+        if (!card?.scryfallId) return null;
+        try { return localStorage.getItem(`mtg_skin_${card.scryfallId}`) || null; } catch (_) { return null; }
+    })();
     if (!card) return null;
 
     const hasDFC = !!card.backImageUri;
@@ -222,6 +228,47 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                             setShowRevealMenu(false);
                                         }}>{p.username}</button>
                                     ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Custom skin — client-only cosmetic override. Only you see it. */}
+                    {card.scryfallId && (
+                        <div className="card-skin-section">
+                            {currentSkin && (
+                                <div className="card-skin-current">
+                                    <span className="muted" style={{ fontSize: 11 }}>Custom skin active</span>
+                                    <button className="small-btn" onClick={() => {
+                                        try { localStorage.removeItem(`mtg_skin_${card.scryfallId}`); } catch (_) {}
+                                        onClose?.();
+                                    }}>Remove skin</button>
+                                </div>
+                            )}
+                            {!showSkinInput ? (
+                                <button className="small-btn" onClick={() => setShowSkinInput(true)}>
+                                    {currentSkin ? 'Change skin' : 'Set custom skin'}
+                                </button>
+                            ) : (
+                                <div className="card-skin-input-row">
+                                    <input
+                                        type="text"
+                                        placeholder="Image URL for custom art"
+                                        value={skinInput}
+                                        onChange={e => setSkinInput(e.target.value)}
+                                        autoFocus
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && skinInput.trim()) {
+                                                try { localStorage.setItem(`mtg_skin_${card.scryfallId}`, skinInput.trim()); } catch (_) {}
+                                                onClose?.();
+                                            }
+                                        }}
+                                    />
+                                    <button className="small-btn primary-btn" disabled={!skinInput.trim()} onClick={() => {
+                                        try { localStorage.setItem(`mtg_skin_${card.scryfallId}`, skinInput.trim()); } catch (_) {}
+                                        onClose?.();
+                                    }}>Apply</button>
+                                    <button className="small-btn" onClick={() => setShowSkinInput(false)}>Cancel</button>
                                 </div>
                             )}
                         </div>

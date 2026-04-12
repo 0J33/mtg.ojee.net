@@ -93,6 +93,16 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         socket.emit('tapCard', { instanceId: card.instanceId });
     };
 
+    // Ctrl+drag multi-select: when ctrl (or cmd) is held and the mouse enters
+    // a card, add it to selection automatically. This lets the user paint a
+    // selection by sweeping across cards while holding ctrl.
+    const handleCardMouseEnter = (e, card) => {
+        if (spectating) return;
+        if (!(e.ctrlKey || e.metaKey)) return;
+        if (e.buttons !== 1) return; // left button must be held (dragging)
+        onToggleSelect?.(card.instanceId);
+    };
+
     const handleCardClick = (e, card) => {
         // When a pending action is active, card clicks resolve it instead of
         // any normal behavior (selection, maximize, etc.). For attach, only
@@ -397,7 +407,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             const pendingLand = zone === 'hand' && needsLand && isLandCard(card);
             return (
                 <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''} ${pendingLand ? 'turn-nudge-land' : ''}`}
-                    onMouseDown={(e) => handleCardMouseDown(e, card)}>
+                    onMouseDown={(e) => handleCardMouseDown(e, card)}
+                    onMouseEnter={(e) => handleCardMouseEnter(e, card)}>
                     <Card
                         card={card}
                         onClick={(e) => handleCardClick(e, card)}
@@ -584,7 +595,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     const isSelected = selectedIds?.has(card.instanceId);
                     return (
                         <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''}`}
-                            onMouseDown={(e) => handleCardMouseDown(e, card)}>
+                            onMouseDown={(e) => handleCardMouseDown(e, card)}
+                            onMouseEnter={(e) => handleCardMouseEnter(e, card)}>
                             <Card
                                 card={card}
                                 onClick={(e) => handleCardClick(e, card)}

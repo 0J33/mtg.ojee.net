@@ -55,7 +55,10 @@ export function useEscapeKey(onEscape) {
 }
 
 // Detect a touch-only device (phones, tablets without mice). Re-evaluates if the
-// matchMedia changes (e.g. external mouse plugged in).
+// matchMedia changes (e.g. external mouse plugged in). Some Firefox builds on
+// touchscreen laptops report (hover: none) incorrectly — so we also flip to
+// non-touch if we ever see a real mousemove event (which touch-only devices
+// never produce).
 export function useIsTouchDevice() {
     const [isTouch, setIsTouch] = useState(() => {
         if (typeof window === 'undefined' || !window.matchMedia) return false;
@@ -67,9 +70,22 @@ export function useIsTouchDevice() {
         const handler = (e) => setIsTouch(e.matches);
         if (mq.addEventListener) mq.addEventListener('change', handler);
         else mq.addListener(handler);
+        // Fallback: if a real mouse event fires, this is NOT a touch-only device.
+        // Firefox on some touchscreen laptops misreports the media query.
+        const onMouse = (e) => {
+            // pointerType check: only "mouse" counts, not "touch" or "pen"
+            if (e.pointerType && e.pointerType !== 'mouse') return;
+            setIsTouch(false);
+            window.removeEventListener('mousemove', onMouse);
+            window.removeEventListener('pointermove', onMouse);
+        };
+        window.addEventListener('mousemove', onMouse, { once: true });
+        window.addEventListener('pointermove', onMouse);
         return () => {
             if (mq.removeEventListener) mq.removeEventListener('change', handler);
             else mq.removeListener(handler);
+            window.removeEventListener('mousemove', onMouse);
+            window.removeEventListener('pointermove', onMouse);
         };
     }, []);
     return isTouch;
