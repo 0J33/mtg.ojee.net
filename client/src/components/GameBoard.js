@@ -449,7 +449,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 onClick: () => socket.emit('revealHand', { targetPlayerIds: [p.userId] }, () => {}),
             })),
             {
-                label: 'Reveal SPECIFIC cards from hand...',
+                label: 'Reveal specific cards from hand...',
                 onClick: () => setRevealPickerOpen(true),
             },
             { divider: true },
@@ -890,34 +890,58 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                         <button onClick={handleLoadDeck} className="small-btn">Load Deck</button>
                     )}
                     {!isSpectator && gameStarted && (
-                        <>
-                            <button onClick={handleUntapAll} className="small-btn">Untap All</button>
-                            <button onClick={handleUndo} className="small-btn">Undo</button>
-                            <button onClick={() => setShowSearch('token')} className="small-btn">Tokens</button>
-                            <button onClick={() => setShowSearch('add')} className="small-btn">Search</button>
-                            <button onClick={handleViewDeck} className="small-btn">View Deck</button>
+                        <div className="topbar-group">
+                            <button onClick={handleUntapAll} className="small-btn" title="Untap all your tapped permanents">Untap All</button>
+                            <button onClick={handleUndo} className="small-btn" title="Undo last action">Undo</button>
                             <button onClick={handleMulligan} className="small-btn" disabled={!canMulligan} title={canMulligan ? `Mulligan (draws ${Math.max(5, 8 - (myMulliganCount + 1))} next)` : 'No more mulligans'}>Mulligan</button>
-                            <button onClick={() => setShowDicePicker(true)} className="small-btn">Roll</button>
-                            <button onClick={() => setCustomCardModal(true)} className="small-btn">Custom</button>
-                        </>
+                        </div>
                     )}
-                    {!isSpectator && (
-                        <button onClick={() => setBgModal(true)} className="small-btn">BG</button>
+                    {!isSpectator && gameStarted && (
+                        <div className="topbar-group">
+                            <button onClick={handleViewDeck} className="small-btn" title="View your full decklist">Deck</button>
+                            <button onClick={() => setShowSearch('token')} className="small-btn" title="Search for tokens">Tokens</button>
+                            <button onClick={() => setShowSearch('add')} className="small-btn" title="Search for any card">Search</button>
+                            <button onClick={() => setShowDicePicker(true)} className="small-btn" title="Roll dice or flip coins">Roll</button>
+                            <button onClick={() => setCustomCardModal(true)} className="small-btn" title="Create or play a custom card">Custom</button>
+                        </div>
                     )}
-                    <button onClick={() => setSettingsModalOpen(true)} className="small-btn" title="Game settings">⚙</button>
-                    <button onClick={() => setGuideOpen(true)} className="small-btn" title="How to play">Guide</button>
-                    <button onClick={() => setActionLogOpen(o => !o)} className="small-btn" title="Action log">Log</button>
-                    {!isTouch && (
-                        <label className="compact-toggle small-btn" title="Share cursor with other desktop players (non-compact only)">
-                            <input type="checkbox" checked={cursorShareEnabled} onChange={e => setCursorShareEnabled(e.target.checked)} />
-                            Cursor
+                    <div className="topbar-group topbar-utils">
+                        <button onClick={() => setSettingsModalOpen(true)} className="topbar-icon-btn" title="Game settings">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                            </svg>
+                        </button>
+                        <button onClick={() => setGuideOpen(true)} className="topbar-icon-btn" title="How to play">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        </button>
+                        <button onClick={() => setActionLogOpen(o => !o)} className="topbar-icon-btn" title="Action log">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18M3 12h18M3 18h12"/>
+                            </svg>
+                        </button>
+                        {!isSpectator && (
+                            <button onClick={() => setBgModal(true)} className="topbar-icon-btn" title="Set background image">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                    <div className="topbar-group topbar-toggles">
+                        {!isTouch && (
+                            <label className="compact-toggle small-btn" title="Share cursor with other desktop players">
+                                <input type="checkbox" checked={cursorShareEnabled} onChange={e => setCursorShareEnabled(e.target.checked)} />
+                                Cursor
+                            </label>
+                        )}
+                        <label className="compact-toggle small-btn" title="Toggle compact layout">
+                            <input type="checkbox" checked={compactMode} onChange={e => setCompactMode(e.target.checked)} />
+                            Compact
                         </label>
-                    )}
-                    <label className="compact-toggle small-btn" title="Toggle compact layout">
-                        <input type="checkbox" checked={compactMode} onChange={e => setCompactMode(e.target.checked)} />
-                        Compact
-                    </label>
-                    <button onClick={onLeave} className="small-btn danger">Leave</button>
+                        <button onClick={onLeave} className="small-btn danger" title="Leave the room">Leave</button>
+                    </div>
                 </div>
             </div>
 

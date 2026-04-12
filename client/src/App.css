@@ -430,7 +430,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .room-code-copied { margin-left: 6px; font-size: 0.75em; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
 .turn-info { font-size: 0.85em; color: var(--text-mid); font-style: italic; }
 .turn-info strong { color: var(--text); font-style: normal; font-family: 'Cinzel', serif; letter-spacing: 1px; }
-.topbar-right { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.topbar-right { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+/* Visually group related buttons with a subtle divider between groups */
+.topbar-group {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    padding: 0 4px;
+    border-right: 1px solid rgba(255,255,255,0.08);
+}
+.topbar-group:last-child { border-right: none; }
+/* Icon-only topbar buttons (settings, guide, log, bg) */
+.topbar-icon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-mid);
+    padding: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    transition: color 0.15s, border-color 0.15s;
+}
+.topbar-icon-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
+.topbar-icon-btn svg { display: block; }
 
 /* ─── PLAYER ZONES LAYOUT ─────────────────────────────────── */
 .player-zones { flex: 1; display: grid; gap: 4px; overflow: hidden; padding: 4px; --card-w: 70px; --card-h: 98px; }
@@ -761,18 +785,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Touch-only ⋮ button next to the player name */
 .player-options-btn {
-    background: var(--bg-deep);
-    border: 1px solid var(--border);
-    color: var(--text-mid);
-    padding: 2px 8px;
-    font-size: 1.1em;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-faint);
+    padding: 1px 5px;
+    font-size: 1em;
     line-height: 1;
     border-radius: 2px;
     letter-spacing: 0;
-    min-width: 28px;
-    min-height: 28px;
+    min-width: 20px;
+    min-height: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
 }
-.player-options-btn:hover { color: var(--accent); border-color: var(--accent); }
+.player-options-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
 .card-effects-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; gap: 8px; }
 .counter-line-max { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.9em; }
 .counter-line-max:last-child { border-bottom: none; }
@@ -1261,6 +1287,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .room-code { font-size: 0.8em; padding: 3px 8px; letter-spacing: 2px; }
     .turn-info { font-size: 0.75em; }
     .game-topbar .small-btn { padding: 4px 8px; font-size: 0.62em; letter-spacing: 1px; }
+    .topbar-group { padding: 0 2px; gap: 2px; }
+    .topbar-icon-btn { padding: 4px; }
+    .topbar-icon-btn svg { width: 14px; height: 14px; }
+    .topbar-toggles { display: none; } /* Compact + Cursor toggles hidden on mobile */
     /* Compact mode is a desktop affordance only — on mobile the player zones
        already stack vertically and there's no room for the toggle to do
        anything useful. Hide it to claim back topbar space. */

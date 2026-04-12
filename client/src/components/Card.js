@@ -68,7 +68,10 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const tempControlled = !!card.controllerOriginal;
     const attached = !!card.attachedTo;
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
-    const hasEffects = hasCounters || hasNotes || attached || hasAttachments;
+    // Only count attach/equip info in hasEffects if we actually have data to
+    // show — otherwise the hover panel opens empty.
+    const hasAttachInfo = (attached && !!attachedToName) || hasAttachments;
+    const hasEffects = hasCounters || hasNotes || hasAttachInfo;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (

@@ -395,12 +395,17 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     // Build attachment maps for the hover/effects panel. Two lookups:
     //   attachedToName: card.instanceId → name of the card it's attached TO
     //   attachmentsOn:  card.instanceId → [{name, imageUri}] of cards attached to it
-    const bf = player.zones.battlefield || [];
+    // We look across ALL players' battlefields so cross-player attachments
+    // (enchanting an opponent's creature) resolve correctly.
+    const allBfCards = [];
+    for (const p of allPlayers) {
+        for (const c of (p.zones?.battlefield || [])) allBfCards.push(c);
+    }
     const bfById = {};
-    for (const c of bf) bfById[c.instanceId] = c;
+    for (const c of allBfCards) bfById[c.instanceId] = c;
     const attachedToName = {};
     const attachmentsOn = {};
-    for (const c of bf) {
+    for (const c of allBfCards) {
         if (c.attachedTo && bfById[c.attachedTo]) {
             const target = bfById[c.attachedTo];
             attachedToName[c.instanceId] = target.name;
@@ -448,15 +453,16 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     {player.username}
                     {player.conceded && <span className="conceded-badge" title="Conceded"> · conceded</span>}
                 </span>
-                {touchMode && !spectating && (
+                {/* Always show the options button (not just touch) so desktop
+                    users know they can access player actions without needing
+                    to discover right-click. */}
+                {!spectating && (
                     <button
                         className="player-options-btn"
-                        title="Player options"
+                        title="Player options (right-click also works)"
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            // Synthesize a click event with coordinates so the
-                            // context-menu opens anchored to this button.
                             const rect = e.currentTarget.getBoundingClientRect();
                             onPlayerContextMenu?.({
                                 preventDefault: () => {},
