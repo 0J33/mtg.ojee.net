@@ -602,6 +602,12 @@ module.exports = function registerSocketHandlers(io) {
                 : sourcePlayer;
             if (!targetPlayer) return callback?.({ error: 'Target player not found' });
 
+            // If a card leaves the battlefield, clean up attachments so
+            // equipment/auras don't point at ghosts.
+            if (fromZone === 'battlefield' && toZone !== 'battlefield') {
+                cleanupAttachments(room, card);
+            }
+
             // Update card properties
             if (x !== undefined) card.x = x;
             if (y !== undefined) card.y = y;
@@ -689,6 +695,9 @@ module.exports = function registerSocketHandlers(io) {
                     for (let i = zone.length - 1; i >= 0; i--) {
                         if (ids.has(zone[i].instanceId)) {
                             const [card] = zone.splice(i, 1);
+                            if (zoneName === 'battlefield' && toZone !== 'battlefield') {
+                                cleanupAttachments(room, card);
+                            }
                             if (toZone !== 'battlefield') { card.x = 0; card.y = 0; card.tapped = false; }
                             const dest = targetPlayer || player;
                             dest.zones[toZone].push(card);
@@ -724,6 +733,22 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
             return null;
+        };
+
+        // When a card leaves the battlefield, clean up any attachment links:
+        //   1. If the leaving card had attachedTo set, clear it.
+        //   2. If any other battlefield card points to the leaving card's
+        //      instanceId via attachedTo, clear that too (equipment falls off).
+        const cleanupAttachments = (room, leavingCard) => {
+            if (!leavingCard) return;
+            if (leavingCard.attachedTo) leavingCard.attachedTo = null;
+            for (const p of room.players) {
+                for (const c of (p.zones.battlefield || [])) {
+                    if (c.attachedTo === leavingCard.instanceId) {
+                        c.attachedTo = null;
+                    }
+                }
+            }
         };
 
         socket.on('addCardNote', ({ instanceId, note }, callback) => {
@@ -2004,7 +2029,14 @@ module.exports = function registerSocketHandlers(io) {
             } else if (field === 'attackingPlayerId' || field === 'controllerOriginal' || field === 'attachedTo') {
                 card[field] = value || null;
             }
-            addAction(room, currentUserId, 'setCardField', { cardName: card.name, field, value: card[field] });
+            // For attachedTo, resolve the target instanceId to a card name so
+            // the action log shows something human-readable.
+            let logValue = card[field];
+            if (field === 'attachedTo' && logValue) {
+                const target = findCardAnywhere(room, logValue);
+                if (target) logValue = target.name;
+            }
+            addAction(room, currentUserId, 'setCardField', { cardName: card.name, field, value: logValue });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });

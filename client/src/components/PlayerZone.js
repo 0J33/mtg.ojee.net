@@ -406,11 +406,13 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     const attachedToName = {};
     const attachmentsOn = {};
     for (const c of allBfCards) {
-        if (c.attachedTo && bfById[c.attachedTo]) {
+        if (c.attachedTo) {
             const target = bfById[c.attachedTo];
-            attachedToName[c.instanceId] = target.name;
-            if (!attachmentsOn[target.instanceId]) attachmentsOn[target.instanceId] = [];
-            attachmentsOn[target.instanceId].push({ name: c.name, imageUri: c.imageUri });
+            if (target) {
+                attachedToName[c.instanceId] = target.name;
+                if (!attachmentsOn[target.instanceId]) attachmentsOn[target.instanceId] = [];
+                attachmentsOn[target.instanceId].push({ name: c.name, imageUri: c.imageUri });
+            }
         }
     }
 
