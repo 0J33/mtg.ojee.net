@@ -6,7 +6,7 @@ import ManaCost, { OracleText } from './ManaCost';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
-export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly }) {
+export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly, attachedToName, attachments }) {
     useEscapeKey(onClose);
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
     const [showRevealMenu, setShowRevealMenu] = useState(false);
@@ -117,6 +117,36 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                             })}
                         </div>
                     )}
+                    {/* Attachment info — shows what this card is equipped to,
+                        or what equipment/auras are attached to this card. */}
+                    {attachedToName && (
+                        <div className="card-effects-section">
+                            <strong>Attached to</strong>
+                            <div className="note-line-max">
+                                <span className="note-text">🔗 {attachedToName}</span>
+                            </div>
+                        </div>
+                    )}
+                    {Array.isArray(attachments) && attachments.length > 0 && (
+                        <div className="card-effects-section">
+                            <strong>Equipped / Enchanted by</strong>
+                            {attachments.map((att, i) => (
+                                <div key={i} className="note-line-max">
+                                    {att.imageUri && (
+                                        <img
+                                            src={att.imageUri}
+                                            alt={att.name}
+                                            className="note-attached-thumb"
+                                            onMouseMove={(e) => handleThumbHover(e, att.imageUri)}
+                                            onMouseLeave={() => setHoverThumb(null)}
+                                        />
+                                    )}
+                                    <span className="note-text">🔗 {att.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {card.instanceId && !readOnly && (
                         <div className="card-max-actions">
                             {/* Quick actions row */}

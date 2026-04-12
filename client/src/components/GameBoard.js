@@ -1166,19 +1166,36 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
 
             {/* Modals */}
             {showSearch && <CardSearch mode={showSearch} onClose={() => setShowSearch(null)} />}
-            {maximizedCard && (
-                <CardMaximized
-                    card={liveMaximizedCard}
-                    onClose={() => setMaximizedCard(null)}
-                    onClickCard={(c) => setMaximizedCard(c)}
-                    onAddNote={isSpectator ? undefined : (instanceId) => setNoteEditor({ instanceId })}
-                    onAddCounter={isSpectator ? undefined : (c) => setCounterModalCard(c)}
-                    allPlayers={gameState.players}
-                    userId={user.id}
-                    currentZone={liveMaximizedInfo?.zone}
-                    readOnly={isSpectator}
-                />
-            )}
+            {maximizedCard && (() => {
+                // Compute attachment info for the maximized card so it can
+                // display "Attached to X" or "Equipped by Y" in the detail view.
+                const allBf = [];
+                for (const p of gameState.players) {
+                    for (const c of (p.zones?.battlefield || [])) allBf.push(c);
+                }
+                const bfMap = {};
+                for (const c of allBf) bfMap[c.instanceId] = c;
+                const maxAttachedToName = liveMaximizedCard?.attachedTo && bfMap[liveMaximizedCard.attachedTo]
+                    ? bfMap[liveMaximizedCard.attachedTo].name : null;
+                const maxAttachments = allBf
+                    .filter(c => c.attachedTo === liveMaximizedCard?.instanceId)
+                    .map(c => ({ name: c.name, imageUri: c.imageUri }));
+                return (
+                    <CardMaximized
+                        card={liveMaximizedCard}
+                        onClose={() => setMaximizedCard(null)}
+                        onClickCard={(c) => setMaximizedCard(c)}
+                        onAddNote={isSpectator ? undefined : (instanceId) => setNoteEditor({ instanceId })}
+                        onAddCounter={isSpectator ? undefined : (c) => setCounterModalCard(c)}
+                        allPlayers={gameState.players}
+                        userId={user.id}
+                        currentZone={liveMaximizedInfo?.zone}
+                        readOnly={isSpectator}
+                        attachedToName={maxAttachedToName}
+                        attachments={maxAttachments.length > 0 ? maxAttachments : null}
+                    />
+                );
+            })()}
             {noteEditor && <NoteEditor instanceId={noteEditor.instanceId} onClose={() => setNoteEditor(null)} />}
             {revealedCard && (
                 <div className="modal-overlay">

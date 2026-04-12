@@ -87,12 +87,18 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
     const handleCardClick = (e, card) => {
         // When a pending action is active, card clicks resolve it instead of
-        // any normal behavior (selection, maximize, etc.).
+        // any normal behavior (selection, maximize, etc.). For attach, only
+        // allow clicking battlefield cards (not command zone / hand / etc).
         if (pendingAction && (pendingAction.type === 'attach') && onResolvePendingCard) {
-            e.preventDefault();
-            e.stopPropagation();
-            onResolvePendingCard(card);
-            return;
+            const isOnBf = allBfCards.some(c => c.instanceId === card.instanceId);
+            if (isOnBf) {
+                e.preventDefault();
+                e.stopPropagation();
+                onResolvePendingCard(card);
+                return;
+            }
+            // Not on battlefield — ignore the click and let normal behavior
+            // continue (opens maximize view instead).
         }
         // Spectators can only view cards — skip selection logic entirely and
         // go straight to the maximized viewer.

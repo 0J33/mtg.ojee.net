@@ -32,7 +32,9 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         // even for empty cards, which pushed left-side placements 260px too
         // far off the left edge of the card the user was hovering.
         const hasSideEffects = (Array.isArray(card.notes) && card.notes.length > 0)
-            || (card.counters && Object.values(card.counters).some(v => v !== 0));
+            || (card.counters && Object.values(card.counters).some(v => v !== 0))
+            || (card.attachedTo && attachedToName)
+            || (Array.isArray(attachments) && attachments.length > 0);
         const panelW = hasSideEffects ? 260 : 0;
         const gap = hasSideEffects ? 8 : 0;
         const totalWidth = zoomW + panelW + gap;
