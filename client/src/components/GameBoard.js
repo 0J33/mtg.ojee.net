@@ -29,6 +29,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [showSearch, setShowSearch] = useState(null); // null, 'token', 'add'
     const [maximizedCard, setMaximizedCard] = useState(null);
     const [drawingEnabled, setDrawingEnabled] = useState(false);
+    const [drawingsHidden, setDrawingsHidden] = useState(false);
     const [showScry, setShowScry] = useState(false);
     const [scryCards, setScryCards] = useState([]);
     const [scryCountModal, setScryCountModal] = useState(false);
@@ -257,11 +258,14 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             if (customCardModal) { setCustomCardModal(false); return; }
             if (bgModal) { setBgModal(false); return; }
             if (librarySearchOpen) { setLibrarySearchOpen(false); return; }
+            if (chatOpen) { setChatOpen(false); return; }
+            if (actionLogOpen) { setActionLogOpen(false); return; }
+            if (pendingAction) { setPendingAction(null); return; }
             if (selectedIds.size > 0) { clearSelection(); return; }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
-    }, [revealedCard, showSearch, maximizedCard, showScry, scryCountModal, showDeckPicker, showPlayerMenu, customCardModal, bgModal, librarySearchOpen, selectedIds, onDismissReveal, clearSelection]);
+    }, [revealedCard, showSearch, maximizedCard, showScry, scryCountModal, showDeckPicker, showPlayerMenu, customCardModal, bgModal, librarySearchOpen, chatOpen, actionLogOpen, pendingAction, selectedIds, onDismissReveal, clearSelection]);
 
     // Space bar toggles tap on all selected cards. Only active when something
     // is selected so it doesn't swallow spaces in inputs. We sniff the active
@@ -498,7 +502,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             ...(player.userId !== user.id ? [
                 { divider: true },
                 {
-                    label: 'Peek & exile (Gonti)',
+                    label: 'Peek & exile top cards...',
                     onClick: () => handlePeekAndExile(player),
                 },
             ] : []),
@@ -1078,6 +1082,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 enabled={!isSpectator && drawingEnabled}
                 onToggle={isSpectator ? () => {} : (() => setDrawingEnabled(!drawingEnabled))}
                 hideToggle={isSpectator}
+                hidden={drawingsHidden}
+                onToggleHidden={() => setDrawingsHidden(h => !h)}
                 penStateRef={penStateRef}
                 onPenColorChange={(newColor) => {
                     // Push a one-off cursorMove with the new color so other

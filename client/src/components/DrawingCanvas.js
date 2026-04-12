@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
 
-export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle, penStateRef, onPenColorChange }) {
+export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle, penStateRef, onPenColorChange, hidden, onToggleHidden }) {
     useEscapeKey(() => { if (enabled) onToggle(); });
     const canvasRef = useRef(null);
     const isDrawingRef = useRef(false);
@@ -415,7 +415,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
     };
 
     return (
-        <div className={`drawing-layer ${enabled ? 'active' : ''}`}>
+        <div className={`drawing-layer ${enabled ? 'active' : ''} ${hidden ? 'drawings-hidden' : ''}`}>
             <canvas
                 ref={canvasRef}
                 className="drawing-canvas"
@@ -486,6 +486,9 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                     </div>
                     <button onClick={() => clearDrawings(true)} className="small-btn">Clear Mine</button>
                     <button onClick={() => clearDrawings(false)} className="small-btn">Clear All</button>
+                    <button onClick={onToggleHidden} className="small-btn" title={hidden ? 'Show all drawings' : 'Hide all drawings (without erasing)'}>
+                        {hidden ? 'Show' : 'Hide'}
+                    </button>
                 </div>
             )}
             {!hideToggle && (
