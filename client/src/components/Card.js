@@ -60,8 +60,6 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const counterEntries = Object.entries(card.counters || {}).filter(([, v]) => v !== 0);
     const hasCounters = counterEntries.length > 0;
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
-    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
-    const hasEffects = hasCounters || hasNotes || attached || hasAttachments;
     const damage = typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
     const phasedOut = !!card.phasedOut;
     const suspendCount = typeof card.suspendCounters === 'number' && card.suspendCounters > 0 ? card.suspendCounters : 0;
@@ -69,6 +67,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const attacking = !!card.attackingPlayerId;
     const tempControlled = !!card.controllerOriginal;
     const attached = !!card.attachedTo;
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    const hasEffects = hasCounters || hasNotes || attached || hasAttachments;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (
