@@ -492,7 +492,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 {!spectating && (
                     <button
                         className="player-options-btn"
-                        title="Player options (right-click also works)"
+                        title="Player options (right-click header also works)"
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();

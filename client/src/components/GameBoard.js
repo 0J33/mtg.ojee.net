@@ -301,8 +301,15 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const bulkTap = (tapped) => {
         socket.emit('bulkTap', { instanceIds: Array.from(selectedIds), tapped });
     };
-    const bulkMove = (toZone, libraryPosition) => {
-        socket.emit('bulkMove', { instanceIds: Array.from(selectedIds), toZone, targetPlayerId: user.id, libraryPosition });
+    const bulkMove = (toZone, libraryPosition, randomize) => {
+        let ids = Array.from(selectedIds);
+        if (randomize) {
+            for (let i = ids.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [ids[i], ids[j]] = [ids[j], ids[i]];
+            }
+        }
+        socket.emit('bulkMove', { instanceIds: ids, toZone, targetPlayerId: user.id, libraryPosition });
         clearSelection();
     };
 
@@ -1071,13 +1078,13 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     <button onClick={() => {
                         if (firstSelectedCard) setNoteEditor({ instanceId: firstSelectedCard.instanceId, bulkIds: selectedIds.size > 1 ? Array.from(selectedIds) : null });
                     }}>Note</button>
-                    <button onClick={() => bulkTap()}>Tap</button>
-                    <button onClick={() => bulkMove('battlefield')}>→ BF</button>
-                    <button onClick={() => bulkMove('hand')}>→ Hand</button>
-                    <button onClick={() => bulkMove('graveyard')}>→ GY</button>
-                    <button onClick={() => bulkMove('exile')}>→ Exile</button>
-                    <button onClick={() => bulkMove('library', 'top')}>→ Top Lib</button>
-                    <button onClick={() => bulkMove('library')}>→ Bot Lib</button>
+                    <button onClick={() => bulkTap()} title="Toggle tap/untap selected cards. Shortcut: spacebar">Tap</button>
+                    <button onClick={() => bulkMove('battlefield')} title="Move to battlefield">→ BF</button>
+                    <button onClick={() => bulkMove('hand')} title="Move to hand">→ Hand</button>
+                    <button onClick={() => bulkMove('graveyard')} title="Move to graveyard">→ GY</button>
+                    <button onClick={() => bulkMove('exile')} title="Move to exile">→ Exile</button>
+                    <button onClick={(e) => bulkMove('library', 'top', e.shiftKey)} title="To top of library. Shift+click = random order">→ Top Lib</button>
+                    <button onClick={(e) => bulkMove('library', undefined, e.shiftKey)} title="To bottom of library. Shift+click = random order">→ Bot Lib</button>
                     <button onClick={() => bulkMove('commandZone')}>→ Cmd</button>
                     <button onClick={clearSelection}>Clear</button>
                 </div>
