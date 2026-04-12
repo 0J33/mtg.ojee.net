@@ -307,13 +307,15 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                             key={art.id}
                                             className={`card-skin-thumb ${currentSkin === art.imageUri ? 'active' : ''}`}
                                             onClick={() => applySkin(art.imageUri, false)}
-                                            title={`${art.set} (${art.setCode}) #${art.cn}\nClick = this card · Shift+click = all copies`}
+                                            title={`${art.set} (${art.setCode}) #${art.cn}\nClick = this card · Shift+click = all copies + save to deck`}
                                             onClickCapture={(e) => {
                                                 if (e.shiftKey) {
                                                     e.stopPropagation();
                                                     applySkin(art.imageUri, true);
                                                 }
                                             }}
+                                            onMouseMove={(e) => handleThumbHover(e, art.imageUri)}
+                                            onMouseLeave={() => setHoverThumb(null)}
                                         >
                                             <img src={art.imageUri.replace('/normal/', '/small/')} alt={art.set} />
                                             <span className="card-skin-set">{art.setCode}</span>
