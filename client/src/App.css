@@ -2422,14 +2422,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     font-family: 'Cinzel', serif;
 }
 .mtg-logo {
-    width: 28px;
-    height: 28px;
-    vertical-align: middle;
+    width: 25px;
+    height: 25px;
+    vertical-align: -4px;
     margin-right: 8px;
 }
 .topbar-logo {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
+    vertical-align: -3px;
 }
 
 /* Background modal — saved backgrounds gallery */
