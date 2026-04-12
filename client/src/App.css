@@ -667,8 +667,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .hand-cards { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 4px; }
 
 /* Side zones */
-.side-zones { display: flex; gap: 4px; flex-shrink: 0; }
-.side-zones .zone { flex: 1; }
+/* Side zones fit their content (collapsed = just the label, expanded = cards)
+   but always take at least one card's worth of space so the click target isn't
+   tiny. flex: 0 1 auto shrinks them instead of the old flex:1 equal-stretch. */
+.side-zones { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+.side-zones .zone { flex: 0 1 auto; min-width: calc(var(--card-w, 70px) + 16px); min-height: calc(var(--card-h, 98px) * 0.4 + 8px); }
 .library-actions { display: flex; gap: 2px; padding: 4px; flex-wrap: wrap; }
 .library-actions button { padding: 3px 8px; font-size: 0.6em; letter-spacing: 1px; }
 
@@ -1299,9 +1302,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .hand-zone { min-height: calc(var(--card-h) + 14px); }
     .hand-cards { gap: 3px; }
 
-    /* Side zones — stack vertically with bigger touch targets */
+    /* Side zones — wrap with bigger touch targets */
     .side-zones { flex-wrap: wrap; }
-    .side-zones .zone { flex: 1 1 45%; min-width: 0; }
+    .side-zones .zone { flex: 0 1 auto; min-width: calc(var(--card-w, 64px) + 12px); }
     .library-actions { flex-wrap: wrap; }
     .library-actions button { padding: 5px 8px; font-size: 0.62em; flex: 1 1 auto; }
 
