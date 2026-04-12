@@ -384,11 +384,30 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                         onContextMenu={(e) => handleCardContext(e, card, zone)}
                         draggable={isOwner}
                         onDragStart={(e) => handleDragStart(e, card, zone)}
+                        attachedToName={attachedToName[card.instanceId]}
+                        attachments={attachmentsOn[card.instanceId]}
                     />
                 </div>
             );
         });
     };
+
+    // Build attachment maps for the hover/effects panel. Two lookups:
+    //   attachedToName: card.instanceId → name of the card it's attached TO
+    //   attachmentsOn:  card.instanceId → [{name, imageUri}] of cards attached to it
+    const bf = player.zones.battlefield || [];
+    const bfById = {};
+    for (const c of bf) bfById[c.instanceId] = c;
+    const attachedToName = {};
+    const attachmentsOn = {};
+    for (const c of bf) {
+        if (c.attachedTo && bfById[c.attachedTo]) {
+            const target = bfById[c.attachedTo];
+            attachedToName[c.instanceId] = target.name;
+            if (!attachmentsOn[target.instanceId]) attachmentsOn[target.instanceId] = [];
+            attachmentsOn[target.instanceId].push({ name: c.name, imageUri: c.imageUri });
+        }
+    }
 
     const cmdDmgEntries = Object.entries(player.commanderDamageFrom || {});
     const lethalCmdDmg = cmdDmgEntries.some(([, dmg]) => dmg >= 21);
@@ -540,6 +559,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 onContextMenu={(e) => handleCardContext(e, card, dragZone)}
                                 draggable={isOwner}
                                 onDragStart={(e) => handleDragStart(e, card, dragZone)}
+                                attachedToName={attachedToName[card.instanceId]}
+                                attachments={attachmentsOn[card.instanceId]}
                             />
                         </div>
                     );

@@ -4,7 +4,7 @@ import { OracleText } from './ManaCost';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
-export default function Card({ card, onClick, onContextMenu, isDragging, small, showBack, draggable, onDragStart, onDragEnd, disableHover }) {
+export default function Card({ card, onClick, onContextMenu, isDragging, small, showBack, draggable, onDragStart, onDragEnd, disableHover, attachedToName, attachments }) {
     const [hoverPos, setHoverPos] = useState(null);
     const [imgError, setImgError] = useState(false);
     const cardRef = useRef(null);
@@ -60,7 +60,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const counterEntries = Object.entries(card.counters || {}).filter(([, v]) => v !== 0);
     const hasCounters = counterEntries.length > 0;
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
-    const hasEffects = hasCounters || hasNotes;
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+    const hasEffects = hasCounters || hasNotes || attached || hasAttachments;
     const damage = typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
     const phasedOut = !!card.phasedOut;
     const suspendCount = typeof card.suspendCounters === 'number' && card.suspendCounters > 0 ? card.suspendCounters : 0;
@@ -96,7 +97,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                 {suspendCount > 0 && <div className="card-suspend-badge" title={`${suspendCount} time counter(s)`}>⌛{suspendCount}</div>}
                 {goaded && <div className="card-goad-badge" title="Goaded — must attack">⚔</div>}
                 {tempControlled && <div className="card-temp-control-badge" title="Under temporary control (returns end of turn)">↶</div>}
-                {attached && <div className="card-attached-badge" title="Attached (equipped/enchanted)">⚔</div>}
+                {attached && <div className="card-attached-badge" title={`Attached to ${attachedToName || '?'}`}>🔗</div>}
+                {hasAttachments && <div className="card-has-attachments-badge" title={`${attachments.length} attached`}>🔗{attachments.length}</div>}
             </div>
 
             {/* Hover zoom + side effects panel */}
@@ -132,6 +134,28 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                                             </div>
                                         );
                                     })}
+                                </div>
+                            )}
+                            {attached && attachedToName && (
+                                <div className="effect-group">
+                                    <div className="effect-group-label">Attached to</div>
+                                    <div className="effect-line attach-effect">
+                                        <span className="effect-icon">🔗</span>
+                                        <span><strong>{attachedToName}</strong></span>
+                                    </div>
+                                </div>
+                            )}
+                            {hasAttachments && (
+                                <div className="effect-group">
+                                    <div className="effect-group-label">Equipped / Enchanted by</div>
+                                    {attachments.map((att, i) => (
+                                        <div key={i} className="effect-line attach-effect">
+                                            {att.imageUri && (
+                                                <img src={att.imageUri.replace('/normal/', '/small/')} alt={att.name} className="effect-card-thumb" />
+                                            )}
+                                            <span><strong>{att.name}</strong></span>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>

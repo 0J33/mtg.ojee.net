@@ -2038,7 +2038,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card.phased-out img { opacity: 0.35; filter: grayscale(0.6); }
 .card.attacking { box-shadow: 0 0 0 2px #e74c3c, 0 0 12px rgba(231, 76, 60, 0.5); }
 .card.temp-controlled { box-shadow: 0 0 0 2px #2980b9; }
-.card-attached-badge { top: 50%; left: 2px; transform: translateY(-50%); background: #27ae60; }
+/* "I am attached to something" — link icon on the equipment/aura itself */
+.card-attached-badge { bottom: 14px; left: 2px; background: #27ae60; font-size: 9px; }
+/* "Things are attached to me" — shown on the creature being equipped */
+.card-has-attachments-badge { bottom: 14px; right: 2px; background: #27ae60; font-size: 9px; }
 
 /* New zone strips — same compact look as graveyard/exile */
 .foretell-zone .zone-label,
