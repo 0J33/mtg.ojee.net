@@ -39,6 +39,8 @@ const cardInstanceSchema = new mongoose.Schema({
     attackingPlayerId: { type: String, default: null },
     controllerOriginal: { type: String, default: null },
     returnZone: { type: String, default: null },
+    rotated180: { type: Boolean, default: false },
+    skinUrl: { type: String, default: null },
 }, { _id: false });
 
 const playerStateSchema = new mongoose.Schema({

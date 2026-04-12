@@ -64,6 +64,7 @@ function createCardInstance(cardData, overrides = {}) {
         // zone (foretell pile, exile from blink). Used to return it.
         returnZone: null,
         rotated180: false,
+        skinUrl: cardData.skinUrl || null, // custom art override — visible to everyone
         ...overrides,
     };
 }

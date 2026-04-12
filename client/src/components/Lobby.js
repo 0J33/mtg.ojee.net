@@ -7,6 +7,7 @@ import DeckBuilder from './DeckBuilder';
 import CustomCardManager from './CustomCardManager';
 import { useDialog } from './Dialog';
 import { IconPencil, IconShare } from './Icons';
+import { VERSION } from '../version';
 
 export default function Lobby({ user, onJoinRoom, onLogout }) {
     // onJoinRoom(code, { asSpectator })
@@ -277,6 +278,7 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
             {customCardsOpen && (
                 <CustomCardManager onClose={() => setCustomCardsOpen(false)} />
             )}
+            <div className="lobby-version">v{VERSION}</div>
         </div>
     );
 }

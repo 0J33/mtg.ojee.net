@@ -20,7 +20,9 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const isFaceDown = card.faceDown || showBack;
     const hasBack = !!card.backImageUri;
     const isFlipped = card.flipped && hasBack;
-    const skin = getSkin(card.scryfallId);
+    // Server-side skin (visible to everyone) takes priority, then localStorage
+    // fallback for any previously-set client-only skins.
+    const skin = card.skinUrl || getSkin(card.scryfallId);
     const frontImage = skin || card.imageUri || card.customImageUrl || CARD_BACK;
     const imageUrl = isFaceDown
         ? CARD_BACK

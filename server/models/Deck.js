@@ -27,6 +27,7 @@ const cardEntrySchema = new mongoose.Schema({
     // Not automatically updated if a username changes (usernames are
     // effectively immutable in this app, so it doesn't matter).
     customCardAuthorUsername: { type: String },
+    skinUrl: { type: String, default: null },
 }, { _id: false });
 
 const deckSchema = new mongoose.Schema({

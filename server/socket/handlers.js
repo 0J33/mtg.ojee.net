@@ -2553,6 +2553,67 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
+        // Set a custom skin on a single card instance (visible to everyone).
+        socket.on('setCardSkin', ({ instanceId, skinUrl }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const card = findCardAnywhere(room, instanceId);
+            if (!card) return callback?.({ error: 'Card not found' });
+            card.skinUrl = skinUrl || null;
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Set a custom skin on ALL cards with the same scryfallId across all
+        // zones of the requesting player. Used for "apply to all copies".
+        socket.on('setCardSkinAll', ({ scryfallId, skinUrl }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const player = getPlayerInRoom(room, currentUserId);
+            if (!player) return callback?.({ error: 'Not in room' });
+            let count = 0;
+            for (const zoneName of Object.keys(player.zones || {})) {
+                const zone = player.zones[zoneName];
+                if (!Array.isArray(zone)) continue;
+                for (const card of zone) {
+                    if (card.scryfallId === scryfallId) {
+                        card.skinUrl = skinUrl || null;
+                        count++;
+                    }
+                }
+            }
+            broadcastRoomState(io, room);
+            callback?.({ success: true, count });
+        });
+
+        // Save a skin to the deck so it loads automatically next time.
+        // Updates every card entry with the matching scryfallId.
+        socket.on('saveSkinToDeck', async ({ deckId, scryfallId, skinUrl }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            try {
+                const Deck = require('../models/Deck');
+                const deck = await Deck.findById(deckId);
+                if (!deck) return callback?.({ error: 'Deck not found' });
+                let updated = 0;
+                for (const section of ['commanders', 'companions', 'mainboard', 'sideboard']) {
+                    for (const entry of (deck[section] || [])) {
+                        if (entry.scryfallId === scryfallId) {
+                            entry.skinUrl = skinUrl || null;
+                            updated++;
+                        }
+                    }
+                }
+                if (updated > 0) {
+                    deck.updatedAt = new Date();
+                    await deck.save();
+                }
+                callback?.({ success: true, updated });
+            } catch (err) {
+                callback?.({ error: err.message });
+            }
+        });
+
         // ─── DISCONNECT ─────────────────────────────────────────────────
         socket.on('disconnect', () => {
             if (!currentRoom) return;

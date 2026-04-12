@@ -15,11 +15,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const [skinInput, setSkinInput] = useState('');
     const [showSkinInput, setShowSkinInput] = useState(false);
 
-    // Check if a custom skin is set for this card
-    const currentSkin = (() => {
-        if (!card?.scryfallId) return null;
-        try { return localStorage.getItem(`mtg_skin_${card.scryfallId}`) || null; } catch (_) { return null; }
-    })();
+    const currentSkin = card?.skinUrl || null;
     if (!card) return null;
 
     const hasDFC = !!card.backImageUri;
@@ -233,16 +229,21 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                         </div>
                     )}
 
-                    {/* Custom skin — client-only cosmetic override. Only you see it. */}
-                    {card.scryfallId && (
+                    {/* Custom skin — visible to all players. Option to apply per-card,
+                        to all copies in the game, or save to the deck for next time. */}
+                    {card.instanceId && (
                         <div className="card-skin-section">
                             {currentSkin && (
                                 <div className="card-skin-current">
                                     <span className="muted" style={{ fontSize: 11 }}>Custom skin active</span>
                                     <button className="small-btn" onClick={() => {
-                                        try { localStorage.removeItem(`mtg_skin_${card.scryfallId}`); } catch (_) {}
-                                        onClose?.();
-                                    }}>Remove skin</button>
+                                        socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: null });
+                                    }}>Remove (this card)</button>
+                                    {card.scryfallId && (
+                                        <button className="small-btn" onClick={() => {
+                                            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: null });
+                                        }}>Remove (all copies)</button>
+                                    )}
                                 </div>
                             )}
                             {!showSkinInput ? (
@@ -259,15 +260,18 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                         autoFocus
                                         onKeyDown={e => {
                                             if (e.key === 'Enter' && skinInput.trim()) {
-                                                try { localStorage.setItem(`mtg_skin_${card.scryfallId}`, skinInput.trim()); } catch (_) {}
-                                                onClose?.();
+                                                socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: skinInput.trim() });
                                             }
                                         }}
                                     />
                                     <button className="small-btn primary-btn" disabled={!skinInput.trim()} onClick={() => {
-                                        try { localStorage.setItem(`mtg_skin_${card.scryfallId}`, skinInput.trim()); } catch (_) {}
-                                        onClose?.();
-                                    }}>Apply</button>
+                                        socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: skinInput.trim() });
+                                    }}>This card</button>
+                                    {card.scryfallId && (
+                                        <button className="small-btn primary-btn" disabled={!skinInput.trim()} onClick={() => {
+                                            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: skinInput.trim() });
+                                        }}>All copies</button>
+                                    )}
                                     <button className="small-btn" onClick={() => setShowSkinInput(false)}>Cancel</button>
                                 </div>
                             )}
