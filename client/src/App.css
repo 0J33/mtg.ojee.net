@@ -2394,6 +2394,21 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     max-width: 100%;
 }
 
+/* DFC preview button in CardMaximized */
+.card-max-image-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
+.card-max-flip-preview {
+    margin-top: 6px;
+    padding: 4px 12px;
+    font-size: 0.75em;
+    background: var(--bg-elev, #222);
+    border: 1px solid var(--border, #444);
+    color: var(--text-mid, #aaa);
+    border-radius: 2px;
+    cursor: pointer;
+    letter-spacing: 1px;
+}
+.card-max-flip-preview:hover { color: var(--accent, #88aaff); border-color: var(--accent-dim); }
+
 /* Proliferate modal — interactive picker */
 .proliferate-list {
     display: flex;

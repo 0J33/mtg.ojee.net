@@ -11,13 +11,22 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
     const [showRevealMenu, setShowRevealMenu] = useState(false);
     const [showMoveMenu, setShowMoveMenu] = useState(false);
+    // Local toggle to preview the other side without actually flipping the
+    // card in-game. Only available when the card has a back image (DFC/MDFC).
+    const [viewingBack, setViewingBack] = useState(false);
     if (!card) return null;
 
+    const hasDFC = !!card.backImageUri;
     const isFaceDown = card.faceDown;
-    const isFlipped = card.flipped && card.backImageUri;
+    const isFlipped = card.flipped && hasDFC;
+    // Determine which side is currently shown in-game
+    const gameShowsBack = isFlipped;
+    // The local preview toggle lets the user peek at whichever side ISN'T
+    // currently shown, without mutating game state.
+    const showBack = viewingBack ? !gameShowsBack : gameShowsBack;
     const imageUrl = isFaceDown
         ? CARD_BACK
-        : isFlipped
+        : showBack
             ? card.backImageUri
             : (card.imageUri || card.customImageUrl || CARD_BACK);
 
@@ -39,7 +48,19 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     return createPortal(
         <div className="modal-overlay card-max-overlay">
             <div className="card-maximized">
-                <img src={largeUrl} alt={card.name} />
+                <div className="card-max-image-wrap">
+                    <img src={largeUrl} alt={card.name} />
+                    {hasDFC && !isFaceDown && (
+                        <button
+                            className="card-max-flip-preview"
+                            onClick={() => setViewingBack(v => !v)}
+                            title={viewingBack ? 'View front side' : 'View other side'}
+                            type="button"
+                        >
+                            {viewingBack ? '↩ Front' : '↪ Other side'}
+                        </button>
+                    )}
+                </div>
                 <div className="card-max-info">
                     <h3>{card.name}</h3>
                     {card.isCustom && (
