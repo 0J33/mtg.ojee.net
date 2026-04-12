@@ -217,32 +217,15 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                 {loading ? (
                     <p className="muted">Loading...</p>
                 ) : isDeckView ? (
-                    /* ─── Deck view: cards grouped by zone ─────────────── */
-                    <div className="library-grid deck-view-grid">
-                        {(() => {
-                            let lastZone = null;
-                            const out = [];
-                            for (const card of filtered) {
-                                const z = card._zone || 'library';
-                                if (z !== lastZone) {
-                                    lastZone = z;
-                                    const count = filtered.filter(c => (c._zone || 'library') === z).length;
-                                    out.push(
-                                        <div key={`hdr-${z}`} className="deck-view-zone-header">
-                                            {ZONE_LABELS[z] || z} ({count})
-                                        </div>
-                                    );
-                                }
-                                out.push(
-                                    <div key={card.instanceId} className="library-card-entry">
-                                        <Card card={card} onClick={() => onMaximizeCard?.(card)} />
-                                        <div className="library-card-name muted">{card.name}</div>
-                                    </div>
-                                );
-                            }
-                            if (out.length === 0) out.push(<p key="empty" className="muted">No matching cards.</p>);
-                            return out;
-                        })()}
+                    /* ─── Deck view: flat alphabetical list of every card ── */
+                    <div className="library-grid">
+                        {filtered.map(card => (
+                            <div key={card.instanceId} className="library-card-entry">
+                                <Card card={card} onClick={() => onMaximizeCard?.(card)} />
+                                <div className="library-card-name muted">{card.name}</div>
+                            </div>
+                        ))}
+                        {filtered.length === 0 && <p className="muted">No matching cards.</p>}
                     </div>
                 ) : (
                     /* ─── Library view: tutor actions per card ─────────── */
