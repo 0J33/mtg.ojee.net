@@ -705,6 +705,22 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [me?.mulliganBottomPending]);
 
+    // Avatar color persistence. The server's default avatar color is a
+    // deterministic hash of userId, so a new room's playerState always starts
+    // with that hash even if you previously picked a different color in another
+    // room. Persist the user's choice in localStorage (keyed by userId so
+    // accounts don't share) and re-emit it whenever we land in a room with a
+    // different value. This makes the picked color sticky across rooms / page
+    // reloads / logout-login.
+    useEffect(() => {
+        if (!me?.userId) return;
+        let preferred;
+        try { preferred = localStorage.getItem(`mtg_avatarColor_${me.userId}`); } catch (_) { /* private mode */ }
+        if (!preferred || !/^#[0-9a-fA-F]{6}$/.test(preferred)) return;
+        if (me.avatarColor === preferred) return;
+        socket.emit('setAvatarColor', { color: preferred });
+    }, [me?.userId, me?.avatarColor]);
+
     return (
         <div ref={gameBoardRef} className={`game-board ${compactMode ? 'compact-mode' : ''}`}>
             {/* Top bar */}
@@ -1624,7 +1640,15 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
     });
     const [shared, setShared] = useState(!!sharedTeamLife);
     const [teamId, setTeamId] = useState(me?.teamId || '');
-    const [colorDraft, setColorDraft] = useState(me?.avatarColor || '#7986cb');
+    // Prefer the persisted choice over whatever the server currently has, so
+    // opening Settings shows the user's actual preference immediately.
+    const [colorDraft, setColorDraft] = useState(() => {
+        try {
+            const stored = localStorage.getItem(`mtg_avatarColor_${me?.userId || 'anon'}`);
+            if (stored && /^#[0-9a-fA-F]{6}$/.test(stored)) return stored;
+        } catch (_) {}
+        return me?.avatarColor || '#7986cb';
+    });
 
     // Format presets — applied to draft locally; user clicks Save to commit.
     const applyFormat = (fmt) => {
@@ -1647,8 +1671,14 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
         if (teamId !== (me?.teamId || '')) {
             socket.emit('setTeam', { playerId: me?.userId, teamId: teamId || null, teamName: `Team ${teamId}` });
         }
-        if (colorDraft && colorDraft !== me?.avatarColor) {
-            socket.emit('setAvatarColor', { color: colorDraft });
+        if (colorDraft && /^#[0-9a-fA-F]{6}$/.test(colorDraft)) {
+            if (colorDraft !== me?.avatarColor) {
+                socket.emit('setAvatarColor', { color: colorDraft });
+            }
+            // Persist the choice keyed by userId so it survives leaving the
+            // room, joining a new one, or refreshing. The reconciler effect in
+            // GameBoard re-applies it after every join.
+            try { localStorage.setItem(`mtg_avatarColor_${me?.userId || 'anon'}`, colorDraft); } catch (_) {}
         }
         onClose();
     };
