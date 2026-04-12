@@ -2422,10 +2422,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     font-family: 'Cinzel', serif;
 }
 .mtg-logo {
-    width: 25px;
-    height: 25px;
-    vertical-align: -4px;
-    margin-right: 8px;
+    width: 36px;
+    height: 36px;
+    vertical-align: -8px;
+    margin-right: 10px;
 }
 .topbar-logo {
     width: 22px;
