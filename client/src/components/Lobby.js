@@ -170,7 +170,7 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
     return (
         <div className="lobby-page">
             <div className="lobby-header">
-                <h1>MTG Commander</h1>
+                <h1>MTG Commander <span className="lobby-version">v{VERSION}</span></h1>
                 <div className="lobby-user">
                     <span>{user.username}</span>
                     <button onClick={onLogout} className="small-btn">Logout</button>
@@ -278,7 +278,6 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
             {customCardsOpen && (
                 <CustomCardManager onClose={() => setCustomCardsOpen(false)} />
             )}
-            <div className="lobby-version">v{VERSION}</div>
         </div>
     );
 }

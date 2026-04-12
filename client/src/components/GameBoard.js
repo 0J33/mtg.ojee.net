@@ -21,6 +21,7 @@ import DeckBuilder from './DeckBuilder';
 import DeckViewer from './DeckViewer';
 import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
+import { VERSION } from '../version';
 
 export default function GameBoard({ user, gameState, roomCode, isSpectator, onLeave, revealedCard, onDismissReveal, revealedHand, onDismissRevealedHand }) {
     const dialog = useDialog();
@@ -778,6 +779,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             {/* Top bar */}
             <div className="game-topbar">
                 <div className="topbar-left">
+                    <span className="topbar-version">v{VERSION}</span>
                     <button
                         type="button"
                         className={`room-code ${roomCodeRevealed ? 'revealed' : 'hidden'}`}
