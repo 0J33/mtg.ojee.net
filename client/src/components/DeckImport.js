@@ -4,10 +4,11 @@ import { useEscapeKey } from '../utils';
 
 export default function DeckImport({ onImport, onDeckCreated, onClose }) {
     useEscapeKey(onClose);
-    // 'paste' = paste a text decklist, 'share' = enter an 8-char share code.
-    // These live on the same modal instead of two separate lobby buttons so
+    // 'moxfield' = paste a Moxfield deck URL (the default and most common path),
+    // 'paste' = paste a raw text decklist, 'share' = enter an 8-char share code.
+    // These live on the same modal instead of three separate lobby buttons so
     // users only have one "Import" entry point to learn.
-    const [mode, setMode] = useState('paste');
+    const [mode, setMode] = useState('moxfield');
     const [text, setText] = useState('');
     const [deckName, setDeckName] = useState('');
     const [shareCode, setShareCode] = useState('');
@@ -180,9 +181,9 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                 {!preview ? (
                     <>
                         <div className="tab-row">
+                            <button className={mode === 'moxfield' ? 'active' : ''} onClick={() => { setMode('moxfield'); setError(''); }}>Moxfield URL</button>
                             <button className={mode === 'paste' ? 'active' : ''} onClick={() => { setMode('paste'); setError(''); }}>Paste Text</button>
                             <button className={mode === 'share' ? 'active' : ''} onClick={() => { setMode('share'); setError(''); }}>Share Code</button>
-                            <button className={mode === 'moxfield' ? 'active' : ''} onClick={() => { setMode('moxfield'); setError(''); }}>Moxfield URL</button>
                         </div>
 
                         {mode === 'paste' && (
