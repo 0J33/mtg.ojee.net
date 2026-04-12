@@ -726,7 +726,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* z-index must sit above reveal-top (2500) and the peek-exile modal (1100)
    so hovering a card in ANY modal shows the zoom instead of going behind it. */
 .card-zoom-wrapper { position: fixed; z-index: 2600; pointer-events: none; display: flex; flex-direction: row; gap: 8px; align-items: flex-start; }
-.card-zoom { width: 320px; flex-shrink: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.9); border: 1px solid var(--accent-dim); }
+.card-zoom { width: 320px; flex-shrink: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.9); border: 1px solid var(--accent-dim); }
 .card-zoom img { width: 100%; display: block; }
 
 /* Effects panel — sits to the side of the card */
@@ -825,7 +825,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ─── CARD MAXIMIZED ──────────────────────────────────────── */
 .card-maximized { display: flex; gap: 28px; align-items: flex-start; background: var(--bg-panel); padding: 28px; border: 1px solid var(--border); border-radius: 4px; max-width: 760px; position: relative; box-shadow: 0 20px 80px rgba(0,0,0,0.8); }
 .card-maximized > img,
-.card-max-image-wrap img { width: 320px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+.card-max-image-wrap img { width: 320px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
 .card-max-image-wrap { flex-shrink: 0; width: 320px; }
 .card-max-info { max-width: 320px; }
 .card-max-info h3 { font-family: 'Cinzel', serif; font-size: 1.3em; margin-bottom: 10px; color: var(--text); letter-spacing: 1px; }
