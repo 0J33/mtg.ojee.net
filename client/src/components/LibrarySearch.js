@@ -44,29 +44,32 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
     const [bfFaceDown, setBfFaceDown] = useState(false);
     const [bfPlusOne, setBfPlusOne] = useState(false);
 
-    // In deck mode, assemble cards from every zone the client already has
-    // (no socket call needed). Tag each card with its zone so we can group.
+    // In deck mode, we need ALL cards including the library — but gameState
+    // intentionally strips library contents to prevent cheating. So we still
+    // need the viewLibrary socket call, then merge with the other zones the
+    // client already has (hand, battlefield, graveyard, exile, command, etc).
     const [deckCards, setDeckCards] = useState([]);
     useEffect(() => {
-        if (isDeckView && allZones) {
-            const ZONE_ORDER = ['commandZone', 'hand', 'battlefield', 'library', 'graveyard', 'exile', 'sideboard', 'companions', 'foretell'];
-            const cards = [];
-            for (const z of ZONE_ORDER) {
-                const arr = allZones[z];
-                if (!Array.isArray(arr)) continue;
-                for (const c of arr) {
-                    if (c && !c.hidden) cards.push({ ...c, _zone: z });
+        // Always fetch library (needed in both modes).
+        socket.emit('viewLibrary', (res) => {
+            const lib = res?.library || [];
+            if (isDeckView && allZones) {
+                const OTHER_ZONES = ['commandZone', 'hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'companions', 'foretell'];
+                const cards = [...lib];
+                for (const z of OTHER_ZONES) {
+                    const arr = allZones[z];
+                    if (!Array.isArray(arr)) continue;
+                    for (const c of arr) {
+                        if (c && !c.hidden) cards.push(c);
+                    }
                 }
+                cards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                setDeckCards(cards);
+            } else {
+                setLibrary(lib);
             }
-            cards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            setDeckCards(cards);
             setLoading(false);
-        } else {
-            socket.emit('viewLibrary', (res) => {
-                if (res?.library) setLibrary(res.library);
-                setLoading(false);
-            });
-        }
+        });
     }, [isDeckView, allZones]);
 
     const grab = (card, toZone, libraryPosition) => {
