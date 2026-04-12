@@ -2052,47 +2052,29 @@ function MulliganBottomModal({ hand, need, onSubmit }) {
 
 function ProliferateModal({ players, onClose, onSubmit }) {
     useEscapeKey(onClose);
-    // Gather every permanent and player that has at least one counter.
-    // Each entry: { key, label, type, id, counters: [{name, value}], selected, chosenCounter }
+    // Each counter on each player/card is its own row — no dropdowns, just
+    // a flat list of checkboxes. One row = one counter to bump.
+    // Shape: { key, label, counterName, value, type, id, selected }
     const [items, setItems] = useState(() => {
         const list = [];
         for (const p of players) {
-            // Always show every player with all standard counter types so the
-            // user has full control — can infect themselves, add energy, etc.
-            const pCounters = [
-                { name: 'poison', value: (p.counters || {}).poison || 0 },
-                { name: 'energy', value: (p.counters || {}).energy || 0 },
-                { name: 'experience', value: (p.counters || {}).experience || 0 },
-                { name: 'infect', value: p.infect || 0 },
+            const std = [
+                ['poison', (p.counters || {}).poison || 0],
+                ['energy', (p.counters || {}).energy || 0],
+                ['experience', (p.counters || {}).experience || 0],
+                ['infect', p.infect || 0],
             ];
-            // Also include any custom counters they might have
             for (const [k, v] of Object.entries(p.counters || {})) {
-                if (!['poison', 'energy', 'experience'].includes(k)) {
-                    pCounters.push({ name: k, value: v || 0 });
-                }
+                if (!['poison', 'energy', 'experience'].includes(k)) std.push([k, v || 0]);
             }
-            list.push({
-                key: `player-${p.userId}`,
-                label: p.username,
-                type: 'player',
-                id: p.userId,
-                counters: pCounters,
-                selected: false,
-                chosenCounter: pCounters[0].name,
-            });
-            // Card counters on battlefield — show cards that have any counter
+            for (const [name, value] of std) {
+                list.push({ key: `p-${p.userId}-${name}`, label: p.username, counterName: name, value, type: 'player', id: p.userId, selected: false });
+            }
             for (const card of (p.zones?.battlefield || [])) {
-                const cEntries = Object.entries(card.counters || {}).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k, value: v }));
-                if (cEntries.length > 0) {
-                    list.push({
-                        key: `card-${card.instanceId}`,
-                        label: card.name || 'Card',
-                        type: 'card',
-                        id: card.instanceId,
-                        counters: cEntries,
-                        selected: false,
-                        chosenCounter: cEntries[0].name,
-                    });
+                for (const [name, value] of Object.entries(card.counters || {})) {
+                    if (value > 0) {
+                        list.push({ key: `c-${card.instanceId}-${name}`, label: card.name || 'Card', counterName: name, value, type: 'card', id: card.instanceId, selected: false });
+                    }
                 }
             }
         }
@@ -2100,16 +2082,13 @@ function ProliferateModal({ players, onClose, onSubmit }) {
     });
 
     const toggle = (key) => setItems(prev => prev.map(it => it.key === key ? { ...it, selected: !it.selected } : it));
-    const setCounter = (key, counter) => setItems(prev => prev.map(it => it.key === key ? { ...it, chosenCounter: counter } : it));
 
     const submit = () => {
-        const targets = items.filter(it => it.selected).map(it => ({
-            type: it.type,
-            id: it.id,
-            counter: it.chosenCounter,
-        }));
+        const targets = items.filter(it => it.selected).map(it => ({ type: it.type, id: it.id, counter: it.counterName }));
         onSubmit(targets);
     };
+
+    const selected = items.filter(it => it.selected).length;
 
     return (
         <div className="modal-overlay">
@@ -2119,35 +2098,22 @@ function ProliferateModal({ players, onClose, onSubmit }) {
                     <button className="close-btn" onClick={onClose}>x</button>
                 </div>
                 <p className="muted" style={{ marginTop: 0 }}>
-                    Choose which counters to add +1 to. Uncheck items you want to skip.
+                    Check each counter you want to add +1 to.
                 </p>
-                {items.length === 0 && <p className="muted">Nothing has counters on it.</p>}
+                {items.length === 0 && <p className="muted">No counters in play.</p>}
                 <div className="proliferate-list">
                     {items.map(it => (
                         <label key={it.key} className={`proliferate-row ${it.selected ? '' : 'deselected'}`}>
                             <input type="checkbox" checked={it.selected} onChange={() => toggle(it.key)} />
                             <span className="proliferate-name">{it.label}</span>
-                            {it.counters.length === 1 ? (
-                                <span className="proliferate-counter">{it.counters[0].name} ({it.counters[0].value} → {it.counters[0].value + 1})</span>
-                            ) : (
-                                <select
-                                    value={it.chosenCounter}
-                                    onChange={e => setCounter(it.key, e.target.value)}
-                                    onClick={e => e.stopPropagation()}
-                                    disabled={!it.selected}
-                                >
-                                    {it.counters.map(c => (
-                                        <option key={c.name} value={c.name}>{c.name} ({c.value} → {c.value + 1})</option>
-                                    ))}
-                                </select>
-                            )}
+                            <span className="proliferate-counter">{it.counterName} ({it.value} → {it.value + 1})</span>
                         </label>
                     ))}
                 </div>
                 <div className="modal-actions">
                     <button onClick={onClose}>Cancel</button>
-                    <button className="primary-btn" onClick={submit} disabled={items.filter(it => it.selected).length === 0}>
-                        Proliferate ({items.filter(it => it.selected).length})
+                    <button className="primary-btn" onClick={submit} disabled={selected === 0}>
+                        Proliferate ({selected})
                     </button>
                 </div>
             </div>
