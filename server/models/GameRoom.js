@@ -83,7 +83,7 @@ const playerStateSchema = new mongoose.Schema({
     teamId: { type: String, default: null },
     mulliganCount: { type: Number, default: 0 },
     mulliganBottomPending: { type: Number, default: 0 },
-    handSizeEnforce: { type: Boolean, default: false },
+    handSizeEnforce: { type: Boolean, default: true },
     avatarColor: { type: String, default: null },
     conceded: { type: Boolean, default: false },
 }, { _id: false });

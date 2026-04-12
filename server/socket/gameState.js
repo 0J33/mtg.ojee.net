@@ -120,9 +120,11 @@ function createPlayerState(userId, username) {
         autoUntap: true,
         // If true, server enforces (well, nudges) the hand-size limit at end
         // of turn — sends a notification to discard down to room.settings
-        // .handSizeLimit. Off by default to match the existing "no enforcement"
-        // philosophy of the app.
-        handSizeEnforce: false,
+        // .handSizeLimit. Defaults to ON since most players want the reminder;
+        // can be turned off via the player options menu. Stored explicitly as
+        // false (not undefined) when toggled off so the cleanup check below
+        // can treat undefined as "default-on".
+        handSizeEnforce: true,
         // Per-player avatar color (hex). Generated on creation; used for the
         // header dot, action log icon, and cursor hue fallback.
         avatarColor: pickAvatarColor(userId),
@@ -344,7 +346,7 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
                 mulliganReady: !!p.mulliganReady,
                 firstPlayerRoll: p.firstPlayerRoll ?? null,
                 autoUntap: p.autoUntap !== false,
-                handSizeEnforce: !!p.handSizeEnforce,
+                handSizeEnforce: p.handSizeEnforce !== false,
                 avatarColor: p.avatarColor || null,
                 conceded: !!p.conceded,
                 manaPool: p.manaPool || { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },

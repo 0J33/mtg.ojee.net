@@ -57,8 +57,9 @@ function endOfTurnCleanup(room, endingPlayer, io) {
             }
         }
     }
-    // 3) Hand-size enforcement nudge for ending player (opt-in only).
-    if (endingPlayer.handSizeEnforce && endingPlayer.zones?.hand && room.settings?.handSizeLimit > 0) {
+    // 3) Hand-size enforcement nudge for ending player (default-on; an
+    //    explicit `false` opts out via the player menu toggle).
+    if (endingPlayer.handSizeEnforce !== false && endingPlayer.zones?.hand && room.settings?.handSizeLimit > 0) {
         const over = endingPlayer.zones.hand.length - room.settings.handSizeLimit;
         if (over > 0 && endingPlayer.socketId && io) {
             io.to(endingPlayer.socketId).emit('notification', {
