@@ -77,7 +77,7 @@ async function hydrateCustomAuthors(sections) {
 }
 
 router.post('/', requireAuth, async (req, res) => {
-    const { name, format, commanders, companions, mainboard, sideboard, notFound, importedFrom } = req.body;
+    const { name, format, commanders, companions, mainboard, sideboard, tokens, notFound, importedFrom } = req.body;
     const sections = {
         commanders: [...(commanders || [])],
         companions: [...(companions || [])],
@@ -93,6 +93,7 @@ router.post('/', requireAuth, async (req, res) => {
         companions: sections.companions,
         mainboard: sections.mainboard,
         sideboard: sections.sideboard,
+        tokens: tokens || [],
         notFound: notFound || [],
         importedFrom,
     });
@@ -101,11 +102,12 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 router.put('/:id', requireAuth, async (req, res) => {
-    const { name, format, commanders, companions, mainboard, sideboard } = req.body;
+    const { name, format, commanders, companions, mainboard, sideboard, tokens } = req.body;
     // Only update fields that are provided (avoid clearing data on partial updates like rename)
     const update = { updatedAt: Date.now() };
     if (name !== undefined) update.name = name;
     if (format !== undefined) update.format = format;
+    if (tokens !== undefined) update.tokens = tokens;
     // Re-hydrate authorUsername on any newly-added custom entries before
     // saving so edits made in DeckBuilder pick up the right name without
     // the client having to compute it.
