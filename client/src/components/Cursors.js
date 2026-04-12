@@ -19,6 +19,20 @@ import socket from '../socket';
 const CURSOR_TIMEOUT = 3000; // ms; entries older than this are culled
 const CLEANUP_INTERVAL = 500;
 
+// Quick luminance check — returns true if the hex color is dark enough that
+// white text is needed for readability. Uses the sRGB relative luminance
+// formula with a threshold of ~0.2.
+function isDark(hex) {
+    if (!hex || typeof hex !== 'string') return false;
+    const h = hex.replace('#', '');
+    if (h.length < 6) return true;
+    const r = parseInt(h.slice(0, 2), 16) / 255;
+    const g = parseInt(h.slice(2, 4), 16) / 255;
+    const b = parseInt(h.slice(4, 6), 16) / 255;
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return lum < 0.2;
+}
+
 // Deterministic hue from a user id so every viewer sees the same color for a
 // given player. 0..359.
 function hueFor(userId) {
@@ -145,9 +159,17 @@ export default function Cursors({ containerRef, currentUserId, players }) {
                 isSpectator: c.isSpectator,
                 // Prefer the sender's provided color (pen-active); fall back
                 // to the player's avatar color; last resort is hash-derived.
-                color: c.color
+                color: (() => {
+                    const col = c.color
+                        || (players || []).find(p => p.userId === userId)?.avatarColor
+                        || `hsl(${hueFor(userId)} 70% 55%)`;
+                    return col;
+                })(),
+                darkBg: isDark(
+                    c.color
                     || (players || []).find(p => p.userId === userId)?.avatarColor
-                    || `hsl(${hueFor(userId)} 70% 55%)`,
+                    || ''
+                ),
                 opacity,
             });
         }
@@ -175,7 +197,7 @@ export default function Cursors({ containerRef, currentUserId, players }) {
                             strokeLinejoin="round"
                         />
                     </svg>
-                    <span className="cursor-label">{e.username}{e.isSpectator && ' [spec]'}</span>
+                    <span className={`cursor-label ${e.darkBg ? 'dark-bg' : ''}`}>{e.username}{e.isSpectator && ' [spec]'}</span>
                 </div>
             ))}
         </div>

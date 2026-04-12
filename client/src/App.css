@@ -1603,6 +1603,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
     font-weight: 700;
 }
+/* Dark cursor colors need white text to stay readable */
+.cursor-label.dark-bg { color: #fff; }
 .cursor-marker.spec .cursor-label { opacity: 0.8; font-style: italic; }
 
 /* ─── CHAT ────────────────────────────────────────────────── */
