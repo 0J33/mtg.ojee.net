@@ -1211,7 +1211,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             )}
 
             {/* Modals */}
-            {showSearch && <CardSearch mode={showSearch} onClose={() => setShowSearch(null)} />}
+            {showSearch && <CardSearch mode={showSearch} onClose={() => setShowSearch(null)} deckTokens={me?.deckTokens} />}
             {maximizedCard && (() => {
                 // Compute attachment info for the maximized card so it can
                 // display "Attached to X" or "Equipped by Y" in the detail view.

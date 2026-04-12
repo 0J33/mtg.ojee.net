@@ -5,7 +5,7 @@ import socket from '../socket';
 import { useEscapeKey } from '../utils';
 import ManaCost from './ManaCost';
 
-export default function CardSearch({ onClose, mode }) {
+export default function CardSearch({ onClose, mode, deckTokens }) {
     useEscapeKey(onClose);
     // mode: 'token' (create token), 'add' (add card to battlefield), 'view' (just view)
     const [query, setQuery] = useState('');
@@ -84,6 +84,27 @@ export default function CardSearch({ onClose, mode }) {
                         </div>
                     )}
                 </div>
+                {/* Deck tokens — quick-spawn section at the top of token search */}
+                {mode === 'token' && Array.isArray(deckTokens) && deckTokens.length > 0 && !query && (
+                    <div className="deck-tokens-section">
+                        <div className="deck-tokens-label">Deck tokens</div>
+                        <div className="deck-tokens-grid">
+                            {deckTokens.map((t, i) => {
+                                const img = t.imageUri ? t.imageUri.replace('/normal/', '/small/') : '';
+                                return (
+                                    <div key={i} className="deck-token-item"
+                                        onClick={() => { handleSelect({ id: t.scryfallId, name: t.name, image_uris: { normal: t.imageUri, small: img }, mana_cost: t.manaCost, type_line: t.typeLine, oracle_text: t.oracleText, power: t.power, toughness: t.toughness, colors: t.colors, layout: t.layout }); }}
+                                        onMouseMove={(e) => handleHover(e, { image_uris: { large: t.imageUri, normal: t.imageUri } })}
+                                        onMouseLeave={() => setHover(null)}
+                                    >
+                                        {img && <img src={img} alt={t.name} />}
+                                        <span className="deck-token-name">{t.name}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
                 <div className="search-results">
                     {loading && <div className="muted">Searching...</div>}
                     {results.map(card => {

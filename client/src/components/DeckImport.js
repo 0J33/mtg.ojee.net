@@ -99,6 +99,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose, initialSh
             companions: preview.companions || [],
             mainboard,
             sideboard: preview.sideboard || [],
+            tokens: preview.tokens || [],
             notFound,
         });
     };

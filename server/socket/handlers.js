@@ -605,6 +605,22 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
 
+            // Store deck tokens as templates for quick spawning. These aren't
+            // card instances — just data objects used by the client's token
+            // menu to create tokens with one click.
+            player.deckTokens = (deckData.tokens || []).map(t => ({
+                scryfallId: t.scryfallId || null,
+                name: t.name,
+                imageUri: t.imageUri || '',
+                manaCost: t.manaCost || '',
+                typeLine: t.typeLine || '',
+                oracleText: t.oracleText || '',
+                power: t.power || '',
+                toughness: t.toughness || '',
+                colors: t.colors || [],
+                layout: t.layout || 'token',
+            }));
+
             // Shuffle library
             shuffleArray(player.zones.library);
 

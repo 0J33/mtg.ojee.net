@@ -170,7 +170,7 @@ router.post('/moxfield', async (req, res) => {
     }
 
     try {
-        const result = { commanders: [], companions: [], mainboard: [], sideboard: [], notFound: [] };
+        const result = { commanders: [], companions: [], mainboard: [], sideboard: [], tokens: [], notFound: [] };
 
         // Moxfield API has two response shapes depending on the endpoint
         // version we got back from the fallback chain in moxfieldClient:
@@ -224,6 +224,39 @@ router.post('/moxfield', async (req, res) => {
         processSection(getSection('companions'), result.companions);
         processSection(getSection('mainboard'), result.mainboard);
         processSection(getSection('sideboard'), result.sideboard);
+
+        // Extract related tokens from the d.tokens array. Moxfield includes
+        // all related cards (tokens, emblems, copies); filter to actual tokens
+        // by checking layout or type_line. Deduplicate by name so duplicate
+        // art variants don't clutter the list.
+        if (Array.isArray(data.tokens)) {
+            const seenTokenNames = new Set();
+            for (const card of data.tokens) {
+                const tl = (card.type_line || '').toLowerCase();
+                const layout = (card.layout || '').toLowerCase();
+                if (layout === 'token' || tl.includes('token')) {
+                    if (seenTokenNames.has(card.name)) continue;
+                    seenTokenNames.add(card.name);
+                    const sid = card.scryfall_id || card.id;
+                    result.tokens.push({
+                        scryfallId: sid,
+                        name: card.name,
+                        quantity: 1,
+                        imageUri: card.image_uris?.normal || scryfallImageFromId(sid, 'front'),
+                        backImageUri: '',
+                        manaCost: card.mana_cost || '',
+                        typeLine: card.type_line || '',
+                        oracleText: card.oracle_text || '',
+                        power: card.power || '',
+                        toughness: card.toughness || '',
+                        colors: card.colors || [],
+                        colorIdentity: card.color_identity || [],
+                        producedMana: [],
+                        layout: card.layout || 'token',
+                    });
+                }
+            }
+        }
 
         const total = result.commanders.length + result.companions.length
             + result.mainboard.length + result.sideboard.length;

@@ -38,6 +38,7 @@ const deckSchema = new mongoose.Schema({
     companions: [cardEntrySchema],
     mainboard: [cardEntrySchema],
     sideboard: [cardEntrySchema],
+    tokens: [cardEntrySchema],
     notFound: { type: [String], default: [] },
     importedFrom: { type: String, default: null },
     // If this deck was created via a share-code import, sharedByUsername is a

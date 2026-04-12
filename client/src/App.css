@@ -844,6 +844,37 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── CARD SEARCH MODAL ──────────────────────────────────── */
 .card-search-modal { max-width: 640px; max-height: 80vh; }
+.deck-tokens-section {
+    margin: 8px 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-soft, #333);
+}
+.deck-tokens-label {
+    font-size: 0.7em;
+    color: var(--text-faint, #555);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.deck-tokens-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.deck-token-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.1s;
+    width: 70px;
+}
+.deck-token-item:hover { background: var(--bg-elev, #222); }
+.deck-token-item img { width: 60px; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+.deck-token-name { font-size: 0.7em; text-align: center; color: var(--text-mid, #aaa); }
 .search-row { display: flex; gap: 8px; align-items: center; }
 .count-input { display: flex; align-items: center; gap: 6px; }
 .count-input input { width: 60px; }

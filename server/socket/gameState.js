@@ -354,6 +354,7 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
                 manaPool: p.manaPool || { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
                 drewThisTurn: !!p.drewThisTurn,
                 landsPlayedThisTurn: p.landsPlayedThisTurn || 0,
+                deckTokens: p.deckTokens || [],
                 connected: !!p.socketId,
                 zones: {
                     hand: canSeeHand ? p.zones.hand : p.zones.hand.map(() => ({ hidden: true })),
