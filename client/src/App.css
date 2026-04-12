@@ -1855,9 +1855,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .guide-modal {
     max-width: 640px;
     width: 90%;
+    height: 520px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
 }
 .guide-body {
-    min-height: 280px;
+    flex: 1;
+    overflow-y: auto;
     padding: 4px 2px 12px;
     font-size: 0.95em;
     line-height: 1.55;
