@@ -783,7 +783,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             {/* Top bar */}
             <div className="game-topbar">
                 <div className="topbar-left">
-                    <img src="https://svgs.scryfall.io/card-symbols/CHAOS.svg" alt="" className="topbar-logo" />
+                    <img src="/mtg.png" alt="" className="topbar-logo" />
                     <span className="topbar-version">v{VERSION}</span>
                     <button
                         type="button"

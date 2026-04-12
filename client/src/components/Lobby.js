@@ -171,7 +171,7 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
         <div className="lobby-page">
             <div className="lobby-header">
                 <h1>
-                    <img src="https://svgs.scryfall.io/card-symbols/CHAOS.svg" alt="" className="mtg-logo" />
+                    <img src="/mtg.png" alt="" className="mtg-logo" />
                     MTG Commander <span className="lobby-version">v{VERSION}</span>
                 </h1>
                 <div className="lobby-user">

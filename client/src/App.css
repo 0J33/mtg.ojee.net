@@ -2426,12 +2426,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     height: 28px;
     vertical-align: middle;
     margin-right: 8px;
-    filter: invert(0.7) sepia(1) saturate(2) hue-rotate(15deg);
 }
 .topbar-logo {
     width: 18px;
     height: 18px;
-    filter: invert(0.6) sepia(1) saturate(2) hue-rotate(15deg);
 }
 
 /* Background modal — saved backgrounds gallery */
