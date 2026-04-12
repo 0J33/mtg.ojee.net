@@ -85,6 +85,14 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         });
     };
 
+    // Middle-click (button 1) toggles tap/untap on any card, anywhere.
+    const handleCardMouseDown = (e, card) => {
+        if (e.button !== 1) return; // only middle click
+        e.preventDefault();
+        if (spectating) return;
+        socket.emit('tapCard', { instanceId: card.instanceId });
+    };
+
     const handleCardClick = (e, card) => {
         // When a pending action is active, card clicks resolve it instead of
         // any normal behavior (selection, maximize, etc.). For attach, only
@@ -383,7 +391,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             // becomes nonzero (which updates needsLand above).
             const pendingLand = zone === 'hand' && needsLand && isLandCard(card);
             return (
-                <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''} ${pendingLand ? 'turn-nudge-land' : ''}`}>
+                <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''} ${pendingLand ? 'turn-nudge-land' : ''}`}
+                    onMouseDown={(e) => handleCardMouseDown(e, card)}>
                     <Card
                         card={card}
                         onClick={(e) => handleCardClick(e, card)}
@@ -566,7 +575,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 const renderCards = (cards, dragZone = 'battlefield') => cards.map(card => {
                     const isSelected = selectedIds?.has(card.instanceId);
                     return (
-                        <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''}`}>
+                        <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''}`}
+                            onMouseDown={(e) => handleCardMouseDown(e, card)}>
                             <Card
                                 card={card}
                                 onClick={(e) => handleCardClick(e, card)}
