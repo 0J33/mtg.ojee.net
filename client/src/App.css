@@ -710,8 +710,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card { width: var(--card-w, 70px); height: var(--card-h, 98px); border-radius: 5px; overflow: hidden; cursor: pointer; position: relative; transition: transform 0.15s; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.5); background: #000; }
 /* Scale the image past the container so its built-in white/light border
    sits outside the clipped area. 6% overshoot hides the frame border
-   at 5px radius without noticeably cropping the art. */
-.card > img { width: 106%; height: 106%; margin: -3% 0 0 -3%; object-fit: cover; }
+   at 5px radius without noticeably cropping the art. Negative margin on
+   all sides keeps it centered. */
+.card > img { width: 106%; height: 106%; margin: -3%; object-fit: cover; }
 .card img { width: 100%; height: 100%; object-fit: cover; }
 .card:hover { z-index: 10; outline: 1px solid var(--accent); }
 .card.tapped { transform: rotate(90deg); margin: calc(var(--card-h, 98px) * 0.14) calc(var(--card-h, 98px) * 0.14); }
