@@ -765,7 +765,7 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true, count });
         });
 
-        socket.on('bulkMove', ({ instanceIds, toZone, targetPlayerId }, callback) => {
+        socket.on('bulkMove', ({ instanceIds, toZone, targetPlayerId, libraryPosition }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             const ids = new Set(instanceIds || []);
@@ -790,7 +790,11 @@ module.exports = function registerSocketHandlers(io) {
                             }
                             if (toZone !== 'battlefield') { card.x = 0; card.y = 0; card.tapped = false; }
                             const dest = targetPlayer || player;
-                            dest.zones[toZone].push(card);
+                            if (toZone === 'library' && libraryPosition === 'top') {
+                                dest.zones[toZone].unshift(card);
+                            } else {
+                                dest.zones[toZone].push(card);
+                            }
                             moved++;
                             // Count lands being played this turn if this bulk
                             // move is hand → battlefield for the card's own

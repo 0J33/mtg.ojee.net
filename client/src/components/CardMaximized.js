@@ -7,7 +7,7 @@ import ManaCost, { OracleText } from './ManaCost';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
-export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly, attachedToName, attachments }) {
+export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly, attachedToName, attachments, loadedDeckId }) {
     useEscapeKey(onClose);
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
     const [showRevealMenu, setShowRevealMenu] = useState(false);
@@ -46,9 +46,22 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const applySkin = (url, allCopies) => {
         if (allCopies && card.scryfallId) {
             socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: url });
+            // Also save to deck so it persists across games
+            if (loadedDeckId) {
+                socket.emit('saveSkinToDeck', { deckId: loadedDeckId, scryfallId: card.scryfallId, skinUrl: url });
+            }
         } else {
             socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: url });
         }
+    };
+
+    const saveSkinToDeck = () => {
+        if (!loadedDeckId || !card.scryfallId || !currentSkin) return;
+        socket.emit('saveSkinToDeck', { deckId: loadedDeckId, scryfallId: card.scryfallId, skinUrl: currentSkin }, (res) => {
+            if (res?.success) {
+                // brief visual feedback would be nice but keeping it simple
+            }
+        });
     };
     if (!card) return null;
 
@@ -273,7 +286,10 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                     <>
                                         <button className="small-btn" onClick={() => applySkin(null, false)}>Reset</button>
                                         {card.scryfallId && (
-                                            <button className="small-btn" onClick={() => applySkin(null, true)}>Reset all copies</button>
+                                            <button className="small-btn" onClick={() => applySkin(null, true)}>Reset all</button>
+                                        )}
+                                        {loadedDeckId && card.scryfallId && (
+                                            <button className="small-btn primary-btn" onClick={saveSkinToDeck} title="Save this art to the deck so it loads automatically next game">Save to deck</button>
                                         )}
                                     </>
                                 )}

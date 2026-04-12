@@ -301,8 +301,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const bulkTap = (tapped) => {
         socket.emit('bulkTap', { instanceIds: Array.from(selectedIds), tapped });
     };
-    const bulkMove = (toZone) => {
-        socket.emit('bulkMove', { instanceIds: Array.from(selectedIds), toZone, targetPlayerId: user.id });
+    const bulkMove = (toZone, libraryPosition) => {
+        socket.emit('bulkMove', { instanceIds: Array.from(selectedIds), toZone, targetPlayerId: user.id, libraryPosition });
         clearSelection();
     };
 
@@ -341,10 +341,12 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         setShowDeckPicker(true);
     };
 
+    const [loadedDeckId, setLoadedDeckId] = useState(null);
     const handleSelectDeck = async (deckId) => {
         const data = await decks.get(deckId);
         if (data.deck) {
             socket.emit('loadDeck', { deckData: data.deck }, () => {});
+            setLoadedDeckId(deckId);
         }
         setShowDeckPicker(false);
     };
@@ -1074,7 +1076,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     <button onClick={() => bulkMove('hand')}>→ Hand</button>
                     <button onClick={() => bulkMove('graveyard')}>→ GY</button>
                     <button onClick={() => bulkMove('exile')}>→ Exile</button>
-                    <button onClick={() => bulkMove('library')}>→ Lib</button>
+                    <button onClick={() => bulkMove('library', 'top')}>→ Top Lib</button>
+                    <button onClick={() => bulkMove('library')}>→ Bot Lib</button>
                     <button onClick={() => bulkMove('commandZone')}>→ Cmd</button>
                     <button onClick={clearSelection}>Clear</button>
                 </div>
@@ -1229,6 +1232,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                         readOnly={isSpectator}
                         attachedToName={maxAttachedToName}
                         attachments={maxAttachments.length > 0 ? maxAttachments : null}
+                        loadedDeckId={loadedDeckId}
                     />
                 );
             })()}
