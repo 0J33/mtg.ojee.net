@@ -291,10 +291,9 @@ export default function DeckImport({ onImport, onDeckCreated, onClose }) {
                                     onChange={e => setDeckName(e.target.value)}
                                 />
                                 <p className="muted import-instructions">
-                                    Paste a public Moxfield deck URL — e.g.
-                                    <code> https://www.moxfield.com/decks/abc123XYZ</code>.
-                                    The server fetches the deck through Moxfield's official API
-                                    (rate-limited, so back-to-back imports may take a few seconds).
+                                    Paste a public Moxfield deck URL. The server fetches the deck
+                                    through Moxfield's official API (rate-limited, so back-to-back
+                                    imports may take a few seconds).
                                 </p>
                                 <input
                                     type="text"
