@@ -71,6 +71,21 @@ router.get('/named', async (req, res) => {
     }
 });
 
+// All printings of a card by name (for alternate art picker)
+router.get('/prints', async (req, res) => {
+    const { name } = req.query;
+    if (!name) return res.status(400).json({ error: 'name required' });
+    try {
+        // Use unique=prints to get every printing (different art, sets, promos)
+        const data = await throttledFetch(
+            `${SCRYFALL_BASE}/cards/search?q=${encodeURIComponent(`!"${name}"`)}&unique=prints&order=released`
+        );
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: 'Scryfall request failed' });
+    }
+});
+
 // Batch lookup (max 75)
 router.post('/collection', async (req, res) => {
     const { identifiers } = req.body;

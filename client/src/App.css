@@ -2494,18 +2494,52 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     padding-top: 10px;
     border-top: 1px solid var(--border-soft, #333);
 }
-.card-skin-current {
+.card-skin-header {
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+}
+.card-skin-header strong { flex: 1; }
+.card-skin-gallery {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    max-height: 180px;
+    overflow-y: auto;
     margin-bottom: 6px;
 }
-.card-skin-input-row {
+.card-skin-thumb {
+    width: 64px;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.15s;
+    position: relative;
+}
+.card-skin-thumb:hover { border-color: var(--accent-dim, #666); }
+.card-skin-thumb.active { border-color: var(--accent, #88aaff); }
+.card-skin-thumb img { width: 100%; display: block; }
+.card-skin-set {
+    position: absolute;
+    bottom: 1px;
+    left: 1px;
+    font-size: 8px;
+    background: rgba(0,0,0,0.75);
+    color: #ccc;
+    padding: 0 3px;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+}
+.card-skin-url-row {
     display: flex;
     gap: 4px;
     align-items: center;
+    margin-top: 4px;
 }
-.card-skin-input-row input {
+.card-skin-url-row input {
     flex: 1;
     padding: 4px 8px;
     font-size: 12px;

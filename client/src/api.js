@@ -34,6 +34,7 @@ export const imports = {
 export const scryfall = {
     search: (q, opts = {}) => request(`/api/scryfall/search?q=${encodeURIComponent(q)}${opts.include_extras ? '&include_extras=true' : ''}`),
     named: (name, fuzzy = false) => request(`/api/scryfall/named?${fuzzy ? 'fuzzy' : 'exact'}=${encodeURIComponent(name)}`),
+    prints: (name) => request(`/api/scryfall/prints?name=${encodeURIComponent(name)}`),
 };
 
 export const customCards = {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
+import { scryfall } from '../api';
 import { useEscapeKey } from '../utils';
 import ManaCost, { OracleText } from './ManaCost';
 
@@ -14,8 +15,41 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const [viewingBack, setViewingBack] = useState(false);
     const [skinInput, setSkinInput] = useState('');
     const [showSkinInput, setShowSkinInput] = useState(false);
+    const [altArts, setAltArts] = useState(null); // null = not loaded, [] = empty
+    const [loadingArts, setLoadingArts] = useState(false);
 
     const currentSkin = card?.skinUrl || null;
+
+    const loadAltArts = async () => {
+        if (altArts !== null || !card?.name) return;
+        setLoadingArts(true);
+        try {
+            // Strip DFC back-face name if present
+            const name = card.name.includes(' // ') ? card.name.split(' // ')[0] : card.name;
+            const res = await scryfall.prints(name);
+            const arts = (res?.data || [])
+                .filter(c => c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal)
+                .map(c => ({
+                    id: c.id,
+                    set: c.set_name,
+                    setCode: c.set?.toUpperCase(),
+                    cn: c.collector_number,
+                    imageUri: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
+                }));
+            setAltArts(arts);
+        } catch (_) {
+            setAltArts([]);
+        }
+        setLoadingArts(false);
+    };
+
+    const applySkin = (url, allCopies) => {
+        if (allCopies && card.scryfallId) {
+            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: url });
+        } else {
+            socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: url });
+        }
+    };
     if (!card) return null;
 
     const hasDFC = !!card.backImageUri;
@@ -229,49 +263,70 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                         </div>
                     )}
 
-                    {/* Custom skin — visible to all players. Option to apply per-card,
-                        to all copies in the game, or save to the deck for next time. */}
+                    {/* Custom skin — change art from Scryfall printings or a custom URL.
+                        Visible to all players. */}
                     {card.instanceId && (
                         <div className="card-skin-section">
-                            {currentSkin && (
-                                <div className="card-skin-current">
-                                    <span className="muted" style={{ fontSize: 11 }}>Custom skin active</span>
-                                    <button className="small-btn" onClick={() => {
-                                        socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: null });
-                                    }}>Remove (this card)</button>
-                                    {card.scryfallId && (
-                                        <button className="small-btn" onClick={() => {
-                                            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: null });
-                                        }}>Remove (all copies)</button>
-                                    )}
+                            <div className="card-skin-header">
+                                <strong>Card art</strong>
+                                {currentSkin && (
+                                    <>
+                                        <button className="small-btn" onClick={() => applySkin(null, false)}>Reset</button>
+                                        {card.scryfallId && (
+                                            <button className="small-btn" onClick={() => applySkin(null, true)}>Reset all copies</button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Alternate printings from Scryfall */}
+                            {altArts === null ? (
+                                <button className="small-btn" onClick={loadAltArts} disabled={loadingArts}>
+                                    {loadingArts ? 'Loading...' : 'Browse alternate art'}
+                                </button>
+                            ) : altArts.length > 0 ? (
+                                <div className="card-skin-gallery">
+                                    {altArts.map(art => (
+                                        <div
+                                            key={art.id}
+                                            className={`card-skin-thumb ${currentSkin === art.imageUri ? 'active' : ''}`}
+                                            onClick={() => applySkin(art.imageUri, false)}
+                                            title={`${art.set} (${art.setCode}) #${art.cn}\nClick = this card · Shift+click = all copies`}
+                                            onClickCapture={(e) => {
+                                                if (e.shiftKey) {
+                                                    e.stopPropagation();
+                                                    applySkin(art.imageUri, true);
+                                                }
+                                            }}
+                                        >
+                                            <img src={art.imageUri.replace('/normal/', '/small/')} alt={art.set} />
+                                            <span className="card-skin-set">{art.setCode}</span>
+                                        </div>
+                                    ))}
                                 </div>
+                            ) : (
+                                <p className="muted" style={{ fontSize: 11 }}>No alternate printings found.</p>
                             )}
+
+                            {/* Custom URL input */}
                             {!showSkinInput ? (
-                                <button className="small-btn" onClick={() => setShowSkinInput(true)}>
-                                    {currentSkin ? 'Change skin' : 'Set custom skin'}
+                                <button className="small-btn" onClick={() => setShowSkinInput(true)} style={{ marginTop: 6 }}>
+                                    Custom URL...
                                 </button>
                             ) : (
-                                <div className="card-skin-input-row">
+                                <div className="card-skin-url-row">
                                     <input
                                         type="text"
-                                        placeholder="Image URL for custom art"
+                                        placeholder="Paste any image URL"
                                         value={skinInput}
                                         onChange={e => setSkinInput(e.target.value)}
                                         autoFocus
                                         onKeyDown={e => {
-                                            if (e.key === 'Enter' && skinInput.trim()) {
-                                                socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: skinInput.trim() });
-                                            }
+                                            if (e.key === 'Enter' && skinInput.trim()) applySkin(skinInput.trim(), false);
+                                            if (e.key === 'Escape') setShowSkinInput(false);
                                         }}
                                     />
-                                    <button className="small-btn primary-btn" disabled={!skinInput.trim()} onClick={() => {
-                                        socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: skinInput.trim() });
-                                    }}>This card</button>
-                                    {card.scryfallId && (
-                                        <button className="small-btn primary-btn" disabled={!skinInput.trim()} onClick={() => {
-                                            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: skinInput.trim() });
-                                        }}>All copies</button>
-                                    )}
+                                    <button className="small-btn primary-btn" disabled={!skinInput.trim()} onClick={() => applySkin(skinInput.trim(), false)}>Apply</button>
                                     <button className="small-btn" onClick={() => setShowSkinInput(false)}>Cancel</button>
                                 </div>
                             )}
