@@ -4,6 +4,18 @@ const { fetchMoxfieldDeck, stats: moxfieldStats } = require('../moxfieldClient')
 
 const SCRYFALL_BASE = 'https://api.scryfall.com';
 
+// Construct a Scryfall card image URL from a scryfall_id. Moxfield's v3 API
+// strips image_uris from card payloads, so we have to build them ourselves
+// from the well-known cards.scryfall.io path layout:
+//   https://cards.scryfall.io/normal/{front|back}/{a}/{b}/{id}.jpg
+// where a and b are the first two characters of the id.
+function scryfallImageFromId(scryfallId, side = 'front') {
+    if (!scryfallId || typeof scryfallId !== 'string' || scryfallId.length < 2) return '';
+    const a = scryfallId[0];
+    const b = scryfallId[1];
+    return `https://cards.scryfall.io/normal/${side}/${a}/${b}/${scryfallId}.jpg`;
+}
+
 function scryfallCardToEntry(card) {
     const face = card.card_faces?.[0];
     return {
@@ -160,34 +172,66 @@ router.post('/moxfield', async (req, res) => {
     try {
         const result = { commanders: [], companions: [], mainboard: [], sideboard: [], notFound: [] };
 
+        // Moxfield API has two response shapes depending on the endpoint
+        // version we got back from the fallback chain in moxfieldClient:
+        //   v2 (api.moxfield.com): data.<board>           = { id: { card, quantity } }
+        //   v3 (api2.moxfield.com): data.boards.<board>.cards = { id: { card, quantity } }
+        // getSection normalizes them.
+        const getSection = (name) => {
+            if (data?.boards?.[name]?.cards) return data.boards[name].cards;
+            if (data?.[name]) return data[name];
+            return null;
+        };
+
         const processSection = (section, target) => {
             if (!section) return;
             for (const [, entry] of Object.entries(section)) {
                 const card = entry.card;
                 if (!card) continue;
+                const sid = card.scryfall_id || card.id;
+                // v3 strips image_uris entirely from the card payload —
+                // construct them from the well-known cards.scryfall.io paths.
+                // v2 does include image_uris so the chain prefers them when
+                // present.
+                const frontFromId = scryfallImageFromId(sid, 'front');
+                const backFromId = card.card_faces && card.card_faces.length > 1
+                    ? scryfallImageFromId(sid, 'back')
+                    : '';
+                const face0 = card.card_faces?.[0];
+                const face1 = card.card_faces?.[1];
                 target.push({
-                    scryfallId: card.scryfall_id || card.id,
+                    scryfallId: sid,
                     name: card.name,
                     quantity: entry.quantity || 1,
-                    imageUri: card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '',
-                    backImageUri: card.card_faces?.[1]?.image_uris?.normal || '',
-                    manaCost: card.mana_cost || '',
-                    typeLine: card.type_line || '',
-                    oracleText: card.oracle_text || '',
-                    power: card.power || '',
-                    toughness: card.toughness || '',
-                    colors: card.colors || [],
+                    imageUri: card.image_uris?.normal
+                        || face0?.image_uris?.normal
+                        || frontFromId,
+                    backImageUri: face1?.image_uris?.normal || backFromId,
+                    manaCost: card.mana_cost || face0?.mana_cost || '',
+                    typeLine: card.type_line || card.type || face0?.type_line || '',
+                    oracleText: card.oracle_text || face0?.oracle_text || '',
+                    power: card.power || face0?.power || '',
+                    toughness: card.toughness || face0?.toughness || '',
+                    colors: card.colors || face0?.colors || [],
                     colorIdentity: card.color_identity || [],
-                    producedMana: card.produced_mana || [],
+                    producedMana: card.produced_mana || face0?.produced_mana || [],
                     layout: card.layout || 'normal',
                 });
             }
         };
 
-        processSection(data.commanders, result.commanders);
-        processSection(data.companions, result.companions);
-        processSection(data.mainboard, result.mainboard);
-        processSection(data.sideboard, result.sideboard);
+        processSection(getSection('commanders'), result.commanders);
+        processSection(getSection('companions'), result.companions);
+        processSection(getSection('mainboard'), result.mainboard);
+        processSection(getSection('sideboard'), result.sideboard);
+
+        const total = result.commanders.length + result.companions.length
+            + result.mainboard.length + result.sideboard.length;
+        if (total === 0) {
+            // Diagnostic — if we somehow got a response but parsed 0 cards,
+            // log the top-level keys so we can see what shape we're missing.
+            console.warn('[moxfield import] parsed 0 cards from response. Top keys:', Object.keys(data || {}).join(','));
+        }
 
         res.json(result);
     } catch (err) {
