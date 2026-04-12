@@ -106,7 +106,7 @@ export default function CardSearch({ onClose, mode }) {
                 </div>
             </div>
             {hover && createPortal(
-                <div className="card-zoom" style={{ left: hover.x, top: hover.y }}>
+                <div className="card-zoom" style={{ position: 'fixed', left: hover.x, top: hover.y, zIndex: 2600, pointerEvents: 'none' }}>
                     <img src={hover.url} alt="" />
                 </div>,
                 document.body
