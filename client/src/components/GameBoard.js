@@ -2070,7 +2070,7 @@ function ProliferateModal({ players, onClose, onSubmit }) {
                     type: 'player',
                     id: p.userId,
                     counters: pCounters,
-                    selected: true,
+                    selected: false,
                     chosenCounter: pCounters[0].name,
                 });
             }
@@ -2084,7 +2084,7 @@ function ProliferateModal({ players, onClose, onSubmit }) {
                         type: 'card',
                         id: card.instanceId,
                         counters: cEntries,
-                        selected: true,
+                        selected: false,
                         chosenCounter: cEntries[0].name,
                     });
                 }
