@@ -103,6 +103,10 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     // GameBoard reads from it inside the throttled mousemove handler without
     // triggering rerenders.
     const penStateRef = useRef({ enabled: false, color: '#ff0000', tool: 'pen' });
+    // Keep avatar color in a ref so the cursor emit (inside a long-lived
+    // useEffect closure) always reads the latest value without needing to
+    // re-register the mousemove handler on every avatarColor change.
+    const avatarColorRef = useRef(null);
     // Last cursor position (0..1 normalized). Used to re-emit a cursorMove
     // immediately when the pen color changes, so viewers see the new color
     // without having to wait for the next mouse movement.
@@ -195,10 +199,11 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
             // current brush color so other players see who's drawing what.
             // Eraser uses default hash color (no tint needed).
             // When actively drawing with the pen, use the brush color. Otherwise
-            // send the user's avatar color so spectators (who aren't in the
-            // players array) still get their cursor colored correctly.
+            // send the user's avatar color via ref (not the closure-captured
+            // `me` which goes stale since this useEffect only re-runs on
+            // cursorsEligible changes).
             const pen = penStateRef.current;
-            const color = pen.enabled && pen.tool === 'pen' ? pen.color : (me?.avatarColor || undefined);
+            const color = pen.enabled && pen.tool === 'pen' ? pen.color : (avatarColorRef.current || undefined);
             lastCursorPosRef.current = { x, y, aspectRatio: rect.width / rect.height };
             socket.emit('cursorMove', { x, y, aspectRatio: rect.width / rect.height, color });
         };
@@ -326,6 +331,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         : null;
 
     const me = gameState.players.find(p => p.userId === user.id);
+    avatarColorRef.current = me?.avatarColor || null;
     const isHost = gameState.hostId === user.id;
     const turnPlayer = gameState.players[gameState.turnIndex];
 
