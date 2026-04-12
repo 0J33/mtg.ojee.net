@@ -290,6 +290,8 @@ const SPECTATOR_ALLOWED_EVENTS = new Set([
     // Cursor sharing is purely visual / ephemeral, so spectators can take part
     // (they point at things while they chat). It's not in the mutation set.
     'cursorMove',
+    // Spectator-specific features that don't mutate game state.
+    'setSpectatorPerspective',
     'disconnect', 'disconnecting',
 ]);
 

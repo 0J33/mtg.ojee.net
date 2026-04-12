@@ -338,7 +338,13 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         : null;
 
     const me = gameState.players.find(p => p.userId === user.id);
-    avatarColorRef.current = me?.avatarColor || null;
+    // For spectators, me is null (not in players array). Fall back to
+    // localStorage so their cursor still shows their chosen color.
+    if (me?.avatarColor) {
+        avatarColorRef.current = me.avatarColor;
+    } else if (!avatarColorRef.current) {
+        try { avatarColorRef.current = localStorage.getItem(`mtg_avatarColor_${user.id}`) || null; } catch (_) {}
+    }
     const isHost = gameState.hostId === user.id;
     const turnPlayer = gameState.players[gameState.turnIndex];
 
