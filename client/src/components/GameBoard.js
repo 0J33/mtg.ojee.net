@@ -87,8 +87,12 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     // with the default desktop grid. Persisted so the user's preference
     // survives reloads.
     const [cursorShareEnabled, setCursorShareEnabled] = useState(() => {
-        try { return localStorage.getItem('mtg_cursorShare') !== '0'; }
-        catch (_) { return true; }
+        try {
+            const stored = localStorage.getItem('mtg_cursorShare');
+            if (stored !== null) return stored !== '0';
+        } catch (_) {}
+        // Default: on for players, off for spectators
+        return !isSpectator;
     });
     const gameBoardRef = useRef(null);
     // Shared ref between GameBoard and DrawingCanvas so the cursor broadcaster
@@ -444,10 +448,13 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 label: 'Reveal entire hand to all',
                 onClick: () => socket.emit('revealHand', { targetPlayerIds: 'all' }, () => {}),
             },
-            ...gameState.players.filter(p => p.userId !== user.id).map(p => ({
-                label: `Reveal entire hand to ${p.username}`,
-                onClick: () => socket.emit('revealHand', { targetPlayerIds: [p.userId] }, () => {}),
-            })),
+            {
+                label: 'Reveal entire hand to...',
+                onClick: () => setPendingAction({
+                    type: 'revealHandTo',
+                    message: 'Click a player to reveal your hand to',
+                }),
+            },
             {
                 label: 'Reveal specific cards from hand...',
                 onClick: () => setRevealPickerOpen(true),
@@ -670,6 +677,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 instanceId: sourceInstanceId,
                 targetPlayerIds: [targetPlayer.userId],
             });
+        } else if (type === 'revealHandTo') {
+            socket.emit('revealHand', { targetPlayerIds: [targetPlayer.userId] });
         }
         setPendingAction(null);
     }, [pendingAction]);
@@ -871,6 +880,9 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                         <div key={s.userId} className={`spectator-list-row ${s.connected ? 'online' : 'offline'}`}>
                                             <span className={`dot ${s.connected ? 'online' : 'offline'}`} />
                                             {s.username}
+                                            {isHost && (
+                                                <button className="spectator-kick-btn" title={`Kick ${s.username}`} onClick={(e) => { e.stopPropagation(); socket.emit('kickSpectator', { targetUserId: s.userId }); }}>x</button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>

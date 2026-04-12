@@ -63,6 +63,7 @@ function createCardInstance(cardData, overrides = {}) {
         // The "from" zone the card was in just before being put into a temp
         // zone (foretell pile, exile from blink). Used to return it.
         returnZone: null,
+        rotated180: false,
         ...overrides,
     };
 }

@@ -707,7 +707,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ─── CARD ────────────────────────────────────────────────── */
 .card-wrapper { display: inline-block; position: relative; }
 .card-wrapper.selected .card { outline: 2px solid var(--accent); outline-offset: 1px; box-shadow: 0 0 14px rgba(212, 175, 111, 0.6); }
-.card { width: var(--card-w, 70px); height: var(--card-h, 98px); border-radius: 3px; overflow: hidden; cursor: pointer; position: relative; transition: transform 0.15s; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+.card { width: var(--card-w, 70px); height: var(--card-h, 98px); border-radius: 5px; overflow: hidden; cursor: pointer; position: relative; transition: transform 0.15s; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.5); background: #000; }
 .card img { width: 100%; height: 100%; object-fit: cover; }
 .card:hover { z-index: 10; outline: 1px solid var(--accent); }
 .card.tapped { transform: rotate(90deg); margin: calc(var(--card-h, 98px) * 0.14) calc(var(--card-h, 98px) * 0.14); }
@@ -865,7 +865,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .quick-counts button { min-width: 40px; }
 
 /* ─── COUNTER MODAL ───────────────────────────────────────── */
-.counter-modal { max-width: 460px; }
+.counter-modal { max-width: 460px; z-index: 3100; }
 .counter-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0; }
 .counter-presets button.active { background: var(--accent); color: #000; border-color: var(--accent); }
 .counter-preset-custom { display: inline-flex; align-items: stretch; }
@@ -2072,6 +2072,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-goad-badge { bottom: 2px; left: 2px; background: #d35400; }
 .card-temp-control-badge { bottom: 2px; right: 2px; background: #2980b9; }
 
+.card.rotated-180 img { transform: rotate(180deg); }
 .card.phased-out img { opacity: 0.35; filter: grayscale(0.6); }
 .card.attacking { box-shadow: 0 0 0 2px #e74c3c, 0 0 12px rgba(231, 76, 60, 0.5); }
 .card.temp-controlled { box-shadow: 0 0 0 2px #2980b9; }

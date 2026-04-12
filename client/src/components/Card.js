@@ -80,7 +80,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         <>
             <div
                 ref={cardRef}
-                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''}`}
+                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''} ${card.rotated180 ? 'rotated-180' : ''}`}
                 onClick={onClick}
                 onContextMenu={onContextMenu}
                 onMouseEnter={handleMouseEnter}

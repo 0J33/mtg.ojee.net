@@ -139,9 +139,24 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
         })
         : sourceList;
 
+    // Parse CMC from mana cost string for sorting (e.g. "{2}{W}{W}" → 4)
+    const parseCmc = (card) => {
+        const cost = card.manaCost || '';
+        let cmc = 0;
+        const tokens = cost.match(/\{[^}]+\}/g) || [];
+        for (const tok of tokens) {
+            const inner = tok.slice(1, -1);
+            if (/^\d+$/.test(inner)) cmc += parseInt(inner);
+            else if (inner !== 'X') cmc += 1;
+        }
+        return cmc;
+    };
+
     const filtered = sortMode === 'alphabetical'
         ? [...baseList].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-        : baseList;
+        : sortMode === 'cmc'
+            ? [...baseList].sort((a, b) => parseCmc(a) - parseCmc(b) || (a.name || '').localeCompare(b.name || ''))
+            : baseList;
 
     // In deck view, group cards by zone for the header labels.
     const ZONE_LABELS = {
@@ -170,8 +185,13 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                             <button
                                 className={`small-btn ${sortMode === 'alphabetical' ? 'primary-btn' : ''}`}
                                 onClick={() => setSortMode(sortMode === 'alphabetical' ? 'order' : 'alphabetical')}
-                                title="Toggle alphabetical sort"
+                                title="Sort alphabetically"
                             >A→Z</button>
+                            <button
+                                className={`small-btn ${sortMode === 'cmc' ? 'primary-btn' : ''}`}
+                                onClick={() => setSortMode(sortMode === 'cmc' ? 'order' : 'cmc')}
+                                title="Sort by mana cost"
+                            >CMC</button>
                             <label className="shuffle-toggle" title="Shuffle the library when you close this modal">
                                 <input type="checkbox" checked={shuffleOnClose} onChange={e => setShuffleOnClose(e.target.checked)} />
                                 Shuffle after close
@@ -224,7 +244,7 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                     <div className="library-grid">
                         {filtered.map(card => (
                             <div key={card.instanceId} className="library-card-entry">
-                                <Card card={card} onClick={() => onMaximizeCard?.(card)} />
+                                <Card card={{ ...card, tapped: false, faceDown: false }} onClick={() => onMaximizeCard?.(card)} />
                                 <div className="library-card-name muted">{card.name}</div>
                             </div>
                         ))}

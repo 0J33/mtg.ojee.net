@@ -207,9 +207,13 @@ function broadcastRoomState(io, room) {
         }
     }
     // Spectators get a state flagged isSpectator — hands are visible, UI goes read-only.
+    // If the spectator has set a perspective, pass it through so they only see that player's hand.
     for (const spec of (room.spectators || [])) {
         if (spec.socketId) {
-            io.to(spec.socketId).emit('gameState', getRoomStateForPlayer(room, spec.userId, { isSpectator: true }));
+            io.to(spec.socketId).emit('gameState', getRoomStateForPlayer(room, spec.userId, {
+                isSpectator: true,
+                spectatorPerspectiveOf: spec.perspectiveOf || null,
+            }));
         }
     }
     checkVictory(io, room);
@@ -466,6 +470,22 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
+        socket.on('kickSpectator', ({ targetUserId }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            if (room.hostId !== currentUserId) return callback?.({ error: 'Only host can kick' });
+            const spec = getSpectatorInRoom(room, targetUserId);
+            if (!spec) return callback?.({ error: 'Spectator not found' });
+            if (spec.socketId) {
+                io.to(spec.socketId).emit('kicked', { roomCode: currentRoom });
+                const s = io.sockets.sockets.get(spec.socketId);
+                if (s) s.leave(currentRoom);
+            }
+            room.spectators = (room.spectators || []).filter(s => s.userId !== targetUserId);
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
         socket.on('leaveRoom', (callback) => {
             if (!currentRoom) return callback?.({ error: 'Not in a room' });
             const room = getRoom(currentRoom);
@@ -570,7 +590,7 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true, drawn });
         });
 
-        socket.on('moveCard', ({ instanceId, fromZone, toZone, targetPlayerId, x, y, faceDown }, callback) => {
+        socket.on('moveCard', ({ instanceId, fromZone, toZone, targetPlayerId, x, y, faceDown, libraryPosition }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
 
@@ -608,6 +628,18 @@ module.exports = function registerSocketHandlers(io) {
                 cleanupAttachments(room, card);
             }
 
+            // Tokens cease to exist when they leave the battlefield (MTG rule
+            // 111.8). Don't push them into graveyard/exile/hand — just drop.
+            if (card.isToken && fromZone === 'battlefield' && toZone !== 'battlefield') {
+                addAction(room, currentUserId, 'moveCard', {
+                    cardName: card.name, fromZone, toZone: '(destroyed — token)',
+                    fromPlayer: sourcePlayer.username,
+                    toPlayer: (targetPlayerId ? getPlayerInRoom(room, targetPlayerId)?.username : sourcePlayer.username) || '',
+                });
+                broadcastRoomState(io, room);
+                return callback?.({ success: true });
+            }
+
             // Update card properties
             if (x !== undefined) card.x = x;
             if (y !== undefined) card.y = y;
@@ -619,8 +651,12 @@ module.exports = function registerSocketHandlers(io) {
                 targetPlayer.commanderDeaths++;
             }
 
-            // Add to target zone
-            targetPlayer.zones[toZone].push(card);
+            // Add to target zone. Library supports explicit top/bottom placement.
+            if (toZone === 'library' && libraryPosition === 'top') {
+                targetPlayer.zones[toZone].unshift(card);
+            } else {
+                targetPlayer.zones[toZone].push(card);
+            }
 
             // Satisfy "did you play a land?" nudge when a land enters the
             // battlefield from the owner's hand. We only count it for the
@@ -697,6 +733,11 @@ module.exports = function registerSocketHandlers(io) {
                             const [card] = zone.splice(i, 1);
                             if (zoneName === 'battlefield' && toZone !== 'battlefield') {
                                 cleanupAttachments(room, card);
+                            }
+                            // Tokens cease to exist when leaving the battlefield
+                            if (card.isToken && zoneName === 'battlefield' && toZone !== 'battlefield') {
+                                moved++;
+                                continue; // don't push to destination zone
                             }
                             if (toZone !== 'battlefield') { card.x = 0; card.y = 0; card.tapped = false; }
                             const dest = targetPlayer || player;
@@ -2013,7 +2054,7 @@ module.exports = function registerSocketHandlers(io) {
         // a malicious client from setting arbitrary fields on cards.
         const ALLOWED_CARD_FIELDS = new Set([
             'damage', 'phasedOut', 'suspendCounters', 'goaded',
-            'attackingPlayerId', 'controllerOriginal', 'attachedTo',
+            'attackingPlayerId', 'controllerOriginal', 'attachedTo', 'rotated180',
         ]);
         socket.on('setCardField', ({ instanceId, field, value }, callback) => {
             const room = getRoom(currentRoom);
@@ -2024,7 +2065,7 @@ module.exports = function registerSocketHandlers(io) {
 
             if (field === 'damage' || field === 'suspendCounters') {
                 card[field] = clampGameValue(value, { allowNegative: false });
-            } else if (field === 'phasedOut' || field === 'goaded') {
+            } else if (field === 'phasedOut' || field === 'goaded' || field === 'rotated180') {
                 card[field] = !!value;
             } else if (field === 'attackingPlayerId' || field === 'controllerOriginal' || field === 'attachedTo') {
                 card[field] = value || null;

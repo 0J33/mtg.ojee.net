@@ -259,6 +259,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         // Battlefield-only state actions
         const stateActionItems = (zone === 'battlefield') ? [
             { divider: true },
+            { label: card.rotated180 ? 'Unrotate' : 'Rotate 180°', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'rotated180', value: !card.rotated180 }) },
             { label: card.phasedOut ? 'Phase in' : 'Phase out', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'phasedOut', value: !card.phasedOut }) },
             { label: card.goaded ? 'Remove goad' : 'Goad', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'goaded', value: !card.goaded }) },
             { label: `Mark damage... (${card.damage || 0})`, onClick: () => onShowCardFieldEditor?.(card, 'damage') },
@@ -290,10 +291,14 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             ...combatItems,
             ...castFromZoneItems,
             { divider: true },
-            ...zones.filter(z => z !== zone).map(z => ({
+            ...zones.filter(z => z !== zone && z !== 'library').map(z => ({
                 label: `Move to ${z === 'commandZone' ? 'Command Zone' : z}`,
                 onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: z }),
             })),
+            ...(zone !== 'library' ? [
+                { label: 'To top of library', onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: 'library', libraryPosition: 'top' }) },
+                { label: 'To bottom of library', onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: 'library' }) },
+            ] : []),
             { divider: true },
             // Single unified "Flip" action. DFC cards swap sides; one-sided
             // cards toggle face-down. One button for everything.
@@ -452,10 +457,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             )}
             <div className="player-header"
                 onContextMenu={spectating ? undefined : onPlayerContextMenu}
-                onClick={pendingAction && (pendingAction.type === 'attack' || pendingAction.type === 'revealTo') && player.userId !== userId
+                onClick={pendingAction && (pendingAction.type === 'attack' || pendingAction.type === 'revealTo' || pendingAction.type === 'revealHandTo') && player.userId !== userId
                     ? (e) => { e.stopPropagation(); onResolvePendingPlayer?.(player); }
                     : undefined}
-                style={pendingAction && (pendingAction.type === 'attack' || pendingAction.type === 'revealTo') && player.userId !== userId
+                style={pendingAction && (pendingAction.type === 'attack' || pendingAction.type === 'revealTo' || pendingAction.type === 'revealHandTo') && player.userId !== userId
                     ? { cursor: 'crosshair' }
                     : undefined}
             >
@@ -536,9 +541,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
                 <div className="player-counters">
                     {Object.entries(player.counters || {}).filter(([, v]) => v > 0).map(([name, val]) => (
-                        <span key={name} className="player-counter-badge" title={name}
+                        <span key={name} className="player-counter-badge" title={`${name} · click +1 · right-click -1 · middle-click remove`}
                             onClick={spectating ? undefined : () => socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : val + 1 })}
-                            onContextMenu={spectating ? (e) => e.preventDefault() : (e) => { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : Math.max(0, val - 1) }); }}>
+                            onContextMenu={spectating ? (e) => e.preventDefault() : (e) => { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : Math.max(0, val - 1) }); }}
+                            onMouseDown={spectating ? undefined : (e) => { if (e.button === 1) { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: 0 }); } }}>
                             {name}: {fmtNum(val)}
                         </span>
                     ))}
@@ -566,8 +572,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     if (t.includes('creature')) return 'creatures';
                     if (t.includes('land')) return 'lands';
                     if (t.includes('planeswalker')) return 'creatures';
-                    if (t.includes('artifact') || t.includes('enchantment')) return 'artifacts';
-                    return 'other';
+                    if (t.includes('artifact') || t.includes('enchantment') || t.includes('battle') || t.includes('kindred')) return 'artifacts';
+                    // Instant / sorcery / anything else — still goes to artifacts
+                    // row to avoid a lonely "other" row with one card in it.
+                    return 'artifacts';
                 };
                 const groups = { creatures: [], artifacts: [], lands: [], other: [] };
                 for (const c of bf) groups[categorize(c)].push(c);
