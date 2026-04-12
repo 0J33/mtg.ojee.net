@@ -46,7 +46,7 @@ function computeRect(containerW, containerH, strokeAR) {
     return { offsetX: (containerW - rectW) / 2, offsetY: (containerH - rectH) / 2, rectW, rectH };
 }
 
-export default function Cursors({ containerRef, currentUserId }) {
+export default function Cursors({ containerRef, currentUserId, players }) {
     // Map of userId -> { x, y, aspectRatio, username, isSpectator, ts }
     const [cursors, setCursors] = useState(() => new Map());
     // Re-render on a slow timer so stale cursors fade out even when nobody is
@@ -144,9 +144,10 @@ export default function Cursors({ containerRef, currentUserId }) {
                 username: c.username,
                 isSpectator: c.isSpectator,
                 // Prefer the sender's provided color (pen-active); fall back
-                // to the stable hash-derived hue so idle cursors still have
-                // a consistent, per-user color across sessions.
-                color: c.color || `hsl(${hueFor(userId)} 70% 55%)`,
+                // to the player's avatar color; last resort is hash-derived.
+                color: c.color
+                    || (players || []).find(p => p.userId === userId)?.avatarColor
+                    || `hsl(${hueFor(userId)} 70% 55%)`,
                 opacity,
             });
         }

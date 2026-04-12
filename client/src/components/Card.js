@@ -67,6 +67,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const goaded = !!card.goaded;
     const attacking = !!card.attackingPlayerId;
     const tempControlled = !!card.controllerOriginal;
+    const attached = !!card.attachedTo;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (
@@ -95,6 +96,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                 {suspendCount > 0 && <div className="card-suspend-badge" title={`${suspendCount} time counter(s)`}>⌛{suspendCount}</div>}
                 {goaded && <div className="card-goad-badge" title="Goaded — must attack">⚔</div>}
                 {tempControlled && <div className="card-temp-control-badge" title="Under temporary control (returns end of turn)">↶</div>}
+                {attached && <div className="card-attached-badge" title="Attached (equipped/enchanted)">⚔</div>}
             </div>
 
             {/* Hover zoom + side effects panel */}

@@ -65,7 +65,6 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [victoryAnim, setVictoryAnim] = useState(null); // { username, ts }
     // Big-batch modals — all hidden behind hovers/menus, no permanent UI footprint.
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-    const [manaPickerCard, setManaPickerCard] = useState(null);            // { card }
     const [cardFieldEditor, setCardFieldEditor] = useState(null);          // { card, field }
     const [emblemAdderTarget, setEmblemAdderTarget] = useState(null);      // playerId
     const [browseLibraryFor, setBrowseLibraryFor] = useState(null);        // { player, library }
@@ -623,17 +622,6 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     };
 
     // ─── Big-batch action handlers (all wired as props into PlayerZone) ───
-    const handleTapForMana = (card) => {
-        // Try the auto path first; if the server says requiresPicker we open
-        // the ManaPicker modal so the user can pick which colors this land
-        // produces (e.g. shocklands, taplands, dual lands without producedMana).
-        socket.emit('tapForMana', { instanceId: card.instanceId }, (res) => {
-            if (res?.success) return;
-            if (res?.requiresPicker) { setManaPickerCard({ card }); return; }
-            if (res?.error) dialog.alert(res.error, { title: 'Tap for mana' });
-        });
-    };
-
     const handleCloneCard = (card) => {
         socket.emit('cloneCard', { instanceId: card.instanceId }, (res) => {
             if (res?.error) dialog.alert(res.error, { title: 'Clone' });
@@ -909,7 +897,6 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                     onShowCardFieldEditor={handleShowCardFieldEditor}
                                     onTakeControl={handleTakeControl}
                                     onCastFromZone={handleCastFromZone}
-                                    onTapForMana={handleTapForMana}
                                     onForetellCard={handleForetell}
                                     onCastForetold={handleCastForetold}
                                 />
@@ -1018,7 +1005,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 non-compact) viewers. Incoming events are still received by
                 everyone but the component won't mount outside eligibility. */}
             {cursorsEligible && (
-                <Cursors containerRef={gameBoardRef} currentUserId={user.id} />
+                <Cursors containerRef={gameBoardRef} currentUserId={user.id} players={gameState.players} />
             )}
 
             {/* Guide / How-to-play */}
@@ -1253,19 +1240,6 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     teams={gameState.teams || []}
                     me={me}
                     onClose={() => setSettingsModalOpen(false)}
-                />
-            )}
-
-            {manaPickerCard && (
-                <ManaPickerModal
-                    card={manaPickerCard.card}
-                    onClose={() => setManaPickerCard(null)}
-                    onConfirm={(colors) => {
-                        socket.emit('tapForMana', { instanceId: manaPickerCard.card.instanceId, colors }, (res) => {
-                            if (res?.error) dialog.alert(res.error, { title: 'Tap for mana' });
-                            setManaPickerCard(null);
-                        });
-                    }}
                 />
             )}
 
@@ -1744,72 +1718,48 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
 
                 <div className="settings-section">
                     <strong>Teams</strong>
-                    <label>
+                    <label className="settings-checkbox-row">
                         <input type="checkbox" checked={shared} onChange={e => setShared(e.target.checked)} disabled={!isHost} />
-                        Shared life across teammates
+                        <span>Shared life across teammates {!isHost && <span className="muted">(host only)</span>}</span>
                     </label>
-                    <label>My team ID
-                        <input type="text" value={teamId} onChange={e => setTeamId(e.target.value)} placeholder="e.g. A or red" />
-                    </label>
+                    <div className="settings-team-picker">
+                        <label>My team
+                            {teams?.length > 0 ? (
+                                <select value={teamId} onChange={e => setTeamId(e.target.value)}>
+                                    <option value="">None</option>
+                                    {teams.map(t => (
+                                        <option key={t.teamId} value={t.teamId}>{t.name}</option>
+                                    ))}
+                                    <option value="__new__">+ New team...</option>
+                                </select>
+                            ) : (
+                                <input type="text" value={teamId} onChange={e => setTeamId(e.target.value)} placeholder="Team name / ID" />
+                            )}
+                        </label>
+                        {teamId === '__new__' && (
+                            <label>New team name
+                                <input type="text" autoFocus placeholder="e.g. Red, Alpha, 1" onChange={e => setTeamId(e.target.value)} />
+                            </label>
+                        )}
+                    </div>
                     {teams?.length > 0 && (
-                        <div className="muted" style={{ fontSize: 11 }}>
-                            Existing teams: {teams.map(t => `${t.name}${t.sharedLife != null ? ` (${t.sharedLife})` : ''}`).join(', ')}
+                        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                            Teams: {teams.map(t => t.name).join(', ')}
                         </div>
                     )}
                 </div>
 
                 <div className="settings-section">
                     <strong>My avatar color</strong>
-                    <input type="color" value={colorDraft} onChange={e => setColorDraft(e.target.value)} />
+                    <div className="avatar-color-row">
+                        <input type="color" className="avatar-color-swatch" value={colorDraft} onChange={e => setColorDraft(e.target.value)} />
+                        <span className="avatar-color-preview" style={{ background: colorDraft }} />
+                    </div>
                 </div>
 
                 <div className="modal-actions">
                     <button onClick={onClose}>Cancel</button>
                     <button onClick={save} className="primary-btn">Save</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ManaPickerModal({ card, onClose, onConfirm }) {
-    useEscapeKey(onClose);
-    const [picked, setPicked] = useState([]);
-    const COLORS = [['W', 'White'], ['U', 'Blue'], ['B', 'Black'], ['R', 'Red'], ['G', 'Green'], ['C', 'Colorless']];
-    const togglePick = (c) => {
-        setPicked(prev => {
-            // Allow duplicates so e.g. Cabal Coffers picking BB is two clicks.
-            const next = [...prev];
-            const idx = next.indexOf(c);
-            if (idx !== -1) next.splice(idx, 1);
-            else next.push(c);
-            return next;
-        });
-    };
-    const addOne = (c) => setPicked(prev => [...prev, c]);
-    return (
-        <div className="modal-overlay">
-            <div className="modal mana-picker-modal">
-                <div className="modal-header">
-                    <h3>Tap {card.name} for which mana?</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
-                </div>
-                <p className="muted">Click each color to add it (e.g. WG for a Stomping Ground). Click again to remove.</p>
-                <div className="mana-picker-grid">
-                    {COLORS.map(([c, label]) => (
-                        <button key={c} type="button" className={`mana-pick-btn ${picked.includes(c) ? 'picked' : ''}`} onClick={() => togglePick(c)}>
-                            <img src={`https://svgs.scryfall.io/card-symbols/${c}.svg`} alt={c} className="mana-sym-img" />
-                            <span>{label}</span>
-                            <button type="button" className="small-btn" onClick={(e) => { e.stopPropagation(); addOne(c); }}>+</button>
-                        </button>
-                    ))}
-                </div>
-                <div className="mana-picker-summary">
-                    Selected: {picked.length === 0 ? <span className="muted">none</span> : picked.join(' ')}
-                </div>
-                <div className="modal-actions">
-                    <button onClick={onClose}>Cancel</button>
-                    <button className="primary-btn" disabled={picked.length === 0} onClick={() => onConfirm(picked)}>Tap</button>
                 </div>
             </div>
         </div>

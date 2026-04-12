@@ -1988,7 +1988,7 @@ module.exports = function registerSocketHandlers(io) {
         // a malicious client from setting arbitrary fields on cards.
         const ALLOWED_CARD_FIELDS = new Set([
             'damage', 'phasedOut', 'suspendCounters', 'goaded',
-            'attackingPlayerId', 'controllerOriginal',
+            'attackingPlayerId', 'controllerOriginal', 'attachedTo',
         ]);
         socket.on('setCardField', ({ instanceId, field, value }, callback) => {
             const room = getRoom(currentRoom);

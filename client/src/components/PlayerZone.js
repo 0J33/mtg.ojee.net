@@ -10,32 +10,39 @@ import { useEscapeKey, useHorizontalWheel, fmtNum, parseGameValue, isInfinite, I
 // most MTG players expect, with colorless on the right.
 const MANA_COLORS = ['W', 'U', 'B', 'R', 'G', 'C'];
 
-// Pool widget — small inline strip in the player header. Shows each color
-// only when its count > 0; clicking subtracts one (mana spent), shift-click
-// adds one (manual fix-up). Owner-only interaction.
+// Manual mana counter — always visible for the owner, shows each WUBRG+C
+// color with +/- buttons. Other players only see it when non-zero. The user
+// adds/removes mana manually; there's no automatic tap-for-mana flow.
 function ManaPoolWidget({ pool, isOwner, playerId, spectating }) {
     if (!pool) return null;
     const totals = MANA_COLORS.map(c => [c, pool[c] || 0]);
     const anyMana = totals.some(([, v]) => v > 0);
-    if (!anyMana && !isOwner) return null;
+    // Opponents see nothing when the pool is empty.
+    if (!isOwner && !anyMana) return null;
     const adjust = (color, delta) => {
         if (spectating) return;
         socket.emit('addMana', { targetPlayerId: playerId, color, amount: delta });
     };
     return (
-        <div className="mana-pool-widget" title="Mana pool — click to spend, shift-click to add">
-            {totals.filter(([, v]) => v > 0).map(([c, v]) => (
-                <span
-                    key={c}
-                    className={`mana-pool-pip mana-${c}`}
-                    onClick={isOwner ? (e) => adjust(c, e.shiftKey ? 1 : -1) : undefined}
-                    onContextMenu={isOwner ? (e) => { e.preventDefault(); adjust(c, 1); } : undefined}
-                >
-                    <img src={`https://svgs.scryfall.io/card-symbols/${c}.svg`} alt={c} className="mana-sym-img" />
-                    <span className="mana-pool-count">{v}</span>
-                </span>
-            ))}
-            {isOwner && anyMana && (
+        <div className="mana-pool-widget" title="Mana pool — click + to add, - to spend">
+            {MANA_COLORS.map(c => {
+                const v = pool[c] || 0;
+                // For opponents, skip colors with 0 to save space.
+                if (!isOwner && v === 0) return null;
+                return (
+                    <span key={c} className={`mana-pool-pip mana-${c} ${v > 0 ? 'has-mana' : ''}`}>
+                        {isOwner && !spectating && (
+                            <button className="mana-btn" onClick={() => adjust(c, -1)} disabled={v <= 0}>-</button>
+                        )}
+                        <img src={`https://svgs.scryfall.io/card-symbols/${c}.svg`} alt={c} className="mana-sym-img" />
+                        <span className="mana-pool-count">{v}</span>
+                        {isOwner && !spectating && (
+                            <button className="mana-btn" onClick={() => adjust(c, 1)}>+</button>
+                        )}
+                    </span>
+                );
+            })}
+            {isOwner && anyMana && !spectating && (
                 <button
                     className="mana-pool-clear"
                     title="Empty mana pool"
@@ -46,7 +53,7 @@ function ManaPoolWidget({ pool, isOwner, playerId, spectating }) {
     );
 }
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onAddEmblem, onShowEmblem, onShowCardFieldEditor, onTakeControl, onCastFromZone, onTapForMana, onForetellCard, onCastForetold }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold }) {
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -127,12 +134,6 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         ] : [];
 
         // ─── Big batch additions: zone-aware menu items ────────────────
-        // Tap-for-mana — battlefield only, cards that don't have tappedFor.
-        // For non-basic lands the server returns requiresPicker; the client
-        // then opens the ManaPicker modal.
-        const tapManaItems = (zone === 'battlefield' && !card.tapped) ? [
-            { label: 'Tap for mana', onClick: () => onTapForMana?.(card) },
-        ] : [];
 
         // Cast from non-battlefield zones with optional auto-exile.
         const castFromZoneItems = (zone === 'graveyard' || zone === 'exile' || zone === 'foretell') ? [
@@ -218,6 +219,23 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             }] : []),
         ] : [];
 
+        // Equip / Attach — find other battlefield cards this card could
+        // attach to. Show a submenu with each candidate. Detach if already
+        // attached. Works for auras, equipment, fortifications.
+        const allBfCards = (player.zones.battlefield || []).filter(c => c.instanceId !== card.instanceId);
+        const attachItems = (zone === 'battlefield') ? [
+            ...(card.attachedTo ? [
+                { label: 'Detach', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'attachedTo', value: null }) },
+            ] : []),
+            ...(allBfCards.length > 0 ? [
+                { divider: true },
+                ...allBfCards.slice(0, 15).map(target => ({
+                    label: `Attach to ${target.name || 'card'}${card.attachedTo === target.instanceId ? ' ✓' : ''}`,
+                    onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'attachedTo', value: target.instanceId }),
+                })),
+            ] : []),
+        ] : [];
+
         // Battlefield-only state actions
         const stateActionItems = (zone === 'battlefield') ? [
             { divider: true },
@@ -226,6 +244,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             { label: `Mark damage... (${card.damage || 0})`, onClick: () => onShowCardFieldEditor?.(card, 'damage') },
             { label: `Suspend counters... (${card.suspendCounters || 0})`, onClick: () => onShowCardFieldEditor?.(card, 'suspendCounters') },
             { label: 'Clone (token)', onClick: () => onCloneCard?.(card) },
+            ...attachItems,
             ...(card.controllerOriginal ? [
                 { label: 'Return to original owner', onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: 'battlefield', toZone: 'battlefield', targetPlayerId: card.controllerOriginal }) },
             ] : []),
@@ -243,7 +262,6 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 label: card.tapped ? 'Untap' : 'Tap',
                 onClick: () => socket.emit('tapCard', { instanceId: card.instanceId }),
             },
-            ...tapManaItems,
             ...foretellItems,
             ...stackPushItems,
             ...adventureItems,
