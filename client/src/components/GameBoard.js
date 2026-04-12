@@ -709,10 +709,9 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         setCardFieldEditor({ card, field });
     };
 
+    const [proliferateModalOpen, setProliferateModalOpen] = useState(false);
     const handleProliferate = () => {
-        socket.emit('proliferate', (res) => {
-            if (res?.error) dialog.alert(res.error, { title: 'Proliferate' });
-        });
+        setProliferateModalOpen(true);
     };
 
     const handleConcede = async () => {
@@ -1425,6 +1424,19 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 />
             )}
 
+            {proliferateModalOpen && (
+                <ProliferateModal
+                    players={gameState.players}
+                    onClose={() => setProliferateModalOpen(false)}
+                    onSubmit={(targets) => {
+                        socket.emit('proliferate', { targets }, (res) => {
+                            if (res?.error) dialog.alert(res.error, { title: 'Proliferate' });
+                        });
+                        setProliferateModalOpen(false);
+                    }}
+                />
+            )}
+
             {/* Stack panel (room-level). Renders inline when non-empty + open. */}
             {Array.isArray(gameState.stack) && gameState.stack.length > 0 && stackPanelOpen && (
                 <StackPanel
@@ -2031,6 +2043,105 @@ function MulliganBottomModal({ hand, need, onSubmit }) {
                 <div className="modal-actions">
                     <button className="primary-btn" disabled={picked.length !== need} onClick={() => onSubmit(picked)}>
                         Bottom {picked.length}/{need}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ProliferateModal({ players, onClose, onSubmit }) {
+    useEscapeKey(onClose);
+    // Gather every permanent and player that has at least one counter.
+    // Each entry: { key, label, type, id, counters: [{name, value}], selected, chosenCounter }
+    const [items, setItems] = useState(() => {
+        const list = [];
+        for (const p of players) {
+            // Player counters
+            const pCounters = [];
+            for (const [k, v] of Object.entries(p.counters || {})) {
+                if (v > 0) pCounters.push({ name: k, value: v });
+            }
+            if ((p.infect || 0) > 0) pCounters.push({ name: 'infect', value: p.infect });
+            if (pCounters.length > 0) {
+                list.push({
+                    key: `player-${p.userId}`,
+                    label: p.username,
+                    type: 'player',
+                    id: p.userId,
+                    counters: pCounters,
+                    selected: true,
+                    chosenCounter: pCounters[0].name,
+                });
+            }
+            // Card counters on battlefield
+            for (const card of (p.zones?.battlefield || [])) {
+                const cEntries = Object.entries(card.counters || {}).filter(([, v]) => v > 0).map(([k, v]) => ({ name: k, value: v }));
+                if (cEntries.length > 0) {
+                    list.push({
+                        key: `card-${card.instanceId}`,
+                        label: card.name || 'Card',
+                        type: 'card',
+                        id: card.instanceId,
+                        counters: cEntries,
+                        selected: true,
+                        chosenCounter: cEntries[0].name,
+                    });
+                }
+            }
+        }
+        return list;
+    });
+
+    const toggle = (key) => setItems(prev => prev.map(it => it.key === key ? { ...it, selected: !it.selected } : it));
+    const setCounter = (key, counter) => setItems(prev => prev.map(it => it.key === key ? { ...it, chosenCounter: counter } : it));
+
+    const submit = () => {
+        const targets = items.filter(it => it.selected).map(it => ({
+            type: it.type,
+            id: it.id,
+            counter: it.chosenCounter,
+        }));
+        onSubmit(targets);
+    };
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal" style={{ maxWidth: 500, maxHeight: '80vh', overflowY: 'auto' }}>
+                <div className="modal-header">
+                    <h3>Proliferate</h3>
+                    <button className="close-btn" onClick={onClose}>x</button>
+                </div>
+                <p className="muted" style={{ marginTop: 0 }}>
+                    Choose which counters to add +1 to. Uncheck items you want to skip.
+                </p>
+                {items.length === 0 && <p className="muted">Nothing has counters on it.</p>}
+                <div className="proliferate-list">
+                    {items.map(it => (
+                        <label key={it.key} className={`proliferate-row ${it.selected ? '' : 'deselected'}`}>
+                            <input type="checkbox" checked={it.selected} onChange={() => toggle(it.key)} />
+                            <span className="proliferate-name">{it.label}</span>
+                            {it.counters.length === 1 ? (
+                                <span className="proliferate-counter">{it.counters[0].name} ({it.counters[0].value} → {it.counters[0].value + 1})</span>
+                            ) : (
+                                <select
+                                    value={it.chosenCounter}
+                                    onChange={e => setCounter(it.key, e.target.value)}
+                                    onClick={e => e.stopPropagation()}
+                                    disabled={!it.selected}
+                                >
+                                    {it.counters.map(c => (
+                                        <option key={c.name} value={c.name}>{c.name} ({c.value} → {c.value + 1})</option>
+                                    ))}
+                                </select>
+                            )}
+                        </label>
+                    ))}
+                </div>
+                <div className="modal-actions">
+                    <button onClick={onClose}>Cancel</button>
+                    <button className="primary-btn" onClick={submit} disabled={items.filter(it => it.selected).length === 0}>
+                        Proliferate ({items.filter(it => it.selected).length})
                     </button>
                 </div>
             </div>

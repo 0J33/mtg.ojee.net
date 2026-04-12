@@ -2392,6 +2392,38 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     max-width: 100%;
 }
 
+/* Proliferate modal — interactive picker */
+.proliferate-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.proliferate-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.proliferate-row.deselected { opacity: 0.4; }
+.proliferate-row input[type="checkbox"] { flex-shrink: 0; width: 16px; height: 16px; }
+.proliferate-name { flex: 1; font-weight: 600; }
+.proliferate-counter { color: var(--text-mid, #aaa); font-size: 11px; }
+.proliferate-row select {
+    padding: 2px 6px;
+    font-size: 11px;
+    background: var(--bg-deep, #111);
+    color: var(--text, #ddd);
+    border: 1px solid var(--border, #444);
+    border-radius: 2px;
+}
+
 /* Pending-action banner — pick-target mode indicator */
 .pending-action-banner {
     display: flex;

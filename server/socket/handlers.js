@@ -2136,20 +2136,33 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
-        // Proliferate — for every counter on every permanent and player, add 1.
-        socket.on('proliferate', (callback) => {
+        // Proliferate — accepts a list of specific targets to bump. Each
+        // target is { type: 'card'|'player', id, counter }. The client's
+        // ProliferateModal lets the user pick which counters to add to.
+        socket.on('proliferate', ({ targets }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             let n = 0;
-            for (const p of room.players) {
-                for (const k of Object.keys(p.counters || {})) {
-                    if ((p.counters[k] || 0) > 0) { p.counters[k]++; n++; }
-                }
-                if ((p.infect || 0) > 0) { p.infect++; n++; }
-                for (const card of (p.zones.battlefield || [])) {
-                    if (!card.counters || typeof card.counters !== 'object') continue;
-                    for (const k of Object.keys(card.counters)) {
-                        if ((card.counters[k] || 0) > 0) { card.counters[k]++; n++; }
+            if (Array.isArray(targets)) {
+                for (const t of targets) {
+                    if (t.type === 'card' && t.id && t.counter) {
+                        const card = findCardAnywhere(room, t.id);
+                        if (card) {
+                            if (!card.counters) card.counters = {};
+                            card.counters[t.counter] = (card.counters[t.counter] || 0) + 1;
+                            n++;
+                        }
+                    } else if (t.type === 'player' && t.id && t.counter) {
+                        const player = getPlayerInRoom(room, t.id);
+                        if (player) {
+                            if (t.counter === 'infect') {
+                                player.infect = (player.infect || 0) + 1;
+                            } else {
+                                if (typeof player.counters !== 'object') player.counters = {};
+                                player.counters[t.counter] = (player.counters[t.counter] || 0) + 1;
+                            }
+                            n++;
+                        }
                     }
                 }
             }
