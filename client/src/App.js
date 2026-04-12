@@ -15,7 +15,17 @@ function consumeInviteCode() {
     const m = window.location.pathname.match(/^\/invite\/([A-Za-z0-9]{4,12})\/?$/);
     if (!m) return null;
     const code = m[1].toUpperCase();
-    // Strip the invite segment from the URL immediately so we don't keep auto-joining.
+    try { window.history.replaceState({}, '', '/'); } catch (_) {}
+    return code;
+}
+
+// Parse a /share/{code} URL — opens the import modal with the share code
+// pre-filled so the recipient doesn't have to copy-paste it manually.
+function consumeShareCode() {
+    if (typeof window === 'undefined') return null;
+    const m = window.location.pathname.match(/^\/share\/([A-Za-z0-9]{4,12})\/?$/);
+    if (!m) return null;
+    const code = m[1].toUpperCase();
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
     return code;
 }
@@ -33,6 +43,7 @@ export default function App() {
     const [reconnecting, setReconnecting] = useState(false);
     // Invite code pending auto-join (set once on mount; persisted through login).
     const [pendingInvite, setPendingInvite] = useState(() => consumeInviteCode());
+    const [pendingShare, setPendingShare] = useState(() => consumeShareCode());
 
     useEffect(() => {
         auth.me().then(data => {
@@ -217,6 +228,8 @@ export default function App() {
     if (!gameState) return (
         <Lobby
             user={user}
+            pendingShareCode={pendingShare}
+            onShareConsumed={() => setPendingShare(null)}
             onJoinRoom={(code, opts = {}) => {
                 setRoomCode(code);
                 setIsSpectator(!!opts.asSpectator);

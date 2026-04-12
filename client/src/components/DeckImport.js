@@ -2,16 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { imports, decks } from '../api';
 import { useEscapeKey } from '../utils';
 
-export default function DeckImport({ onImport, onDeckCreated, onClose }) {
+export default function DeckImport({ onImport, onDeckCreated, onClose, initialShareCode }) {
     useEscapeKey(onClose);
     // 'moxfield' = paste a Moxfield deck URL (the default and most common path),
     // 'paste' = paste a raw text decklist, 'share' = enter an 8-char share code.
-    // These live on the same modal instead of three separate lobby buttons so
-    // users only have one "Import" entry point to learn.
-    const [mode, setMode] = useState('moxfield');
+    // If opened via a /share/CODE link, jump straight to the share tab.
+    const [mode, setMode] = useState(initialShareCode ? 'share' : 'moxfield');
     const [text, setText] = useState('');
     const [deckName, setDeckName] = useState('');
-    const [shareCode, setShareCode] = useState('');
+    const [shareCode, setShareCode] = useState(initialShareCode || '');
     const [moxfieldUrl, setMoxfieldUrl] = useState('');
     // Copy = new CustomCard records owned by me, fully independent.
     // Link = keep the original author's ownership; their edits propagate to

@@ -9,7 +9,7 @@ import { useDialog } from './Dialog';
 import { IconPencil, IconShare } from './Icons';
 import { VERSION } from '../version';
 
-export default function Lobby({ user, onJoinRoom, onLogout }) {
+export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, onShareConsumed }) {
     // onJoinRoom(code, { asSpectator })
     const dialog = useDialog();
     const [joinCode, setJoinCode] = useState('');
@@ -23,6 +23,14 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
     const [error, setError] = useState('');
     const [socketReady, setSocketReady] = useState(socket.connected);
     const [customCardsOpen, setCustomCardsOpen] = useState(false);
+
+    // Auto-open import modal with share code pre-filled when arriving via /share/CODE
+    useEffect(() => {
+        if (pendingShareCode) {
+            setShowImport(true);
+            onShareConsumed?.();
+        }
+    }, [pendingShareCode, onShareConsumed]);
 
     useEffect(() => {
         decks.list().then(data => {
@@ -131,10 +139,11 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
             const res = await decks.share(deckId);
             if (res?.error) { dialog.alert(res.error, { title: 'Share failed' }); return; }
             if (!res?.code) { dialog.alert('No share code returned.', { title: 'Share failed' }); return; }
-            try { await navigator.clipboard?.writeText(res.code); } catch (_) {}
+            const shareUrl = `${window.location.origin}/share/${res.code}`;
+            try { await navigator.clipboard?.writeText(shareUrl); } catch (_) {}
             await dialog.alert(
-                `Share code for "${res.deckName}":\n\n${res.code}\n\nCopied to clipboard. Share it with a friend — they can import it from the lobby. Codes last 180 days.`,
-                { title: 'Deck share' }
+                `Share link for "${res.deckName}":\n\n${shareUrl}\n\nCopied to clipboard. Opening the link auto-imports the deck. Codes last 180 days.`,
+                { title: 'Deck shared' }
             );
         } catch (err) {
             dialog.alert(err.message || 'Share failed', { title: 'Share failed' });
@@ -259,7 +268,7 @@ export default function Lobby({ user, onJoinRoom, onLogout }) {
                 </div>
             </div>
 
-            {showImport && <DeckImport onImport={handleDeckImported} onDeckCreated={handleDeckCreated} onClose={() => setShowImport(false)} />}
+            {showImport && <DeckImport onImport={handleDeckImported} onDeckCreated={handleDeckCreated} onClose={() => setShowImport(false)} initialShareCode={pendingShareCode} />}
             {viewingDeck && (
                 <DeckViewer
                     deckId={viewingDeck}
