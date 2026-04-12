@@ -71,6 +71,12 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [revealPickerOpen, setRevealPickerOpen] = useState(false);
     const [mulliganBottomOpen, setMulliganBottomOpen] = useState(false);
     const [stackPanelOpen, setStackPanelOpen] = useState(true); // auto-collapse?
+    // Two-step "pick target" mode — used by Attach, Attack, Reveal-to, and any
+    // future action where clicking an inline submenu with N options would bloat
+    // the context menu. State shape: { type, sourceInstanceId, message, extra? }
+    // When non-null, card clicks and player-header clicks resolve the pending
+    // action instead of their normal behavior.
+    const [pendingAction, setPendingAction] = useState(null);
     // Peek & exile (Gonti-style) state: while non-null, shows a modal where
     // the caster picks a card to exile from the target's top-N library.
     // Shape: { targetPlayerId, targetUsername, cards: [...], count: N }
@@ -621,6 +627,40 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
         });
     };
 
+    // ─── Pending-action resolver (two-step "pick target" pattern) ───
+    // When pendingAction is set, card clicks and player clicks resolve it
+    // instead of their normal behavior.
+    const resolvePendingCard = useCallback((targetCard) => {
+        if (!pendingAction) return;
+        const { type, sourceInstanceId } = pendingAction;
+        if (type === 'attach') {
+            socket.emit('setCardField', {
+                instanceId: sourceInstanceId,
+                field: 'attachedTo',
+                value: targetCard.instanceId,
+            });
+        }
+        setPendingAction(null);
+    }, [pendingAction]);
+
+    const resolvePendingPlayer = useCallback((targetPlayer) => {
+        if (!pendingAction) return;
+        const { type, sourceInstanceId } = pendingAction;
+        if (type === 'attack') {
+            socket.emit('setCardField', {
+                instanceId: sourceInstanceId,
+                field: 'attackingPlayerId',
+                value: targetPlayer.userId,
+            });
+        } else if (type === 'revealTo') {
+            socket.emit('revealCard', {
+                instanceId: sourceInstanceId,
+                targetPlayerIds: [targetPlayer.userId],
+            });
+        }
+        setPendingAction(null);
+    }, [pendingAction]);
+
     // ─── Big-batch action handlers (all wired as props into PlayerZone) ───
     const handleCloneCard = (card) => {
         socket.emit('cloneCard', { instanceId: card.instanceId }, (res) => {
@@ -868,6 +908,14 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 </div>
             </div>
 
+            {/* Pending-action banner — shows when the user is in "pick target" mode */}
+            {pendingAction && (
+                <div className="pending-action-banner">
+                    <span>{pendingAction.message || 'Click a target...'}</span>
+                    <button className="small-btn" onClick={() => setPendingAction(null)}>Cancel</button>
+                </div>
+            )}
+
             {/* Player zones */}
             <div className={`player-zones players-${gameState.players.length}`}>
                 {(() => {
@@ -899,6 +947,10 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                     onCastFromZone={handleCastFromZone}
                                     onForetellCard={handleForetell}
                                     onCastForetold={handleCastForetold}
+                                    pendingAction={pendingAction}
+                                    onStartPendingAction={setPendingAction}
+                                    onResolvePendingCard={resolvePendingCard}
+                                    onResolvePendingPlayer={resolvePendingPlayer}
                                 />
                             </div>
                         );

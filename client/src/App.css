@@ -2335,6 +2335,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     border-radius: 4px;
 }
 
+/* Pending-action banner — pick-target mode indicator */
+.pending-action-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 6px 16px;
+    background: rgba(120, 200, 255, 0.18);
+    border-bottom: 1px solid rgba(120, 200, 255, 0.3);
+    font-size: 13px;
+    text-align: center;
+    z-index: 50;
+}
+
 /* Spectator perspective dropdown — sits next to the spectator-badge */
 .spec-perspective-select {
     margin-left: 6px;

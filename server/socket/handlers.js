@@ -2001,7 +2001,7 @@ module.exports = function registerSocketHandlers(io) {
                 card[field] = clampGameValue(value, { allowNegative: false });
             } else if (field === 'phasedOut' || field === 'goaded') {
                 card[field] = !!value;
-            } else if (field === 'attackingPlayerId' || field === 'controllerOriginal') {
+            } else if (field === 'attackingPlayerId' || field === 'controllerOriginal' || field === 'attachedTo') {
                 card[field] = value || null;
             }
             addAction(room, currentUserId, 'setCardField', { cardName: card.name, field, value: card[field] });

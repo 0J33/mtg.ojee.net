@@ -53,7 +53,7 @@ function ManaPoolWidget({ pool, isOwner, playerId, spectating }) {
     );
 }
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer }) {
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -86,6 +86,14 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     };
 
     const handleCardClick = (e, card) => {
+        // When a pending action is active, card clicks resolve it instead of
+        // any normal behavior (selection, maximize, etc.).
+        if (pendingAction && (pendingAction.type === 'attach') && onResolvePendingCard) {
+            e.preventDefault();
+            e.stopPropagation();
+            onResolvePendingCard(card);
+            return;
+        }
         // Spectators can only view cards — skip selection logic entirely and
         // go straight to the maximized viewer.
         if (spectating) {
@@ -195,20 +203,19 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             }},
         ] : [];
 
-        // Combat declaration — only on YOUR OWN battlefield creatures.
-        // Adds an "Attack → <opponent>" submenu, plus "Stop attacking" if the
-        // card is currently marked. The marker auto-clears at end of turn via
-        // server-side cleanup.
+        // Combat declaration — single "Declare attack..." item that enters
+        // pick-target mode. The user then clicks an opponent's player header
+        // to set the attack target. Avoids bloating the menu with N opponent entries.
         const combatItems = (zone === 'battlefield' && player.userId === userId) ? [
             { divider: true },
-            ...allPlayers.filter(p => p.userId !== userId).map(p => ({
-                label: `Attack → ${p.username}${card.attackingPlayerId === p.userId ? ' ✓' : ''}`,
-                onClick: () => socket.emit('setCardField', {
-                    instanceId: card.instanceId,
-                    field: 'attackingPlayerId',
-                    value: p.userId,
+            {
+                label: 'Declare attack...',
+                onClick: () => onStartPendingAction?.({
+                    type: 'attack',
+                    sourceInstanceId: card.instanceId,
+                    message: `Click an opponent to attack with ${card.name || 'this creature'}`,
                 }),
-            })),
+            },
             ...(card.attackingPlayerId ? [{
                 label: 'Stop attacking',
                 onClick: () => socket.emit('setCardField', {
@@ -219,20 +226,19 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             }] : []),
         ] : [];
 
-        // Equip / Attach — find other battlefield cards this card could
-        // attach to. Show a submenu with each candidate. Detach if already
-        // attached. Works for auras, equipment, fortifications.
-        const allBfCards = (player.zones.battlefield || []).filter(c => c.instanceId !== card.instanceId);
+        // Equip / Attach — single "Attach to..." item that enters pick-target
+        // mode. The user then clicks another battlefield card to set attachedTo.
         const attachItems = (zone === 'battlefield') ? [
+            {
+                label: 'Attach to...',
+                onClick: () => onStartPendingAction?.({
+                    type: 'attach',
+                    sourceInstanceId: card.instanceId,
+                    message: `Click a card to attach ${card.name || 'this card'} to`,
+                }),
+            },
             ...(card.attachedTo ? [
                 { label: 'Detach', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'attachedTo', value: null }) },
-            ] : []),
-            ...(allBfCards.length > 0 ? [
-                { divider: true },
-                ...allBfCards.slice(0, 15).map(target => ({
-                    label: `Attach to ${target.name || 'card'}${card.attachedTo === target.instanceId ? ' ✓' : ''}`,
-                    onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'attachedTo', value: target.instanceId }),
-                })),
             ] : []),
         ] : [];
 
@@ -286,10 +292,14 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             },
             { divider: true },
             { label: 'Reveal to all', onClick: () => socket.emit('revealCard', { instanceId: card.instanceId, targetPlayerIds: 'all' }) },
-            ...allPlayers.filter(p => p.userId !== userId).map(p => ({
-                label: `Reveal to ${p.username}`,
-                onClick: () => socket.emit('revealCard', { instanceId: card.instanceId, targetPlayerIds: [p.userId] }),
-            })),
+            {
+                label: 'Reveal to...',
+                onClick: () => onStartPendingAction?.({
+                    type: 'revealTo',
+                    sourceInstanceId: card.instanceId,
+                    message: `Click a player to reveal ${card.name || 'this card'} to`,
+                }),
+            },
             { divider: true },
             { label: 'Add counter...', onClick: () => setCounterModal({ instanceId: card.instanceId, card }) },
             ...(card.counters && Object.values(card.counters).some(v => v !== 0) ? [{
@@ -399,7 +409,15 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     {lethalCmdDmg ? 'KILLED BY COMMANDER' : lethalInfect ? 'POISONED' : 'ELIMINATED'}
                 </div>
             )}
-            <div className="player-header" onContextMenu={spectating ? undefined : onPlayerContextMenu}>
+            <div className="player-header"
+                onContextMenu={spectating ? undefined : onPlayerContextMenu}
+                onClick={pendingAction && (pendingAction.type === 'attack' || pendingAction.type === 'revealTo') && player.userId !== userId
+                    ? (e) => { e.stopPropagation(); onResolvePendingPlayer?.(player); }
+                    : undefined}
+                style={pendingAction && (pendingAction.type === 'attack' || pendingAction.type === 'revealTo') && player.userId !== userId
+                    ? { cursor: 'crosshair' }
+                    : undefined}
+            >
                 {player.avatarColor && (
                     <span
                         className="player-avatar-dot"
