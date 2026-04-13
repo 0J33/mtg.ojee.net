@@ -33,12 +33,11 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize, setCod
     const [hover, setHover] = useState(null);
     const [basicLands, setBasicLands] = useState(FALLBACK_BASICS);
 
-    // Fetch basic lands from the draft set so they have matching art
+    // Fetch basic lands from the draft set so they have matching art.
+    // Falls back to a recent core set if the draft set has no basics.
     useEffect(() => {
-        if (!setCode) return;
-        scryfall.search(`set:${setCode} t:basic unique:prints`).then(data => {
-            if (!data.data || data.data.length === 0) return;
-            // Pick one art per land name (first result)
+        const parseLands = (data) => {
+            if (!data.data || data.data.length === 0) return null;
             const byName = {};
             for (const card of data.data) {
                 const name = card.name;
@@ -59,8 +58,20 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize, setCod
             const lands = ['Plains', 'Island', 'Swamp', 'Mountain', 'Forest']
                 .map(n => byName[n])
                 .filter(Boolean);
-            if (lands.length > 0) setBasicLands(lands);
-        }).catch(() => {});
+            return lands.length === 5 ? lands : null;
+        };
+        const fetchLands = async () => {
+            if (setCode) {
+                const data = await scryfall.search(`set:${setCode} t:basic`).catch(() => ({}));
+                const lands = parseLands(data);
+                if (lands) { setBasicLands(lands); return; }
+            }
+            // Fallback: recent core set basics
+            const fallback = await scryfall.search('t:basic set:fdn unique:cards').catch(() => ({}));
+            const lands = parseLands(fallback);
+            if (lands) setBasicLands(lands);
+        };
+        fetchLands();
     }, [setCode]);
     const [sortBy, setSortBy] = useState('color');
     const [landCounts, setLandCounts] = useState({ Plains: 0, Island: 0, Swamp: 0, Mountain: 0, Forest: 0 });

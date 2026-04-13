@@ -268,6 +268,7 @@ function appendChatMessage(room, { userId, username, text, isSpectator }) {
 
 function addAction(room, playerId, type, data) {
     const action = { actionId: uuidv4(), playerId, type, data, timestamp: Date.now() };
+    if (!room.actionHistory) room.actionHistory = [];
     room.actionHistory.push(action);
     if (room.actionHistory.length > 200) room.actionHistory.shift(); // keep last 200
     room.lastActivity = Date.now();
