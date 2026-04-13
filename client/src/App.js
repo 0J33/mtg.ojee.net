@@ -86,6 +86,10 @@ export default function App() {
                         localStorage.removeItem('mtg_lastRoom');
                         localStorage.removeItem('mtg_lastRoomIsSpec');
                     } else {
+                        // Use the full state from the callback (includes
+                        // chat + actionHistory) so the first render has
+                        // everything before any debounced broadcast arrives.
+                        if (res.state) setGameState(res.state);
                         setRoomCode(target);
                         setIsSpectator(rejoinAsSpec);
                     }
@@ -190,6 +194,7 @@ export default function App() {
                 dialog.alert(`Couldn't join room ${target}: ${res.error}`, { title: 'Invite failed' });
                 return;
             }
+            if (res?.state) setGameState(res.state);
             setRoomCode(target);
             setIsSpectator(!!asSpectator);
         });
@@ -259,6 +264,7 @@ export default function App() {
             pendingShareCode={pendingShare}
             onShareConsumed={() => setPendingShare(null)}
             onJoinRoom={(code, opts = {}) => {
+                if (opts.state) setGameState(opts.state);
                 setRoomCode(code);
                 setIsSpectator(!!opts.asSpectator);
             }}

@@ -1577,7 +1577,8 @@ function RollToast({ result: r }) {
 function DiceModal({ onClose }) {
     useEscapeKey(onClose);
     const [count, setCount] = useState(1);
-    const sides = [4, 6, 8, 10, 12, 20, 100];
+    const [customSides, setCustomSides] = useState('');
+    const sides = [2, 3, 4, 6, 8, 10, 12, 20, 100];
 
     const roll = (s) => {
         socket.emit('rollDice', { sides: s, count }, () => {});
@@ -1586,6 +1587,10 @@ function DiceModal({ onClose }) {
     const flip = () => {
         socket.emit('flipCoin', { count }, () => {});
         onClose();
+    };
+    const rollCustom = () => {
+        const s = parseInt(customSides);
+        if (s >= 2) roll(s);
     };
 
     return (
@@ -1604,6 +1609,17 @@ function DiceModal({ onClose }) {
                         <button key={s} className="dice-btn" onClick={() => roll(s)}>d{s}</button>
                     ))}
                     <button className="dice-btn coin-btn" onClick={flip}>Coin</button>
+                </div>
+                <div className="dice-custom">
+                    <input
+                        type="number"
+                        min={2}
+                        placeholder="Custom sides"
+                        value={customSides}
+                        onChange={e => setCustomSides(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && rollCustom()}
+                    />
+                    <button className="small-btn" onClick={rollCustom} disabled={!customSides || parseInt(customSides) < 2}>Roll d{customSides || '?'}</button>
                 </div>
             </div>
         </div>

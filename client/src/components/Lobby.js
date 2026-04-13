@@ -103,7 +103,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
         setError('');
         socket.emit('joinRoom', { roomCode: joinCode.toUpperCase(), userId: user.id, username: user.username }, (res) => {
             if (res.error) return setError(res.error);
-            onJoinRoom(joinCode.toUpperCase(), { asSpectator: false });
+            onJoinRoom(joinCode.toUpperCase(), { asSpectator: false, state: res.state });
         });
     };
 
@@ -113,7 +113,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
         setError('');
         socket.emit('joinRoomAsSpectator', { roomCode: joinCode.toUpperCase(), userId: user.id, username: user.username }, (res) => {
             if (res?.error) return setError(res.error);
-            onJoinRoom(joinCode.toUpperCase(), { asSpectator: true });
+            onJoinRoom(joinCode.toUpperCase(), { asSpectator: true, state: res.state });
         });
     };
 

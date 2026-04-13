@@ -955,6 +955,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .dice-btn { padding: 16px 8px; font-size: 1em; font-weight: 700; background: var(--bg-deep); border: 1px solid var(--border); }
 .dice-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
 .coin-btn { grid-column: span 2; background: linear-gradient(135deg, var(--accent-dim), var(--accent)); color: var(--bg-deep); border-color: var(--accent); }
+.dice-custom { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
+.dice-custom input { flex: 1; padding: 8px; font-size: 0.9em; }
 
 .roll-results-stack { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 600; pointer-events: none; }
 .roll-result-toast { background: var(--bg-panel); border: 1px solid var(--accent); color: var(--text); padding: 10px 20px; border-radius: 2px; font-size: 0.9em; box-shadow: 0 6px 24px rgba(0,0,0,0.6); animation: slideDown 0.3s ease-out; font-family: 'EB Garamond', serif; }
