@@ -19,6 +19,9 @@ import Cursors from './Cursors';
 import DeckImport from './DeckImport';
 import DeckBuilder from './DeckBuilder';
 import DeckViewer from './DeckViewer';
+import DraftSetup from './DraftSetup';
+import DraftPick from './DraftPick';
+import SealedBuilder from './SealedBuilder';
 import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 import { VERSION } from '../version';
@@ -112,6 +115,15 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
     const [victoryAnim, setVictoryAnim] = useState(null); // { username, ts }
     // Big-batch modals — all hidden behind hovers/menus, no permanent UI footprint.
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [draftSetupOpen, setDraftSetupOpen] = useState(false);
+    // Draft/sealed state
+    const [draftPack, setDraftPack] = useState(null);
+    const [draftRound, setDraftRound] = useState(0);
+    const [draftPickNumber, setDraftPickNumber] = useState(0);
+    const [draftTotalRounds, setDraftTotalRounds] = useState(3);
+    const [draftPicks, setDraftPicks] = useState([]);
+    const [sealedPool, setSealedPool] = useState(null);
+    const [sealedSubmitted, setSealedSubmitted] = useState(false);
     const [cardFieldEditor, setCardFieldEditor] = useState(null);          // { card, field }
     const [emblemAdderTarget, setEmblemAdderTarget] = useState(null);      // playerId
     const [browseLibraryFor, setBrowseLibraryFor] = useState(null);        // { player, library }
@@ -209,6 +221,31 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
         };
         socket.on('victory', handler);
         return () => socket.off('victory', handler);
+    }, []);
+
+    // Draft/sealed socket listeners
+    useEffect(() => {
+        const onPack = ({ pack, round, pickNumber, totalRounds }) => {
+            setDraftPack(pack);
+            setDraftRound(round);
+            setDraftPickNumber(pickNumber);
+            setDraftTotalRounds(totalRounds);
+        };
+        const onPicked = ({ card, picks }) => {
+            setDraftPicks(picks);
+        };
+        const onPool = ({ pool }) => {
+            setSealedPool(pool);
+            setSealedSubmitted(false);
+        };
+        socket.on('draft:pack', onPack);
+        socket.on('draft:picked', onPicked);
+        socket.on('sealed:pool', onPool);
+        return () => {
+            socket.off('draft:pack', onPack);
+            socket.off('draft:picked', onPicked);
+            socket.off('sealed:pool', onPool);
+        };
     }, []);
 
     // Non-touch + non-compact desktop users see AND broadcast cursors. Mobile
@@ -1041,7 +1078,10 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         <button onClick={handleStartGame} className="primary-btn small-btn">Start Game</button>
                     )}
                     {!isSpectator && !gameStarted && (
-                        <button onClick={handleLoadDeck} className="small-btn">Load Deck</button>
+                        <>
+                            <button onClick={handleLoadDeck} className="small-btn">Load Deck</button>
+                            {isHost && <button onClick={() => setDraftSetupOpen(true)} className="small-btn">Draft / Sealed</button>}
+                        </>
                     )}
                     {!isSpectator && gameStarted && (
                         <div className="topbar-group">
@@ -1279,6 +1319,44 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
 
             {/* Guide / How-to-play */}
             {guideOpen && <Guide onClose={() => setGuideOpen(false)} />}
+
+            {/* Draft/Sealed setup modal */}
+            {draftSetupOpen && (
+                <DraftSetup
+                    onClose={() => setDraftSetupOpen(false)}
+                    isHost={isHost}
+                />
+            )}
+
+            {/* Draft pick screen — shown during draft picking phase */}
+            {gameState?.draftState?.mode === 'draft' && gameState.draftState.phase === 'picking' && draftPack && (
+                <div className="modal-overlay">
+                    <div className="modal draft-pick-modal">
+                        <DraftPick
+                            pack={draftPack}
+                            round={draftRound}
+                            pickNumber={draftPickNumber}
+                            totalRounds={draftTotalRounds}
+                            picks={draftPicks}
+                            onMaximize={setMaximizedCard}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Sealed/Draft deck builder — shown during building phase */}
+            {sealedPool && !sealedSubmitted && (
+                <div className="modal-overlay">
+                    <div className="modal sealed-builder-modal">
+                        <SealedBuilder
+                            pool={sealedPool}
+                            mode={gameState?.draftState?.mode || 'sealed'}
+                            onSubmit={() => setSealedSubmitted(true)}
+                            onMaximize={setMaximizedCard}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Revealed hand viewer — fired by handRevealed socket event.
                 Cards open CardMaximized on click; that modal is a body-level

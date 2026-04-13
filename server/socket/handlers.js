@@ -2717,6 +2717,212 @@ module.exports = function registerSocketHandlers(io) {
             }
         });
 
+        // ─── SEALED / DRAFT ──────────────────────────────────────────────
+        const { generatePack, generateSealedPool } = require('../services/packGenerator');
+
+        // sealed:start — host generates sealed pools for all players
+        socket.on('sealed:start', async ({ setCode, packCount }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return;
+            const host = room.players[0];
+            if (!host || host.userId !== currentUserId) {
+                return typeof callback === 'function' && callback({ error: 'Only host can start sealed' });
+            }
+            try {
+                const pools = {};
+                for (const p of room.players) {
+                    const result = await generateSealedPool(setCode, packCount || 6);
+                    pools[p.userId] = result.pool;
+                }
+                room.draftState = {
+                    mode: 'sealed',
+                    phase: 'building',
+                    setCode,
+                    pools,
+                    decks: {},
+                    submitted: {},
+                };
+                // Send each player their pool privately
+                for (const p of room.players) {
+                    if (p.socketId) {
+                        io.to(p.socketId).emit('sealed:pool', { pool: pools[p.userId] });
+                    }
+                }
+                broadcastRoomState(io, room);
+                typeof callback === 'function' && callback({ ok: true });
+            } catch (err) {
+                console.error('[sealed:start]', err);
+                typeof callback === 'function' && callback({ error: err.message });
+            }
+        });
+
+        // sealed:submitDeck — player finalizes their sealed deck
+        socket.on('sealed:submitDeck', ({ main, sideboard }) => {
+            const room = getRoom(currentRoom);
+            if (!room?.draftState) return;
+            room.draftState.decks[currentUserId] = { main, sideboard };
+            room.draftState.submitted[currentUserId] = true;
+            // Check if all players submitted
+            const allDone = room.players.every(p => room.draftState.submitted[p.userId]);
+            if (allDone) room.draftState.phase = 'complete';
+            broadcastRoomState(io, room);
+        });
+
+        // draft:start — host starts a draft
+        socket.on('draft:start', async ({ setCode, packsPerPlayer, pickTimeSec }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return;
+            const host = room.players[0];
+            if (!host || host.userId !== currentUserId) {
+                return typeof callback === 'function' && callback({ error: 'Only host can start draft' });
+            }
+            try {
+                const numPacks = packsPerPlayer || 3;
+                const seatOrder = room.players.map(p => p.userId);
+                // Generate all packs upfront
+                const allPacks = {}; // round → playerId → pack
+                for (let round = 0; round < numPacks; round++) {
+                    allPacks[round] = {};
+                    for (const pid of seatOrder) {
+                        allPacks[round][pid] = await generatePack(setCode);
+                    }
+                }
+                room.draftState = {
+                    mode: 'draft',
+                    phase: 'picking',
+                    setCode,
+                    round: 0,
+                    pickNumber: 0,
+                    totalRounds: numPacks,
+                    seatOrder,
+                    // Current pack in front of each player
+                    currentPacks: { ...allPacks[0] },
+                    // All generated packs by round (for opening next rounds)
+                    allPacks,
+                    picks: Object.fromEntries(seatOrder.map(id => [id, []])),
+                    submitted: {}, // who has picked this round
+                    passDirection: 'left', // left for round 0, alternates
+                    pickTimeSec: pickTimeSec || 60,
+                    decks: {},
+                };
+                // Send each player their first pack
+                for (const p of room.players) {
+                    if (p.socketId) {
+                        io.to(p.socketId).emit('draft:pack', {
+                            pack: room.draftState.currentPacks[p.userId],
+                            round: 0, pickNumber: 0,
+                            totalRounds: numPacks,
+                        });
+                    }
+                }
+                broadcastRoomState(io, room);
+                typeof callback === 'function' && callback({ ok: true });
+            } catch (err) {
+                console.error('[draft:start]', err);
+                typeof callback === 'function' && callback({ error: err.message });
+            }
+        });
+
+        // draft:pick — player picks a card from their current pack
+        socket.on('draft:pick', ({ cardIndex }) => {
+            const room = getRoom(currentRoom);
+            if (!room?.draftState || room.draftState.mode !== 'draft' || room.draftState.phase !== 'picking') return;
+            const ds = room.draftState;
+            const pack = ds.currentPacks[currentUserId];
+            if (!pack || ds.submitted[currentUserId]) return; // already picked or no pack
+
+            // Pick the card
+            const picked = pack.splice(cardIndex, 1)[0];
+            if (!picked) return;
+            ds.picks[currentUserId].push(picked);
+            ds.submitted[currentUserId] = true;
+
+            // Notify the picker
+            const playerSocket = room.players.find(p => p.userId === currentUserId)?.socketId;
+            if (playerSocket) {
+                io.to(playerSocket).emit('draft:picked', { card: picked, picks: ds.picks[currentUserId] });
+            }
+
+            // Check if ALL players have picked
+            const allPicked = ds.seatOrder.every(id => ds.submitted[id]);
+            if (!allPicked) {
+                broadcastRoomState(io, room);
+                return;
+            }
+
+            // All picked — pass packs
+            ds.submitted = {};
+            ds.pickNumber++;
+
+            // Check if current round's packs are empty
+            const anyPacksLeft = ds.seatOrder.some(id => ds.currentPacks[id]?.length > 0);
+            if (!anyPacksLeft) {
+                // Move to next round
+                ds.round++;
+                if (ds.round >= ds.totalRounds) {
+                    // Draft complete — move to building phase
+                    ds.phase = 'building';
+                    ds.currentPacks = {};
+                    // Send each player their full picks as their pool
+                    for (const p of room.players) {
+                        if (p.socketId) {
+                            io.to(p.socketId).emit('sealed:pool', { pool: ds.picks[p.userId] });
+                        }
+                    }
+                    broadcastRoomState(io, room);
+                    return;
+                }
+                // Open next round's packs, reverse direction
+                ds.passDirection = ds.passDirection === 'left' ? 'right' : 'left';
+                ds.pickNumber = 0;
+                ds.currentPacks = { ...ds.allPacks[ds.round] };
+            } else {
+                // Pass remaining packs to the next player
+                const order = ds.seatOrder;
+                const newPacks = {};
+                for (let i = 0; i < order.length; i++) {
+                    const fromIdx = i;
+                    const toIdx = ds.passDirection === 'left'
+                        ? (i + 1) % order.length
+                        : (i - 1 + order.length) % order.length;
+                    newPacks[order[toIdx]] = ds.currentPacks[order[fromIdx]];
+                }
+                ds.currentPacks = newPacks;
+            }
+
+            // Send each player their new pack
+            for (const p of room.players) {
+                if (p.socketId && ds.currentPacks[p.userId]) {
+                    io.to(p.socketId).emit('draft:pack', {
+                        pack: ds.currentPacks[p.userId],
+                        round: ds.round, pickNumber: ds.pickNumber,
+                        totalRounds: ds.totalRounds,
+                    });
+                }
+            }
+            broadcastRoomState(io, room);
+        });
+
+        // draft:submitDeck — reuse sealed submit for draft building phase
+        socket.on('draft:submitDeck', ({ main, sideboard }) => {
+            const room = getRoom(currentRoom);
+            if (!room?.draftState) return;
+            room.draftState.decks[currentUserId] = { main, sideboard };
+            room.draftState.submitted[currentUserId] = true;
+            const allDone = room.players.every(p => room.draftState.submitted[p.userId]);
+            if (allDone) room.draftState.phase = 'complete';
+            broadcastRoomState(io, room);
+        });
+
+        // draft:cancel — host cancels an in-progress draft/sealed
+        socket.on('draft:cancel', () => {
+            const room = getRoom(currentRoom);
+            if (!room) return;
+            if (room.players[0]?.userId !== currentUserId) return;
+            room.draftState = null;
+            broadcastRoomState(io, room);
+        });
+
         // ─── DISCONNECT ─────────────────────────────────────────────────
         socket.on('disconnect', () => {
             if (!currentRoom) return;

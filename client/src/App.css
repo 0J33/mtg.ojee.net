@@ -2836,3 +2836,66 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .modal-actions { flex-direction: column; }
     .modal-actions button { width: 100%; }
 }
+
+/* ─── DRAFT / SEALED ───────────────────────────────────────── */
+.draft-setup-modal { max-width: 560px; }
+.draft-mode-picker { display: flex; gap: 6px; margin-bottom: 10px; }
+.draft-set-search { margin-bottom: 8px; }
+.draft-set-search input { width: 100%; }
+.draft-set-list { max-height: 280px; overflow-y: auto; border: 1px solid var(--border-soft, #333); border-radius: 4px; margin-bottom: 10px; }
+.draft-set-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-soft, #222); }
+.draft-set-item:hover { background: var(--bg-deep); }
+.draft-set-item.selected { background: rgba(136,170,255,0.12); border-left: 3px solid var(--accent); }
+.draft-set-icon { width: 20px; height: 20px; filter: invert(0.7); }
+.draft-set-info { display: flex; flex-direction: column; gap: 2px; }
+.draft-set-info strong { font-size: 0.85em; }
+.draft-set-info .muted { font-size: 0.7em; }
+.draft-options { display: flex; gap: 16px; margin-bottom: 10px; font-size: 0.85em; }
+.draft-options label { display: flex; align-items: center; gap: 6px; }
+.draft-options input[type="number"] { width: 50px; }
+.draft-error { color: var(--danger); font-size: 0.8em; margin-bottom: 8px; }
+
+/* Draft pick screen */
+.draft-pick-modal { max-width: 900px; width: 95vw; max-height: 90vh; overflow-y: auto; }
+.draft-pick-panel { padding: 8px 0; }
+.draft-pick-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.draft-pick-header h3 { margin: 0; font-size: 1em; }
+.draft-pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.draft-pack-card { position: relative; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s; }
+.draft-pack-card:hover { transform: scale(1.03); }
+.draft-pack-card.selected { border-color: var(--accent); box-shadow: 0 0 12px rgba(136,170,255,0.4); }
+.draft-pack-card img { width: 100%; display: block; border-radius: 6px; }
+.draft-card-rarity { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; font-size: 0.6em; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
+.draft-card-name { padding: 8px; font-size: 0.75em; }
+.draft-pick-actions { text-align: center; margin-bottom: 12px; }
+.draft-waiting { text-align: center; padding: 30px 0; }
+.draft-picks-summary { margin-top: 12px; border-top: 1px solid var(--border-soft, #333); padding-top: 8px; }
+.draft-picks-summary strong { font-size: 0.85em; display: block; margin-bottom: 6px; }
+.draft-picks-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.draft-pick-thumb { width: 50px; cursor: pointer; border-radius: 4px; overflow: hidden; }
+.draft-pick-thumb img { width: 100%; display: block; }
+
+/* Sealed deck builder */
+.sealed-builder-modal { max-width: 1000px; width: 95vw; max-height: 90vh; overflow-y: auto; }
+.sealed-builder { padding: 8px 0; }
+.sealed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.sealed-header h3 { margin: 0; }
+.sealed-sort-row { display: flex; gap: 4px; align-items: center; margin-bottom: 8px; font-size: 0.8em; }
+.sealed-panels { display: flex; gap: 12px; min-height: 300px; }
+.sealed-panel { flex: 1; border: 1px solid var(--border-soft, #333); border-radius: 4px; padding: 8px; overflow-y: auto; max-height: 55vh; }
+.sealed-panel strong { display: block; margin-bottom: 6px; font-size: 0.85em; }
+.sealed-main { border-color: var(--accent-dim, #556); }
+.sealed-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); gap: 4px; }
+.sealed-card { cursor: pointer; border-radius: 5px; overflow: hidden; border: 2px solid transparent; transition: border-color 0.15s; position: relative; }
+.sealed-card:hover { border-color: var(--accent); }
+.sealed-card img { width: 100%; display: block; border-radius: 3px; }
+.sealed-card-name { padding: 4px; font-size: 0.65em; }
+.rarity-mythic { box-shadow: 0 0 4px rgba(255,140,0,0.4); }
+.rarity-rare { box-shadow: 0 0 4px rgba(255,215,0,0.3); }
+.sealed-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-soft, #333); }
+
+@media (max-width: 700px) {
+    .sealed-panels { flex-direction: column; }
+    .sealed-panel { max-height: 40vh; }
+    .draft-pack-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+}

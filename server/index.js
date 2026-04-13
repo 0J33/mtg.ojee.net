@@ -47,6 +47,7 @@ app.use('/api/decks', require('./routes/decks'));
 app.use('/api/scryfall', require('./routes/scryfall'));
 app.use('/api/import', require('./routes/import'));
 app.use('/api/custom-cards', require('./routes/customCards'));
+app.use('/api/draft', require('./routes/draft'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

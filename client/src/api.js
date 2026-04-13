@@ -37,6 +37,10 @@ export const scryfall = {
     prints: (name) => request(`/api/scryfall/prints?name=${encodeURIComponent(name)}`),
 };
 
+export const draft = {
+    sets: () => request('/api/draft/sets'),
+};
+
 export const customCards = {
     list: () => request('/api/custom-cards'),
     create: (card) => request('/api/custom-cards', { method: 'POST', body: JSON.stringify(card) }),
