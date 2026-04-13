@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
+import { scryfall } from '../api';
 
 const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G', 'C', 'M', 'L'];
 function cardColorKey(card) {
@@ -13,8 +14,8 @@ function cardColorKey(card) {
 
 const RARITY_ORDER = { mythic: 0, rare: 1, uncommon: 2, common: 3, basic: 4 };
 
-// Basic land entries — unlimited supply, always available for limited formats
-const BASIC_LANDS = [
+// Fallback basic lands (no art) — used while Scryfall fetch is loading
+const FALLBACK_BASICS = [
     { name: 'Plains',   typeLine: 'Basic Land — Plains',   colors: ['W'], colorIdentity: ['W'], rarity: 'basic', imageUri: '', scryfallId: 'basic-plains', isBasicLand: true, manaCost: '' },
     { name: 'Island',   typeLine: 'Basic Land — Island',   colors: ['U'], colorIdentity: ['U'], rarity: 'basic', imageUri: '', scryfallId: 'basic-island', isBasicLand: true, manaCost: '' },
     { name: 'Swamp',    typeLine: 'Basic Land — Swamp',    colors: ['B'], colorIdentity: ['B'], rarity: 'basic', imageUri: '', scryfallId: 'basic-swamp', isBasicLand: true, manaCost: '' },
@@ -22,16 +23,45 @@ const BASIC_LANDS = [
     { name: 'Forest',   typeLine: 'Basic Land — Forest',   colors: ['G'], colorIdentity: ['G'], rarity: 'basic', imageUri: '', scryfallId: 'basic-forest', isBasicLand: true, manaCost: '' },
 ];
 
-const MANA_SYMBOLS = { W: '\u2600', U: '\ud83d\udca7', B: '\ud83d\udc80', R: '\ud83d\udd25', G: '\ud83c\udf3f' };
-
 /**
  * Deck builder for sealed/draft. Three panels: Main Deck, Card Pool, Basic Lands.
  * Click cards to move between main/pool. Basic lands have +/- buttons for unlimited supply.
  */
-export default function SealedBuilder({ pool, onSubmit, mode, onMaximize }) {
+export default function SealedBuilder({ pool, onSubmit, mode, onMaximize, setCode }) {
     const [main, setMain] = useState([]);
     const [sideboard, setSideboard] = useState([...pool]);
     const [hover, setHover] = useState(null);
+    const [basicLands, setBasicLands] = useState(FALLBACK_BASICS);
+
+    // Fetch basic lands from the draft set so they have matching art
+    useEffect(() => {
+        if (!setCode) return;
+        scryfall.search(`set:${setCode} t:basic unique:prints`).then(data => {
+            if (!data.data || data.data.length === 0) return;
+            // Pick one art per land name (first result)
+            const byName = {};
+            for (const card of data.data) {
+                const name = card.name;
+                if (byName[name]) continue;
+                const face = card.card_faces?.[0];
+                byName[name] = {
+                    name,
+                    typeLine: card.type_line || face?.type_line || `Basic Land — ${name}`,
+                    colors: card.color_identity || [],
+                    colorIdentity: card.color_identity || [],
+                    rarity: 'basic',
+                    imageUri: card.image_uris?.normal || face?.image_uris?.normal || '',
+                    scryfallId: card.id,
+                    isBasicLand: true,
+                    manaCost: '',
+                };
+            }
+            const lands = ['Plains', 'Island', 'Swamp', 'Mountain', 'Forest']
+                .map(n => byName[n])
+                .filter(Boolean);
+            if (lands.length > 0) setBasicLands(lands);
+        }).catch(() => {});
+    }, [setCode]);
     const [sortBy, setSortBy] = useState('color');
     const [landCounts, setLandCounts] = useState({ Plains: 0, Island: 0, Swamp: 0, Mountain: 0, Forest: 0 });
 
@@ -59,7 +89,7 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize }) {
         setLandCounts(prev => ({ ...prev, [landName]: newCount }));
 
         if (delta > 0) {
-            const template = BASIC_LANDS.find(l => l.name === landName);
+            const template = basicLands.find(l => l.name === landName);
             const newLands = Array.from({ length: delta }, (_, i) => ({
                 ...template,
                 scryfallId: `basic-${landName.toLowerCase()}-${Date.now()}-${i}`,
@@ -179,7 +209,7 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize }) {
             <div className="sealed-lands">
                 <strong>Basic Lands ({totalLands})</strong>
                 <div className="sealed-land-row">
-                    {BASIC_LANDS.map(land => {
+                    {basicLands.map(land => {
                         const count = landCounts[land.name] || 0;
                         const color = land.colorIdentity[0];
                         return (

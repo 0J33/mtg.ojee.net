@@ -1358,6 +1358,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         <SealedBuilder
                             pool={sealedPool}
                             mode={gameState?.draftState?.mode || 'sealed'}
+                            setCode={gameState?.draftState?.setCode || draftSetCode}
                             onSubmit={() => setSealedSubmitted(true)}
                             onMaximize={setMaximizedCard}
                         />
