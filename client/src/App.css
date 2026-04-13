@@ -1416,9 +1416,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .selection-bar button { padding: 4px 8px; font-size: 0.6em; }
 
     /* Drawing toolbar */
-    .drawing-toolbar { bottom: 60px; padding: 6px 10px; gap: 6px; flex-wrap: wrap; max-width: 92vw; }
-    .color-swatch { width: 20px; height: 20px; }
-    .brush-size input { width: 60px; }
+    .drawing-toolbar { top: auto; bottom: 60px; padding: 6px 10px; gap: 4px; flex-wrap: wrap; max-width: 96vw; }
+    .color-picker { gap: 3px; }
+    .color-swatch { width: 18px; height: 18px; border-width: 1.5px; }
+    .color-swatch.active { transform: scale(1.15); }
+    .brush-size input { width: 50px; }
+    .drawing-toolbar .small-btn { padding: 4px 8px; font-size: 0.6em; }
 
     /* Roll results / center notifications */
     .roll-results-stack { top: 56px; max-width: 92vw; }
