@@ -111,7 +111,7 @@ Full list of what the app does, grouped by area.
 ## game settings (host)
 
 - ⚙ button in topbar opens a Settings modal usable mid-game
-- format presets: commander, brawl, modern, oathbreaker, free
+- format presets: commander, brawl, standard, modern, legacy, vintage, pauper, oathbreaker, draft, free
 - starting life, commander damage lethal, max players, hand-size limit
 - mulligan rules: **Vancouver** (legacy 7→7→6→5), **London** (always 7, bottom N), **Free7** (7→7→6→5→4)
 - shared team life toggle

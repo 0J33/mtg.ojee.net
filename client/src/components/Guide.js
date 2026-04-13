@@ -203,7 +203,7 @@ const PAGES = [
             <>
                 <p>The new <strong>⚙</strong> button in the topbar opens a Settings modal. The host can change everything live, mid-game:</p>
                 <ul>
-                    <li><strong>Format presets</strong>: commander, brawl, modern, oathbreaker, free — picking one fills in starting life and commander damage.</li>
+                    <li><strong>Format presets</strong>: commander, brawl, standard, modern, legacy, vintage, pauper, oathbreaker, draft, free — picking one fills in starting life and commander damage.</li>
                     <li><strong>Numbers</strong>: starting life, commander damage lethal, max players, hand-size limit.</li>
                     <li><strong>Mulligan rules</strong>: Vancouver (legacy 7→7→6→5), London (always draw 7, bottom N), or Free 7 (free first mull).</li>
                     <li><strong>Shared team life</strong> — when ON, every life change to a player on a team propagates to every teammate so the team is one number.</li>

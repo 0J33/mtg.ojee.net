@@ -2025,10 +2025,15 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
     const applyFormat = (fmt) => {
         const presets = {
             commander: { startingLife: 40, commanderDamageLethal: 21 },
-            brawl: { startingLife: 30, commanderDamageLethal: 21 },
-            modern: { startingLife: 20, commanderDamageLethal: 21 },
+            brawl:     { startingLife: 30, commanderDamageLethal: 21 },
+            standard:  { startingLife: 20, commanderDamageLethal: 21 },
+            modern:    { startingLife: 20, commanderDamageLethal: 21 },
+            legacy:    { startingLife: 20, commanderDamageLethal: 21 },
+            vintage:   { startingLife: 20, commanderDamageLethal: 21 },
+            pauper:    { startingLife: 20, commanderDamageLethal: 21 },
             oathbreaker: { startingLife: 20, commanderDamageLethal: 21 },
-            free: { startingLife: 40, commanderDamageLethal: 21 },
+            draft:     { startingLife: 20, commanderDamageLethal: 21 },
+            free:      { startingLife: 40, commanderDamageLethal: 21 },
         };
         const preset = presets[fmt] || presets.commander;
         setDraft(d => ({ ...d, format: fmt, ...preset }));
@@ -2068,7 +2073,7 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
                 <div className="settings-section">
                     <strong>Format</strong>
                     <div className="settings-row">
-                        {['commander', 'brawl', 'modern', 'oathbreaker', 'free'].map(f => (
+                        {['commander', 'brawl', 'standard', 'modern', 'legacy', 'vintage', 'pauper', 'oathbreaker', 'draft', 'free'].map(f => (
                             <button
                                 key={f}
                                 className={`small-btn ${draft.format === f ? 'active' : ''}`}
