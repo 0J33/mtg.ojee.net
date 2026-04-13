@@ -181,7 +181,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
             <div className="lobby-header">
                 <h1>
                     <img src="/mtg.png" alt="" className="mtg-logo" />
-                    MTG Commander <span className="lobby-version">v{VERSION}</span>
+                    mtg.ojee.net <span className="lobby-version">v{VERSION}</span>
                 </h1>
                 <div className="lobby-user">
                     <span>{user.username}</span>

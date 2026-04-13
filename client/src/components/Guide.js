@@ -17,7 +17,8 @@ const PAGES = [
         body: (
             <>
                 <p className="guide-lede">
-                    This is an unofficial digital tabletop for Commander / EDH. It's a tool,
+                    This is an unofficial digital tabletop for Magic: The Gathering. It supports
+                    Commander, Standard, Modern, Legacy, Draft, Sealed, and more. It's a tool,
                     not a rules engine — you move cards, change life totals, and draw stuff
                     however your playgroup actually plays.
                 </p>

@@ -1,6 +1,6 @@
 # mtg.ojee.net
 
-a small commander tabletop sim i built for me and my friends to play edh in the browser. live at [mtg.ojee.net](https://mtg.ojee.net).
+an mtg tabletop sim i built for me and my friends to play magic in the browser. supports commander, standard, modern, legacy, vintage, pauper, oathbreaker, draft, and sealed. live at [mtg.ojee.net](https://mtg.ojee.net).
 
 it's not a rules engine, just a table. you drag cards around, flip them, track life and counters, draw arrows on the board. the actual magic rules are on you and your friends.
 

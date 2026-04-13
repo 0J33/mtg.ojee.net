@@ -19,8 +19,8 @@ export default function Login({ onLogin }) {
     return (
         <div className="login-page">
             <div className="login-card">
-                <h1>MTG Commander</h1>
-                <p className="login-subtitle">Online Tabletop</p>
+                <h1>mtg.ojee.net</h1>
+                <p className="login-subtitle">Online MTG Tabletop</p>
                 <form onSubmit={handleSubmit}>
                     <input
                         type="text"
