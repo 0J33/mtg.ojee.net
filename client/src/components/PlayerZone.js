@@ -411,15 +411,29 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         e.dataTransfer.dropEffect = 'move';
     };
 
+    // On touch devices, render a small ⋮ button on each card so the
+    // context menu is accessible without long-press.
+    const renderCardOptionsBtn = (card, zone) => {
+        if (!touchMode || spectating) return null;
+        return (
+            <button
+                className="card-options-touch"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    handleCardContext({ preventDefault: () => {}, stopPropagation: () => {}, clientX: rect.left, clientY: rect.bottom + 4 }, card, zone);
+                }}
+                title="Card options"
+            >⋮</button>
+        );
+    };
+
     const renderZoneCards = (cards, zone) => {
         if (!cards || cards.length === 0) return <div className="zone-empty">Empty</div>;
         return cards.map(card => {
             const isHidden = card.hidden;
             if (isHidden) return <div key={Math.random()} className="card card-hidden" />;
             const isSelected = selectedIds?.has(card.instanceId);
-            // Glow any land in your own hand on your own turn until you
-            // actually play one — the nudge clears as soon as landsPlayedThisTurn
-            // becomes nonzero (which updates needsLand above).
             const pendingLand = zone === 'hand' && needsLand && isLandCard(card);
             return (
                 <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''} ${pendingLand ? 'turn-nudge-land' : ''}`}
@@ -434,6 +448,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                         attachedToName={attachedToName[card.instanceId]}
                         attachments={attachmentsOn[card.instanceId]}
                     />
+                    {renderCardOptionsBtn(card, zone)}
                 </div>
             );
         });
@@ -627,6 +642,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 attachedToName={attachedToName[card.instanceId]}
                                 attachments={attachmentsOn[card.instanceId]}
                             />
+                            {renderCardOptionsBtn(card, dragZone)}
                         </div>
                     );
                 });
@@ -661,6 +677,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, 'commandZone')}
                                 grow={dynamicGrow(player.zones.commandZone || [])}
+                                isCollapsed={collapsedRows.has('commandZone')}
+                                onToggle={() => toggleRow('commandZone')}
                             />
 
                             {renderRow('lands', 'Lands', groups.lands, 'battlefield-lands')}
@@ -828,23 +846,28 @@ function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, rende
     );
 }
 
-function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow }) {
+function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow, isCollapsed, onToggle }) {
     const ref = useHorizontalWheel();
     return (
-        <div className="zone command-zone bf-cell"
+        <div className={`zone command-zone bf-cell ${isCollapsed ? 'collapsed' : ''}`}
             onDragOver={onDragOver}
             onDrop={onDrop}
-            style={{ flexGrow: grow }}>
-            <div className="zone-label">
-                Command ({player.zones.commandZone?.length || 0})
-                {player.commanderDeaths > 0 && <span className="death-counter"> · Deaths: {player.commanderDeaths}</span>}
-                {player.commanderTax > 0 && <span className="tax-counter"> · Tax: {player.commanderTax}</span>}
+            style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
+            <div className="bf-row-label">
+                <span className="bf-row-toggle" onClick={onToggle}>
+                    <span className="bf-collapse-icon">{isCollapsed ? '▶' : '▼'}</span>
+                    Command ({player.zones.commandZone?.length || 0})
+                    {player.commanderDeaths > 0 && <span className="death-counter"> · Deaths: {player.commanderDeaths}</span>}
+                    {player.commanderTax > 0 && <span className="tax-counter"> · Tax: {player.commanderTax}</span>}
+                </span>
             </div>
-            <div ref={ref} className="zone-cards battlefield-cards">
-                {(player.zones.commandZone?.length || 0) === 0
-                    ? <div className="zone-empty">—</div>
-                    : renderCards(player.zones.commandZone, 'commandZone')}
-            </div>
+            {!isCollapsed && (
+                <div ref={ref} className="zone-cards battlefield-cards">
+                    {(player.zones.commandZone?.length || 0) === 0
+                        ? <div className="zone-empty">—</div>
+                        : renderCards(player.zones.commandZone, 'commandZone')}
+                </div>
+            )}
         </div>
     );
 }

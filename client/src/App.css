@@ -599,7 +599,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── ZONES ───────────────────────────────────────────────── */
 .zone { margin: 3px 0; border: 1px solid var(--border-soft); border-radius: 3px; background: rgba(0,0,0,0.4); position: relative; }
-.zone-label { font-family: 'Cinzel', serif; font-size: 0.65em; color: var(--text-mid); padding: 4px 10px; cursor: pointer; user-select: none; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; border-bottom: 1px solid var(--border-soft); }
+.zone-label { font-family: 'Cinzel', serif; font-size: 0.65em; color: var(--text-mid); padding: 4px 10px; cursor: pointer; user-select: none; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; border-bottom: 1px solid var(--border-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .zone-label:hover { color: var(--accent); background: rgba(212, 175, 111, 0.05); }
 .zone-empty { font-size: 0.7em; color: var(--text-faint); padding: 8px; text-align: center; font-style: italic; }
 .zone-cards { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; }
@@ -1324,7 +1324,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .card-max-info { max-width: 100%; }
 
     /* Game topbar */
-    .game-topbar { flex-wrap: wrap; padding: 6px 8px; gap: 6px; min-height: auto; }
+    .game-topbar { flex-wrap: nowrap; padding: 4px 6px; gap: 4px; min-height: auto; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .topbar-left { gap: 8px; flex-wrap: wrap; }
     .topbar-right { gap: 4px; }
     .room-code { font-size: 0.8em; padding: 3px 8px; letter-spacing: 2px; }
@@ -2444,6 +2444,29 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     max-width: 100%;
 }
 
+/* Touch card options button — visible only on touch devices via the
+   touchMode prop check in PlayerZone. Small ⋮ in the corner of each card. */
+.card-options-touch {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    z-index: 5;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    border: none;
+    font-size: 11px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.card-options-touch:hover { background: rgba(0,0,0,0.85); }
+
 /* Card count + source link in deck views */
 .deck-card-counts { font-size: 0.9em; color: var(--text-faint, #666); }
 .deck-source-link { color: var(--accent, #88aaff); text-decoration: none; }
@@ -2553,14 +2576,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     border-top: 1px solid var(--border-soft, #333);
 }
 .card-skin-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 0.85em;
-    flex-wrap: wrap;
 }
-.card-skin-header strong { flex: 1; min-width: 60px; }
+.card-skin-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
 .card-skin-section .small-btn { padding: 5px 12px; font-size: 0.72em; }
 .card-skin-gallery {
     display: flex;

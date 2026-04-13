@@ -282,18 +282,18 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                         <div className="card-skin-section">
                             <div className="card-skin-header">
                                 <strong>Card art</strong>
-                                {currentSkin && (
-                                    <>
-                                        <button className="small-btn" onClick={() => applySkin(null, false)}>Reset</button>
-                                        {card.scryfallId && (
-                                            <button className="small-btn" onClick={() => applySkin(null, true)}>Reset all</button>
-                                        )}
-                                        {loadedDeckId && card.scryfallId && (
-                                            <button className="small-btn primary-btn" onClick={saveSkinToDeck} title="Save this art to the deck so it loads automatically next game">Save to deck</button>
-                                        )}
-                                    </>
-                                )}
                             </div>
+                            {currentSkin && (
+                                <div className="card-skin-actions">
+                                    <button className="small-btn" onClick={() => applySkin(null, false)}>Reset this card</button>
+                                    {card.scryfallId && (
+                                        <button className="small-btn" onClick={() => applySkin(null, true)}>Reset all copies</button>
+                                    )}
+                                    {loadedDeckId && card.scryfallId && (
+                                        <button className="small-btn primary-btn" onClick={saveSkinToDeck}>Save to deck</button>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Alternate printings from Scryfall */}
                             {altArts === null ? (
