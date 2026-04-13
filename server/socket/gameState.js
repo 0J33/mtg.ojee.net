@@ -215,6 +215,11 @@ function createRoom(hostId, hostUsername, settings = {}) {
         // the team total drops instead of the individual life. Off by default.
         sharedTeamLife: false,
         started: false,
+        // Timers — server-authoritative timestamps. Clients compute elapsed
+        // time locally from these so all viewers stay in sync.
+        gameStartedAt: null,       // Date.now() when startGame fires
+        turnStartedAt: null,       // Date.now() when the current turn began
+        cumulativeTurnTime: {},    // { [userId]: totalMs } accumulated per player
         createdAt: Date.now(),
         lastActivity: Date.now(),
     };
@@ -305,6 +310,9 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
             source: t.source,
         })),
         started: room.started,
+        gameStartedAt: room.gameStartedAt || null,
+        turnStartedAt: room.turnStartedAt || null,
+        cumulativeTurnTime: room.cumulativeTurnTime || {},
         mulliganPhase: !!room.mulliganPhase,
         drawings: room.drawings,
         // Strip socketId from spectator list before sending to clients

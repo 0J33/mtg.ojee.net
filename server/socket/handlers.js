@@ -1597,6 +1597,14 @@ module.exports = function registerSocketHandlers(io) {
                 return callback?.({ error: "Only the current turn player (or host) can end the turn" });
             }
 
+            // Accumulate the ending player's turn time before advancing.
+            if (endingPlayer && room.turnStartedAt) {
+                const elapsed = Date.now() - room.turnStartedAt;
+                if (!room.cumulativeTurnTime) room.cumulativeTurnTime = {};
+                room.cumulativeTurnTime[endingPlayer.userId] = (room.cumulativeTurnTime[endingPlayer.userId] || 0) + elapsed;
+            }
+            room.turnStartedAt = Date.now();
+
             // Run end-of-turn cleanup before we advance: damage clears,
             // temporary control changes revert, attacking markers wipe.
             endOfTurnCleanup(room, endingPlayer, io);
@@ -1736,6 +1744,7 @@ module.exports = function registerSocketHandlers(io) {
                     const winnerIdx = room.players.findIndex(p => p.userId === winner.userId);
                     room.mulliganPhase = false;
                     room.turnIndex = winnerIdx;
+                    room.turnStartedAt = Date.now(); // first turn begins now
                     addAndBroadcastAction(io, room, currentUserId, 'firstPlayerRoll', {
                         rolls: room.players.map(p => `${p.username}:${p.firstPlayerRoll}`).join(', '),
                         winner: winner.username,
@@ -2030,6 +2039,9 @@ module.exports = function registerSocketHandlers(io) {
             }
 
             room.started = true;
+            room.gameStartedAt = Date.now();
+            room.turnStartedAt = Date.now();
+            room.cumulativeTurnTime = {};
             room.winnerUserId = null; // clear any previous victor for rematches
             // Enter the mulligan phase: everyone has their 7, can mulligan
             // freely, and clicks Ready when done. First player isn't decided

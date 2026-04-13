@@ -682,40 +682,53 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     // 3 draws 5 → blocked. Allow up to 3 mulligans total.
     const canMulligan = !gameStarted || inMulliganPhase || myMulliganCount < 3;
 
-    // ─── Timers (purely client-side, no server needed) ──────────────
-    const [gameStartTime] = useState(() => Date.now());
-    const [gameElapsed, setGameElapsed] = useState(0);
-    const [turnStartTime, setTurnStartTime] = useState(() => Date.now());
-    const [turnElapsed, setTurnElapsed] = useState(0);
-    const [cumulativeTurnTime, setCumulativeTurnTime] = useState(() => ({}));
+    // ─── Timers — read server-authoritative timestamps, tick locally ──
+    // Server stores gameStartedAt, turnStartedAt, cumulativeTurnTime.
+    // Client computes elapsed = now - timestamp every second for display.
+    // Falls back to client-local timestamps if server hasn't sent them yet
+    // (e.g. server hasn't been restarted with the timer code).
+    const serverGameStart = gameState?.gameStartedAt;
+    const serverTurnStart = gameState?.turnStartedAt;
+    const serverCumulative = gameState?.cumulativeTurnTime || {};
+    const [gameStartFallback] = useState(() => Date.now());
+    const [turnStartFallback, setTurnStartFallback] = useState(() => Date.now());
     const prevTurnIndexRef = useRef(gameState?.turnIndex);
+    const [fallbackCumulative, setFallbackCumulative] = useState({});
+
+    const effectiveGameStart = serverGameStart || gameStartFallback;
+    const effectiveTurnStart = serverTurnStart || turnStartFallback;
+    const cumulativeTurnTime = Object.keys(serverCumulative).length > 0 ? serverCumulative : fallbackCumulative;
+
+    const [gameElapsed, setGameElapsed] = useState(0);
+    const [turnElapsed, setTurnElapsed] = useState(0);
 
     useEffect(() => {
         if (!gameStarted) return;
         const timer = setInterval(() => {
-            setGameElapsed(Date.now() - gameStartTime);
-            setTurnElapsed(Date.now() - turnStartTime);
+            setGameElapsed(Date.now() - effectiveGameStart);
+            setTurnElapsed(Date.now() - effectiveTurnStart);
         }, 1000);
         return () => clearInterval(timer);
-    }, [gameStarted, gameStartTime, turnStartTime]);
+    }, [gameStarted, effectiveGameStart, effectiveTurnStart]);
 
+    // Fallback: track turn changes client-side if server doesn't have timers
     useEffect(() => {
-        if (!gameStarted) return;
+        if (!gameStarted || serverTurnStart) return; // server handles it
         const currentIdx = gameState?.turnIndex;
         if (currentIdx !== prevTurnIndexRef.current) {
             const prevPlayer = gameState?.players?.[prevTurnIndexRef.current];
             if (prevPlayer) {
-                const elapsed = Date.now() - turnStartTime;
-                setCumulativeTurnTime(prev => ({
+                const elapsed = Date.now() - turnStartFallback;
+                setFallbackCumulative(prev => ({
                     ...prev,
                     [prevPlayer.userId]: (prev[prevPlayer.userId] || 0) + elapsed,
                 }));
             }
-            setTurnStartTime(Date.now());
+            setTurnStartFallback(Date.now());
             setTurnElapsed(0);
             prevTurnIndexRef.current = currentIdx;
         }
-    }, [gameState?.turnIndex, gameStarted, turnStartTime]);
+    }, [gameState?.turnIndex, gameStarted, serverTurnStart, turnStartFallback]);
 
     const handleRollForFirstPlayer = () => {
         socket.emit('rollForFirstPlayer', {}, (res) => {
