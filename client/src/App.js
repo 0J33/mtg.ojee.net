@@ -291,6 +291,7 @@ export default function App() {
         <GameBoard
             user={user}
             gameState={gameState}
+            setGameState={setGameState}
             roomCode={roomCode}
             isSpectator={isSpectator || !!gameState.viewerIsSpectator}
             onLeave={handleLeaveRoom}

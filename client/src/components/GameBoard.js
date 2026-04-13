@@ -33,9 +33,40 @@ function fmtTimer(ms) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function GameBoard({ user, gameState, roomCode, isSpectator, onLeave, revealedCard, onDismissReveal, revealedHand, onDismissRevealedHand }) {
+export default function GameBoard({ user, gameState, setGameState, roomCode, isSpectator, onLeave, revealedCard, onDismissReveal, revealedHand, onDismissRevealedHand }) {
     const dialog = useDialog();
     const isTouch = useIsTouchDevice();
+
+    // ─── Optimistic update helpers ──────────────────────────────────
+    // Apply a mutation to local gameState immediately so the UI responds
+    // without waiting for the server round-trip. The next authoritative
+    // gameState broadcast from the server overwrites everything, so
+    // optimistic state is never stale for more than ~100ms. No rollback
+    // logic needed — the server is always the source of truth.
+    const optimisticUpdateCard = useCallback((instanceId, updater) => {
+        setGameState(prev => {
+            if (!prev) return prev;
+            const next = { ...prev, players: prev.players.map(p => ({
+                ...p,
+                zones: Object.fromEntries(Object.entries(p.zones).map(([z, cards]) => [
+                    z,
+                    Array.isArray(cards) ? cards.map(c =>
+                        c?.instanceId === instanceId ? updater(c) : c
+                    ) : cards,
+                ])),
+            }))};
+            return next;
+        });
+    }, [setGameState]);
+
+    const optimisticUpdatePlayer = useCallback((userId, updater) => {
+        setGameState(prev => {
+            if (!prev) return prev;
+            return { ...prev, players: prev.players.map(p =>
+                p.userId === userId ? updater(p) : p
+            )};
+        });
+    }, [setGameState]);
     const [showSearch, setShowSearch] = useState(null); // null, 'token', 'add'
     const [maximizedCard, setMaximizedCard] = useState(null);
     const [drawingEnabled, setDrawingEnabled] = useState(false);
@@ -302,6 +333,10 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                 const found = findCardWithZone(id);
                 return found && !found.card.tapped;
             });
+            // Optimistic: toggle locally before server confirms
+            for (const id of ids) {
+                optimisticUpdateCard(id, c => ({ ...c, tapped: anyUntapped }));
+            }
             socket.emit('bulkTap', { instanceIds: ids, tapped: anyUntapped });
         };
         document.addEventListener('keydown', handler);
@@ -311,7 +346,11 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     }, [selectedIds, gameState]);
 
     const bulkTap = (tapped) => {
-        socket.emit('bulkTap', { instanceIds: Array.from(selectedIds), tapped });
+        const ids = Array.from(selectedIds);
+        for (const id of ids) {
+            optimisticUpdateCard(id, c => ({ ...c, tapped: tapped !== undefined ? tapped : !c.tapped }));
+        }
+        socket.emit('bulkTap', { instanceIds: ids, tapped });
     };
     const bulkMove = (toZone, libraryPosition, randomize) => {
         let ids = Array.from(selectedIds);
@@ -1102,6 +1141,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                     onStartPendingAction={setPendingAction}
                                     onResolvePendingCard={resolvePendingCard}
                                     onResolvePendingPlayer={resolvePendingPlayer}
+                                    optimisticUpdateCard={optimisticUpdateCard}
+                                    optimisticUpdatePlayer={optimisticUpdatePlayer}
                                 />
                             </div>
                         );

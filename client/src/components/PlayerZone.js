@@ -62,7 +62,7 @@ function fmtTimer(ms) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer }) {
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -99,6 +99,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         if (e.button !== 1) return; // only middle click
         e.preventDefault();
         if (spectating) return;
+        // Optimistic: toggle locally before server confirms
+        optimisticUpdateCard?.(card.instanceId, c => ({ ...c, tapped: !c.tapped }));
         socket.emit('tapCard', { instanceId: card.instanceId });
     };
 
@@ -300,7 +302,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             { label: `View: ${card.name || 'Face-down'}`, onClick: () => onMaximizeCard(card) },
             {
                 label: card.tapped ? 'Untap' : 'Tap',
-                onClick: () => socket.emit('tapCard', { instanceId: card.instanceId }),
+                onClick: () => {
+                    optimisticUpdateCard?.(card.instanceId, c => ({ ...c, tapped: !c.tapped }));
+                    socket.emit('tapCard', { instanceId: card.instanceId });
+                },
             },
             ...foretellItems,
             ...stackPushItems,
@@ -372,6 +377,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
     const adjustLife = (amount) => {
         if (spectating) return;
+        // Optimistic: update locally before server confirms
+        optimisticUpdatePlayer?.(player.userId, p => ({ ...p, life: p.life + amount }));
         socket.emit('adjustLife', { targetPlayerId: player.userId, amount });
     };
 
