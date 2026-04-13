@@ -1110,12 +1110,19 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                     if (compactMode) {
                         const self = gameState.players.find(p => p.userId === user.id);
                         const others = gameState.players.filter(p => p.userId !== user.id);
+                        // In compact mode with 3+ opponents, reverse the second
+                        // half so the strip reads clockwise left-to-right.
+                        let orderedOthers = others;
+                        if (others.length >= 3) {
+                            const half = Math.ceil(others.length / 2);
+                            orderedOthers = [...others.slice(0, half), ...others.slice(half).reverse()];
+                        }
                         return (
                             <>
                                 {self && renderPlayer(self, gameState.players.indexOf(self))}
-                                {others.length > 0 && (
+                                {orderedOthers.length > 0 && (
                                     <div className="others-row">
-                                        {others.map(p => renderPlayer(p, gameState.players.indexOf(p)))}
+                                        {orderedOthers.map(p => renderPlayer(p, gameState.players.indexOf(p)))}
                                     </div>
                                 )}
                             </>
