@@ -3125,8 +3125,7 @@ module.exports = function registerSocketHandlers(io) {
                 if (m.player1 && m.player2 && m.status === 'pending') m.status = 'active';
             }
             broadcastRoomState(io, room);
-            addAndBroadcastAction(room, io, {
-                type: 'tournament',
+            addAndBroadcastAction(io, room, null, 'tournament', {
                 message: `Tournament started! ${room.players.length} players, ${bracket.rounds.length} rounds.`,
             });
         });
@@ -3170,15 +3169,13 @@ module.exports = function registerSocketHandlers(io) {
             if (finalMatch?.winner) {
                 t.champion = finalMatch.winner;
                 const champName = finalMatch.player1?.userId === finalMatch.winner ? finalMatch.player1.username : finalMatch.player2.username;
-                addAndBroadcastAction(room, io, {
-                    type: 'tournament',
+                addAndBroadcastAction(io, room, null, 'tournament', {
                     message: `${champName} wins the tournament!`,
                 });
                 // Fire victory animation for the champion
                 io.to(currentRoom).emit('victory', { username: champName });
             } else {
-                addAndBroadcastAction(room, io, {
-                    type: 'tournament',
+                addAndBroadcastAction(io, room, null, 'tournament', {
                     message: `${winnerName} defeats ${loserName} in round ${roundIdx + 1}!`,
                 });
             }
