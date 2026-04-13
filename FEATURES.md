@@ -264,3 +264,46 @@ Full list of what the app does, grouped by area.
 - idempotent startup migrations (custom card origin backfill ran once to stabilize existing data)
 - socket middleware gate for spectator-allowed events
 - deck share codes with ttl auto-expiry via mongodb ttl index
+- broadcast debouncing (80ms per room) with trimmed payloads and append-only action log
+- staleness watchdog (client requests full state if no update in 10s)
+- optimistic updates for tap/untap and life adjustments
+
+## timers
+
+- game timer — counts up from game start, synced across all clients via server timestamps
+- turn timer — shows current turn elapsed next to the active player's name
+- cumulative per-player turn time — total time spent on all turns, shown next to each player's name
+- server-authoritative: `gameStartedAt`, `turnStartedAt`, `cumulativeTurnTime` stored on the room, clients compute elapsed locally
+
+## custom skins & alternate art
+
+- browse all printings of any card from scryfall (different sets, promos, showcase, borderless)
+- click a printing to apply it to this card, shift+click to apply to all copies + save to deck
+- custom image URL input for non-official art
+- skins are server-side — all players see them
+- `Save to deck` persists the chosen art so it loads automatically next game
+- hover zoom on art thumbnails in the picker
+
+## deck tokens
+
+- moxfield import extracts associated tokens automatically (deduped by name)
+- tokens stored in the deck and shown in the deck viewer
+- in-game token menu shows deck tokens at the top for one-click spawning
+- total card count (with unique) and token count shown in import preview and deck viewer
+
+## sharing
+
+- deck share generates a URL (`/share/CODE`) instead of just a code
+- opening a share link auto-opens the import modal with the code pre-filled
+- moxfield source URL saved with the deck, shown as clickable link in deck viewer
+- open graph meta tags for discord / slack / twitter link embeds with mtg.png logo
+
+## visual polish
+
+- clockwise turn order: bottom row of the player grid is reversed for 4+ players
+- context menus: scrollable with max-height, smart up/down positioning
+- saved backgrounds gallery with thumbnail previews
+- version number in lobby title and game topbar
+- mtg.png logo in lobby and topbar
+- disclaimers for wizards of the coast, scryfall, moxfield
+- guide modal: fixed height so navigation arrows don't shift between pages

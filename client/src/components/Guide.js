@@ -233,10 +233,16 @@ const PAGES = [
                     <li>The <strong>Shuffle after</strong> checkbox in View Deck is now off by default — turn it on for effects like "tutor then shuffle"</li>
                     <li>Use <strong>Custom</strong> to make a token or fake card on the fly; save it to your library via the lobby's Custom Cards manager</li>
                     <li><strong>Background (BG)</strong> sets a background image for your side of the board</li>
-                    <li>Drawing now shows a <strong>brush preview circle</strong> at your cursor so you know the actual radius before you commit a stroke</li>
-                    <li>The new <strong>conditional zones</strong> (Foretell, Sideboard, Wishboard, Emblems) only appear when they have content — your usual 3-zone strip stays clean if you don't use them</li>
-                    <li>The mana pool empties automatically at the start of your next turn — no more "wait, did I floats this last turn?"</li>
+                    <li><strong>Middle-click</strong> any card to tap/untap it instantly</li>
+                    <li><strong>Ctrl+drag</strong> across cards to paint-select multiple at once</li>
+                    <li><strong>Shift+click</strong> "→ Top Lib" or "→ Bot Lib" to randomize the order</li>
+                    <li><strong>Shift+click</strong> an alternate art in the skin picker to apply to all copies + save to deck</li>
+                    <li>Player counter badges: <strong>click</strong> +1, <strong>right-click</strong> -1, <strong>middle-click</strong> removes</li>
+                    <li>Drawing now shows a <strong>brush preview circle</strong> at your cursor; <strong>Hide</strong> button hides all drawings without erasing</li>
+                    <li>The new <strong>conditional zones</strong> (Foretell, Sideboard, Wishboard, Emblems) only appear when they have content</li>
+                    <li>The mana pool empties automatically at the start of your next turn</li>
                     <li>Eliminated and conceded players are skipped automatically on turn pass</li>
+                    <li>Custom dice: the Roll modal now supports d2, d3, and any custom number of sides</li>
                 </ul>
                 <p>When one player (or one team) is the last surviving group, a 🏆 victory animation fires for the whole table.</p>
                 <p className="guide-tip">

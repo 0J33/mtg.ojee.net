@@ -1091,8 +1091,8 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                             <input type="checkbox" checked={compactMode} onChange={e => setCompactMode(e.target.checked)} />
                             Compact
                         </label>
-                        <button onClick={onLeave} className="small-btn danger" title="Leave the room">Leave</button>
                     </div>
+                    <button onClick={onLeave} className="small-btn danger" title="Leave the room">Leave</button>
                 </div>
             </div>
 
