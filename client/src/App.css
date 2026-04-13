@@ -243,7 +243,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     position: static;
     flex-shrink: 0;
 }
-.close-btn:hover { color: var(--text); background: none; }
+/* (hover colors handled via background-image swap above) */
 
 /* ─── DECK LIST ───────────────────────────────────────────── */
 .deck-list { display: flex; flex-direction: column; gap: 7px; max-height: 350px; overflow-y: auto; }
@@ -2459,7 +2459,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
 /* Touch mode toggle buttons — fixed bottom-left on touch devices.
-   Two buttons: checkmark (select mode) and dots (menu mode). */
+   Two buttons: checkmark (select mode) and dots (menu mode).
+   Style matches the topbar icon buttons for visual consistency. */
 .touch-mode-btns {
     position: fixed;
     bottom: 12px;
@@ -2467,21 +2468,21 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 300;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 .touch-mode-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
     background: var(--bg-panel, #1a1a2e);
-    border: 2px solid var(--border, #444);
+    border: 1px solid var(--border, #444);
     color: var(--text-mid, #aaa);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    transition: all 0.15s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
     -webkit-tap-highlight-color: transparent;
 }
 .touch-mode-btn.active {
