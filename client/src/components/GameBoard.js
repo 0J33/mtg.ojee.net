@@ -1107,17 +1107,9 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                         );
                     };
 
-                    // Clockwise seating: rotate so the current user is always
-                    // last (bottom of the visual layout). Opponents sit above
-                    // in the order they'd appear clockwise from the user.
-                    const selfIdx = gameState.players.findIndex(p => p.userId === user.id);
-                    const seated = selfIdx >= 0
-                        ? [...gameState.players.slice(selfIdx + 1), ...gameState.players.slice(0, selfIdx), gameState.players[selfIdx]]
-                        : gameState.players;
-
                     if (compactMode) {
-                        const self = seated[seated.length - 1];
-                        const others = seated.slice(0, -1);
+                        const self = gameState.players.find(p => p.userId === user.id);
+                        const others = gameState.players.filter(p => p.userId !== user.id);
                         return (
                             <>
                                 {self && renderPlayer(self, gameState.players.indexOf(self))}
@@ -1129,8 +1121,7 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             </>
                         );
                     }
-
-                    return seated.map(p => renderPlayer(p, gameState.players.indexOf(p)));
+                    return gameState.players.map((p, i) => renderPlayer(p, i));
                 })()}
             </div>
 
