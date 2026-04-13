@@ -2444,6 +2444,22 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     max-width: 100%;
 }
 
+/* Disclaimer */
+.lobby-disclaimer {
+    text-align: center;
+    padding: 20px 16px 8px;
+    font-size: 0.6em;
+    color: var(--text-faint, #444);
+    line-height: 1.5;
+    max-width: 600px;
+    margin: 0 auto;
+}
+.guide-disclaimer {
+    font-size: 0.8em;
+    color: var(--text-faint, #555);
+    font-style: italic;
+}
+
 /* Version — inline next to title in lobby, small label in topbar */
 .lobby-version {
     font-size: 0.45em;

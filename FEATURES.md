@@ -2,6 +2,8 @@
 
 Full list of what the app does, grouped by area.
 
+> **Disclaimer:** Magic: The Gathering is a trademark of Wizards of the Coast LLC. This is an unofficial fan project, not affiliated with or endorsed by Wizards of the Coast. Card data from [Scryfall](https://scryfall.com). Deck import via [Moxfield](https://moxfield.com).
+
 ## rooms & multiplayer
 
 - create rooms with short 6-character codes (unambiguous alphabet, no 0/O/1/I)

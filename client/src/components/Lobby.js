@@ -290,6 +290,9 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
             {customCardsOpen && (
                 <CustomCardManager onClose={() => setCustomCardsOpen(false)} />
             )}
+            <div className="lobby-disclaimer">
+                Magic: The Gathering, MTG, and all associated names, logos, card images, and symbols are trademarks of Wizards of the Coast LLC. This is an unofficial fan project — not produced, endorsed, or supported by Wizards of the Coast. Card data provided by Scryfall. Deck import powered by Moxfield's API — Moxfield is not affiliated with this project.
+            </div>
         </div>
     );
 }

@@ -61,6 +61,10 @@ register, make a room, paste a deck, play.
 - [FEATURES.md](FEATURES.md) — full feature catalog grouped by area
 - [FEATURES_TEST.md](FEATURES_TEST.md) — test plan for the latest big-batch deploy
 
+## disclaimer
+
+Magic: The Gathering, MTG, the MTG logo, and all associated card names, images, mana symbols, and game mechanics are trademarks and copyrights of Wizards of the Coast LLC. This is an unofficial fan project — not produced, endorsed, supported, or affiliated with Wizards of the Coast in any way. Card data and images are provided by [Scryfall](https://scryfall.com). Deck import is powered by [Moxfield](https://moxfield.com)'s API. Neither Scryfall nor Moxfield are affiliated with this project.
+
 ## license
 
 no license yet. ask me if you want to fork or run your own.

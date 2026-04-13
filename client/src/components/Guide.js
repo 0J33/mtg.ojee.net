@@ -17,9 +17,12 @@ const PAGES = [
         body: (
             <>
                 <p className="guide-lede">
-                    This is a digital tabletop for Commander / EDH. It's a tool, not a
-                    rules engine — you move cards, change life totals, and draw stuff
+                    This is an unofficial digital tabletop for Commander / EDH. It's a tool,
+                    not a rules engine — you move cards, change life totals, and draw stuff
                     however your playgroup actually plays.
+                </p>
+                <p className="guide-disclaimer">
+                    Magic: The Gathering is a trademark of Wizards of the Coast. This project is not produced, endorsed, or supported by Wizards of the Coast. Card data from Scryfall. Deck import via Moxfield.
                 </p>
                 <p>
                     Quick start: <strong>Load Deck</strong> in the topbar, then
