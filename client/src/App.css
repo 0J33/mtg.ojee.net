@@ -462,11 +462,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ─── PLAYER ZONES LAYOUT ─────────────────────────────────── */
 .player-zones { flex: 1; display: grid; gap: 4px; overflow: hidden; padding: 4px; --card-w: 70px; --card-h: 98px; }
 .players-1 { grid-template-columns: 1fr; }
-.players-2 { grid-template-columns: 1fr 1fr; }
-.players-3 { grid-template-columns: 1fr 1fr 1fr; --card-w: 56px; --card-h: 78px; }
-.players-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; --card-w: 56px; --card-h: 78px; }
-.players-5, .players-6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; --card-w: 48px; --card-h: 67px; }
-.players-7, .players-8 { grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; --card-w: 44px; --card-h: 61px; }
+/* Clockwise seating: opponents fill the top row(s), self spans the full
+   bottom row. The JS rotates the player array so self renders last. */
+.players-2 { grid-template-columns: 1fr; }
+.players-3 { grid-template-columns: 1fr 1fr; --card-w: 56px; --card-h: 78px; }
+.players-4 { grid-template-columns: 1fr 1fr 1fr; --card-w: 56px; --card-h: 78px; }
+.players-5 { grid-template-columns: 1fr 1fr 1fr 1fr; --card-w: 48px; --card-h: 67px; }
+.players-6 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr; --card-w: 48px; --card-h: 67px; }
+.players-7 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; --card-w: 44px; --card-h: 61px; }
+.players-8 { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr; --card-w: 44px; --card-h: 61px; }
+/* Self always spans the entire bottom row */
+.player-zone-wrapper.is-self { grid-column: 1 / -1; }
 
 .player-zone-wrapper { overflow: hidden; border-radius: 4px; }
 
