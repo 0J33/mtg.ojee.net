@@ -1186,6 +1186,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                                     optimisticUpdateCard={optimisticUpdateCard}
                                     optimisticUpdatePlayer={optimisticUpdatePlayer}
                                     touchInteractMode={touchInteractMode}
+                                    format={gameState.settings?.format || 'commander'}
                                 />
                             </div>
                         );
@@ -1263,7 +1264,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <button onClick={() => bulkMove('exile')} title="Move to exile">→ Exile</button>
                     <button onClick={(e) => bulkMove('library', 'top', e.shiftKey)} title="To top of library. Shift+click = random order">→ Top Lib</button>
                     <button onClick={(e) => bulkMove('library', undefined, e.shiftKey)} title="To bottom of library. Shift+click = random order">→ Bot Lib</button>
-                    <button onClick={() => bulkMove('commandZone')}>→ Cmd</button>
+                    {['commander', 'brawl', 'oathbreaker'].includes(gameState.settings?.format) && <button onClick={() => bulkMove('commandZone')}>→ Cmd</button>}
                     <button onClick={clearSelection}>Clear</button>
                 </div>
             )}

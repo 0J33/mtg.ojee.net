@@ -62,7 +62,10 @@ function fmtTimer(ms) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer, touchInteractMode }) {
+const COMMANDER_FORMATS = new Set(['commander', 'brawl', 'oathbreaker']);
+
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer, touchInteractMode, format }) {
+    const hasCommanderZone = COMMANDER_FORMATS.has(format || 'commander');
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -482,7 +485,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             ...combatItems,
             ...castFromZoneItems,
             { divider: true },
-            ...zones.filter(z => z !== zone && z !== 'library').map(z => ({
+            ...zones.filter(z => z !== zone && z !== 'library' && (z !== 'commandZone' || hasCommanderZone)).map(z => ({
                 label: `Move to ${z === 'commandZone' ? 'Command Zone' : z}`,
                 onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: z }),
             })),
@@ -631,7 +634,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     }
 
     const cmdDmgEntries = Object.entries(player.commanderDamageFrom || {});
-    const lethalCmdDmg = cmdDmgEntries.some(([, dmg]) => dmg >= 21);
+    const lethalCmdDmg = hasCommanderZone && cmdDmgEntries.some(([, dmg]) => dmg >= 21);
     const totalInfect = player.infect || 0;
     const lethalInfect = totalInfect >= 10;
     const isDead = player.life <= 0 || lethalCmdDmg || lethalInfect;
@@ -715,8 +718,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     {!spectating && <button onClick={() => adjustLife(1)}>+</button>}
                 </div>
 
-                {/* Commander damage next to HP, full names */}
-                {cmdDmgEntries.length > 0 && (
+                {/* Commander damage next to HP (commander formats only) */}
+                {hasCommanderZone && cmdDmgEntries.length > 0 && (
                     <div className="commander-damage-inline">
                         {cmdDmgEntries.filter(([, v]) => v > 0).map(([fromId, dmg]) => {
                             const from = allPlayers.find(p => p.userId === fromId);
@@ -824,18 +827,20 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
                 return (
                     <div className="bf-grid">
-                        {/* Top row: command zone + lands */}
+                        {/* Top row: command zone (commander formats only) + lands */}
                         <div className="bf-top-row">
-                            <CommandZoneCell
-                                player={player}
-                                renderCards={renderCards}
-                                onDragOver={handleDragOver}
-                                onDrop={(e) => handleDrop(e, 'commandZone')}
-                                grow={dynamicGrow(player.zones.commandZone || [])}
-                                isCollapsed={collapsedRows.has('commandZone')}
-                                onToggle={() => toggleRow('commandZone')}
-                                playerId={player.userId}
-                            />
+                            {hasCommanderZone && (
+                                <CommandZoneCell
+                                    player={player}
+                                    renderCards={renderCards}
+                                    onDragOver={handleDragOver}
+                                    onDrop={(e) => handleDrop(e, 'commandZone')}
+                                    grow={dynamicGrow(player.zones.commandZone || [])}
+                                    isCollapsed={collapsedRows.has('commandZone')}
+                                    onToggle={() => toggleRow('commandZone')}
+                                    playerId={player.userId}
+                                />
+                            )}
 
                             {renderRow('lands', 'Lands', groups.lands, 'battlefield-lands')}
                         </div>
