@@ -976,7 +976,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     {Array.isArray(gameState.extraTurns) && gameState.extraTurns.length > 0 && (
                         <span className="extra-turn-indicator" title="Extra turns queued">
                             ↺ {gameState.extraTurns.length}: {gameState.extraTurns.map(t => t.ownerName).join(', ')}
-                            {!isSpectator && <button className="small-btn" style={{ marginLeft: 4 }} onClick={() => socket.emit('removeExtraTurn', { index: 0 })}>x</button>}
+                            {!isSpectator && <button className="small-btn" style={{ marginLeft: 4 }} onClick={() => socket.emit('removeExtraTurn', { index: 0 })}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>}
                         </span>
                     )}
                     {/* Stack indicator — auto-shown when non-empty */}
@@ -1024,7 +1024,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                                             <span className={`dot ${s.connected ? 'online' : 'offline'}`} />
                                             {s.username}
                                             {isHost && (
-                                                <button className="spectator-kick-btn" title={`Kick ${s.username}`} onClick={(e) => { e.stopPropagation(); socket.emit('kickSpectator', { targetUserId: s.userId }); }}>x</button>
+                                                <button className="spectator-kick-btn" title={`Kick ${s.username}`} onClick={(e) => { e.stopPropagation(); socket.emit('kickSpectator', { targetUserId: s.userId }); }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                                             )}
                                         </div>
                                     ))}
@@ -1288,7 +1288,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="modal revealed-hand-modal">
                         <div className="modal-header">
                             <h3>{revealedHand.revealedByName || 'Someone'} revealed their hand</h3>
-                            <button className="close-btn" onClick={onDismissRevealedHand}>x</button>
+                            <button className="close-btn" onClick={onDismissRevealedHand}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </div>
                         <div className="revealed-hand-grid">
                             {(revealedHand.cards || []).length === 0 && <div className="muted">Empty hand.</div>}
@@ -1313,7 +1313,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="modal peek-exile-modal">
                         <div className="modal-header">
                             <h3>Looking at top {peekSession.count} of {peekSession.targetUsername}'s library</h3>
-                            <button className="close-btn" onClick={() => setPeekSession(null)}>x</button>
+                            <button className="close-btn" onClick={() => setPeekSession(null)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </div>
                         <p className="muted">Pick one card to exile face-down under your control. The rest go to the bottom in random order.</p>
                         <div className="revealed-hand-grid">
@@ -1393,7 +1393,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="modal">
                         <div className="modal-header">
                             <h2>Select Deck</h2>
-                            <button className="close-btn" onClick={() => setShowDeckPicker(false)}>x</button>
+                            <button className="close-btn" onClick={() => setShowDeckPicker(false)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                         </div>
                         <div className="deck-picker-actions">
                             <button className="small-btn" onClick={() => setIngameDeckBuilderOpen(false)}>Build New</button>
@@ -1752,7 +1752,7 @@ function DiceModal({ onClose }) {
             <div className="modal dice-modal">
                 <div className="modal-header">
                     <h2>Roll</h2>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <div className="dice-count">
                     <label>Count:</label>
@@ -1788,7 +1788,7 @@ function ScryCountModal({ onSubmit, onCancel }) {
             <div className="modal scry-count-modal">
                 <div className="modal-header">
                     <h2>Scry</h2>
-                    <button className="close-btn" onClick={onCancel}>x</button>
+                    <button className="close-btn" onClick={onCancel}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <label className="muted">How many cards to scry?</label>
                 <input
@@ -1868,7 +1868,7 @@ function CustomCardModal({ onClose }) {
                 <div className="modal custom-card-modal">
                     <div className="modal-header">
                         <h2>{editing._id ? 'Edit' : 'Create'} Custom Card</h2>
-                        <button className="close-btn" onClick={() => setEditing(null)}>x</button>
+                        <button className="close-btn" onClick={() => setEditing(null)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                     </div>
                     <input type="text" placeholder="Card name" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
                     <input type="text" placeholder="Image URL" value={editing.imageUrl} onChange={e => setEditing({ ...editing, imageUrl: e.target.value })} />
@@ -1893,7 +1893,7 @@ function CustomCardModal({ onClose }) {
             <div className="modal custom-card-modal">
                 <div className="modal-header">
                     <h2>Custom Cards</h2>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <button onClick={() => setEditing(blankCard())} className="primary-btn">+ New Custom Card</button>
                 {loading ? <p className="muted">Loading...</p> : savedCards.length === 0 ? (
@@ -1954,7 +1954,7 @@ function BackgroundModal({ onClose }) {
             <div className="modal bg-modal">
                 <div className="modal-header">
                     <h2>Set Background</h2>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <input
                     type="text"
@@ -1984,7 +1984,7 @@ function BackgroundModal({ onClose }) {
                                     className="bg-saved-remove"
                                     onClick={() => handleRemoveSaved(link)}
                                     title="Remove from saved"
-                                >x</button>
+                                ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                             </div>
                         ))}
                     </div>
@@ -2059,7 +2059,7 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
             <div className="modal settings-modal">
                 <div className="modal-header">
                     <h2>Game Settings</h2>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <p className="muted" style={{ marginTop: 0 }}>
                     Settings are pure tools — nothing is enforced. Host can change them mid-game; existing life totals stay as they are.
@@ -2173,7 +2173,7 @@ function CardFieldEditorModal({ card, field, onClose, onSubmit }) {
             <div className="modal small-modal">
                 <div className="modal-header">
                     <h3>{labels[field] || field}</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <p className="muted">{card.name}</p>
                 <input
@@ -2201,7 +2201,7 @@ function EmblemAdderModal({ targetPlayerId, onClose, onSubmit }) {
             <div className="modal">
                 <div className="modal-header">
                     <h3>Add emblem</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <input type="text" placeholder="Emblem name (e.g. 'Teferi emblem')" value={name} onChange={e => setName(e.target.value)} autoFocus />
                 <textarea placeholder="Effect text" value={text} onChange={e => setText(e.target.value)} rows={4} />
@@ -2225,7 +2225,7 @@ function BrowseLibraryModal({ player, library, onClose, onMaximizeCard, onSteal 
             <div className="modal browse-library-modal">
                 <div className="modal-header">
                     <h3>{player.username}'s library ({library.length} cards)</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <input type="text" placeholder="Filter by name" value={filter} onChange={e => setFilter(e.target.value)} autoFocus />
                 <p className="muted">Click "Take" to put a card on your battlefield (Bribery / Acquire). Click the card to view it.</p>
@@ -2259,7 +2259,7 @@ function RevealHandPickerModal({ hand, targets, onClose, onSubmit }) {
             <div className="modal">
                 <div className="modal-header">
                     <h3>Reveal which cards from your hand?</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <div className="reveal-target-row">
                     <label>To:</label>
@@ -2372,7 +2372,7 @@ function ProliferateModal({ players, onClose, onSubmit }) {
             <div className="modal" style={{ maxWidth: 500, maxHeight: '80vh', overflowY: 'auto' }}>
                 <div className="modal-header">
                     <h3>Proliferate</h3>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <p className="muted" style={{ marginTop: 0 }}>
                     Check each counter you want to add +1 to.

@@ -7,7 +7,7 @@ it's not a rules engine, just a table. you drag cards around, flip them, track l
 ## what it does
 
 - rooms with invite links, join as player or spectator
-- build decks in the lobby or mid-game, import from moxfield (text **and** url, rate-limited)
+- build decks in the lobby or mid-game, import from moxfield url (rate-limited api) or pasted text
 - custom cards with image urls, shareable across your decks
 - deck share codes — importer picks copy (independent) or link (author's edits propagate)
 - drag cards between zones, mana pool with tap-for-mana, infinite values for combos

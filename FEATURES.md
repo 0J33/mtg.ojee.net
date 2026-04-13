@@ -19,7 +19,7 @@ Full list of what the app does, grouped by area.
 
 - build decks in the lobby or in-game without leaving the table
 - scryfall-backed live card search in deck builder with color/type/text filters
-- import from moxfield via "copy as plain text" → paste from clipboard button, single-click import
+- **moxfield URL import** (default tab): paste a deck URL, server fetches via rate-limited API (10s floor, serial queue), auto-detects commanders, tokens, and art choices
 - import from pasted text with auto-commander detection (legendary creatures, vehicles, planeswalkers with "can be your commander")
 - share decks via short 8-character codes (server-side share collection, 180-day ttl)
 - deck share import: picker between **copy** (new independent custom card records) and **link** (reference the original author's cards — their edits propagate to you automatically)
@@ -227,15 +227,16 @@ Full list of what the app does, grouped by area.
 ## guide / help
 
 - paged in-app how-to-play guide, opens via topbar button (never auto-shown)
-- ~10 pages covering: welcome, zones, card movement, life/counters, turns, drawing, chat/cursors/spectators, inviting, decks & custom cards, tips & shortcuts
+- ~15 pages covering: welcome, zones, card movement, life/counters, turns, drawing, chat/cursors/spectators, inviting, decks & custom cards, mana pool, card actions, stack/emblems/proliferate, settings, hand & library tools, tips & shortcuts
 - navigation via on-screen ◀ / ▶ arrows, keyboard ← / →, clickable page dots, esc to close
 - content updated in sync with feature additions
 
 ## mobile support
 
 - responsive layout: player zones stack vertically, modals go full-screen, card sizes shrink
-- touch-first interactions: tap to select, sticky bottom toolbar replaces right-click menus
-- player options available via ⋮ button (no right-click on touch)
+- **floating mode buttons** (bottom-left): **Select mode** (checkmark) for multi-select, **Menu mode** (three dots) to open context menus — replaces right-click on touch
+- tap a card in normal mode to maximize it; modes toggle on/off
+- bulk action bar for moving / tapping / untapping selected cards
 - hover zoom disabled on touch devices
 - long-press image callout and text selection suppressed inside the game area so dragging doesn't fight with the os
 - fixed scroll chaining (no "scroll the navbar too" issue)

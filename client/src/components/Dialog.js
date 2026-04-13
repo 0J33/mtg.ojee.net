@@ -102,7 +102,7 @@ function DialogShell({ dialog, onClose }) {
             <div className={`modal dialog-modal ${dialog.danger ? 'danger-dialog' : ''}`}>
                 <div className="modal-header">
                     <h3>{dialog.title}</h3>
-                    <button className="close-btn" onClick={handleCancel}>x</button>
+                    <button className="close-btn" onClick={handleCancel}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 {dialog.message && (
                     <p className="dialog-message" style={{ whiteSpace: 'pre-line' }}>{dialog.message}</p>

@@ -109,7 +109,7 @@ export default function CustomCardManager({ onClose }) {
             <div className="modal custom-card-manager-modal">
                 <div className="modal-header">
                     <h2>Custom Cards</h2>
-                    <button className="close-btn" onClick={onClose}>x</button>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
 
                 {editingId === null ? (
@@ -134,7 +134,7 @@ export default function CustomCardManager({ onClose }) {
                                         <div className="ccm-actions">
                                             <button className="small-btn" onClick={() => startEdit(c)}>Edit</button>
                                             <button className="icon-btn" onClick={() => shareCard(c)} title="Share card"><IconShare /></button>
-                                            <button className="delete-btn" onClick={() => remove(c)}>x</button>
+                                            <button className="delete-btn" onClick={() => remove(c)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                                         </div>
                                     </div>
                                 ))}

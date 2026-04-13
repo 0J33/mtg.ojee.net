@@ -203,7 +203,7 @@ export default function ActionLog({ history, players, open, onToggle }) {
             <aside className={`action-log-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
                 <div className="chat-header">
                     <h3>Action Log</h3>
-                    <button className="close-btn" onClick={onToggle} type="button">x</button>
+                    <button className="close-btn" onClick={onToggle} type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
                 <div className="action-log-messages" ref={listRef}>
                     {entries.length === 0 && <div className="chat-empty">No actions yet.</div>}

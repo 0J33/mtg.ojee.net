@@ -59,11 +59,16 @@ const PAGES = [
                 <p><strong>Right-click</strong> a card for a context menu with Move, Tap, Flip, Face-down, Reveal, and more.</p>
                 <p><strong>Click a card</strong> to maximize and view its oracle text + counters.</p>
                 <p>
-                    On touch devices, tap selects cards and a sticky toolbar at the bottom
-                    takes the place of the right-click menu. Tap again to deselect.
+                    <strong>On mobile / touch devices</strong>, two floating buttons appear at the
+                    bottom-left corner:
                 </p>
+                <ul>
+                    <li><strong>Select mode</strong> (checkmark) — tap cards to multi-select them, then use the bulk action bar to move/tap/untap.</li>
+                    <li><strong>Menu mode</strong> (three dots) — tap a card to open its context menu (replaces right-click).</li>
+                </ul>
+                <p>When neither mode is active, tapping a card maximizes it. Toggle a mode off by tapping its button again.</p>
                 <p className="guide-tip">
-                    Shift-click (or ctrl-click / cmd-click) cards to multi-select and use
+                    On desktop: shift-click (or ctrl-click / cmd-click) cards to multi-select, and use
                     the bulk action bar to move them together.
                 </p>
             </>
@@ -94,6 +99,7 @@ const PAGES = [
                 <p>Dead/eliminated players (life ≤ 0, 21+ commander damage, 10+ poison) are <em>automatically skipped</em> on turn advance.</p>
                 <p><strong>Turn-start nudges</strong>: on your turn, the Draw button glows amber until you draw, and any land card in your hand glows until you drop your first land. Purely visual reminders — nothing is enforced, just hard to forget your land drop.</p>
                 <p><strong>Auto-untap</strong> runs at the start of your turn by default. You can turn it off per-player via the player context menu — useful for effects like "doesn't untap during your untap step". Auto-untap events appear in the action log (italic/faint) so you can always see what happened.</p>
+                <p><strong>Timers</strong>: a game timer counts up from when the game started. Each player also has a cumulative turn timer shown next to their name so you can see who's slow. Turn order is clockwise around the table.</p>
                 <p><strong>Undo</strong> reverts the last mutating action (30 deep). Custom designations (Monarch, Initiative, City's Blessing, Day/Night) are in the player context menu — visual only, no automatic triggers.</p>
             </>
         ),
@@ -140,7 +146,7 @@ const PAGES = [
         body: (
             <>
                 <p><strong>Build / import / view decks from anywhere</strong> — in the lobby under "My Decks", or inside a room via the <em>Load Deck</em> modal. Every deck list has <em>Build New</em>, <em>Import</em>, and per-deck <em>View</em> / <em>Edit</em> actions.</p>
-                <p><strong>Moxfield import</strong>: open your deck on Moxfield → More → Export → <strong>Copy as plain text</strong> (not "Copy for Moxfield" — plain text is more reliable, fewer missing cards). Paste into Import → Paste Text tab. The "Moxfield URL" tab is disabled because Moxfield's API is Cloudflare-protected and blocks both server-side and cross-origin access — there's no way around it without OAuth.</p>
+                <p><strong>Moxfield import</strong>: paste a Moxfield deck URL (the default tab) or use Paste Text for plain-text lists. URL import auto-detects commanders, tokens, and card art from Moxfield. Tokens associated with the deck are saved and appear in the in-game token menu for quick spawning.</p>
                 <p><strong>Custom cards</strong> — create them from the lobby's <em>Custom Cards</em> button, or from the Custom Cards tab inside Deck Builder. They show up in any deck you build. Editing a custom card propagates the change to every deck that uses it — yours AND any friend who imported your deck in link mode.</p>
                 <p><strong>Sharing decks</strong> — click the share icon next to a deck to generate a short 8-character share code. The recipient opens <strong>Import</strong> → <strong>Share Code</strong>, pastes it, and picks how to handle custom cards:</p>
                 <ul>
@@ -237,6 +243,8 @@ const PAGES = [
                     <li><strong>Ctrl+drag</strong> across cards to paint-select multiple at once</li>
                     <li><strong>Shift+click</strong> "→ Top Lib" or "→ Bot Lib" to randomize the order</li>
                     <li><strong>Shift+click</strong> an alternate art in the skin picker to apply to all copies + save to deck</li>
+                    <li><strong>Alternate art / skins</strong>: maximize a card → Skin section → browse all printings from Scryfall (showcase, borderless, promo) or paste a custom image URL. Everyone sees the skin. Save to deck to keep it for next game</li>
+                    <li><strong>View other side</strong> of double-faced cards: maximize the card → "View other side" button</li>
                     <li>Player counter badges: <strong>click</strong> +1, <strong>right-click</strong> -1, <strong>middle-click</strong> removes</li>
                     <li>Drawing now shows a <strong>brush preview circle</strong> at your cursor; <strong>Hide</strong> button hides all drawings without erasing</li>
                     <li>The new <strong>conditional zones</strong> (Foretell, Sideboard, Wishboard, Emblems) only appear when they have content</li>
@@ -278,7 +286,7 @@ export default function Guide({ onClose }) {
             <div className="modal guide-modal">
                 <div className="modal-header">
                     <h2>Guide · {current.title}</h2>
-                    <button className="close-btn" onClick={onClose} type="button">x</button>
+                    <button className="close-btn" onClick={onClose} type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
 
                 <div className="guide-body">
