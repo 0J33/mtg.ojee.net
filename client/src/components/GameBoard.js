@@ -22,6 +22,7 @@ import DeckViewer from './DeckViewer';
 import DraftSetup from './DraftSetup';
 import DraftPick from './DraftPick';
 import SealedBuilder from './SealedBuilder';
+import TournamentBracket from './TournamentBracket';
 import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 import { VERSION } from '../version';
@@ -116,6 +117,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
     // Big-batch modals — all hidden behind hovers/menus, no permanent UI footprint.
     const [settingsModalOpen, setSettingsModalOpen] = useState(false);
     const [draftSetupOpen, setDraftSetupOpen] = useState(false);
+    const [bracketOpen, setBracketOpen] = useState(false);
     // Draft/sealed state
     const [draftPack, setDraftPack] = useState(null);
     const [draftRound, setDraftRound] = useState(0);
@@ -1087,6 +1089,12 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                             {isHost && <button onClick={() => setDraftSetupOpen(true)} className="small-btn">Draft / Sealed</button>}
                         </>
                     )}
+                    {gameState?.draftState?.tournament && (
+                        <button onClick={() => setBracketOpen(true)} className="small-btn" title="View tournament bracket">Bracket</button>
+                    )}
+                    {isHost && !gameState?.draftState?.tournament && gameState?.draftState?.phase === 'complete' && (
+                        <button onClick={() => socket.emit('tournament:start')} className="small-btn primary-btn" title="Start tournament bracket">Start Tournament</button>
+                    )}
                     {!isSpectator && gameStarted && (
                         <div className="topbar-group">
                             <button onClick={handleUntapAll} className="small-btn" title="Untap all your tapped permanents">Untap All</button>
@@ -1330,6 +1338,16 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                 <DraftSetup
                     onClose={() => setDraftSetupOpen(false)}
                     isHost={isHost}
+                />
+            )}
+
+            {/* Tournament bracket */}
+            {bracketOpen && gameState?.draftState?.tournament && (
+                <TournamentBracket
+                    tournament={gameState.draftState.tournament}
+                    isHost={isHost}
+                    userId={user.id}
+                    onClose={() => setBracketOpen(false)}
                 />
             )}
 

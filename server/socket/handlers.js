@@ -281,6 +281,110 @@ function broadcastToRoom(io, room, event, data, excludeSocketId = null) {
     }
 }
 
+// Generate a single-elimination bracket from a list of player objects.
+// Returns { rounds: [[match, match, ...], ...], currentRound: 0 }
+// Each match: { id, player1: {userId,username}, player2: {userId,username}|null (bye), winner: null, status: 'pending'|'active'|'done' }
+function generateBracket(players) {
+    // Shuffle players for random seeding
+    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    // Pad to next power of 2 with byes
+    let size = 1;
+    while (size < shuffled.length) size *= 2;
+
+    const entries = shuffled.map(p => ({ userId: p.userId, username: p.username }));
+    while (entries.length < size) entries.push(null); // bye slots
+
+    // Build first round matches
+    const firstRound = [];
+    for (let i = 0; i < entries.length; i += 2) {
+        firstRound.push({
+            id: `r0-m${i / 2}`,
+            player1: entries[i],
+            player2: entries[i + 1],
+            winner: null,
+            status: 'pending',
+        });
+    }
+
+    // Auto-advance byes
+    for (const m of firstRound) {
+        if (!m.player2) {
+            m.winner = m.player1.userId;
+            m.status = 'done';
+        } else if (!m.player1) {
+            m.winner = m.player2.userId;
+            m.status = 'done';
+        }
+    }
+
+    // Build empty rounds for the rest of the bracket
+    const totalRounds = Math.log2(size);
+    const rounds = [firstRound];
+    for (let r = 1; r < totalRounds; r++) {
+        const prevRound = rounds[r - 1];
+        const round = [];
+        for (let i = 0; i < prevRound.length; i += 2) {
+            round.push({
+                id: `r${r}-m${i / 2}`,
+                player1: null,
+                player2: null,
+                winner: null,
+                status: 'pending',
+            });
+        }
+        rounds.push(round);
+    }
+
+    // Propagate bye winners into round 2
+    advanceBracket(rounds);
+
+    return { rounds, currentRound: 0, champion: null };
+}
+
+// Advance winners into the next round's slots. Called after a match result.
+function advanceBracket(rounds) {
+    for (let r = 0; r < rounds.length - 1; r++) {
+        for (let m = 0; m < rounds[r].length; m += 2) {
+            const m1 = rounds[r][m];
+            const m2 = rounds[r][m + 1];
+            const nextMatch = rounds[r + 1][Math.floor(m / 2)];
+            if (!nextMatch) continue;
+            // Slot winner of match m into player1
+            if (m1?.winner && !nextMatch.player1) {
+                const w = m1.player1?.userId === m1.winner ? m1.player1 : m1.player2;
+                nextMatch.player1 = w;
+            }
+            // Slot winner of match m+1 into player2
+            if (m2?.winner && !nextMatch.player2) {
+                const w = m2.player1?.userId === m2.winner ? m2.player1 : m2.player2;
+                nextMatch.player2 = w;
+            }
+            // Auto-advance if only one player (bye propagation)
+            if (nextMatch.player1 && !nextMatch.player2 && nextMatch.status === 'pending') {
+                // Only auto-advance if the feeding match is truly a bye (no opponent)
+                if (m2 && !m2.player1 && !m2.player2) {
+                    nextMatch.winner = nextMatch.player1.userId;
+                    nextMatch.status = 'done';
+                }
+            }
+            if (nextMatch.player2 && !nextMatch.player1 && nextMatch.status === 'pending') {
+                if (m1 && !m1.player1 && !m1.player2) {
+                    nextMatch.winner = nextMatch.player2.userId;
+                    nextMatch.status = 'done';
+                }
+            }
+        }
+    }
+}
+
+// Find the current active round (first round with pending/active matches)
+function findCurrentRound(rounds) {
+    for (let r = 0; r < rounds.length; r++) {
+        if (rounds[r].some(m => m.status !== 'done')) return r;
+    }
+    return rounds.length - 1;
+}
+
 // Load submitted draft/sealed decks into player zones. Called when all players
 // have submitted their decks. Each player's main goes to library, sideboard
 // goes to sideboard zone, basic lands are created as card instances.
@@ -3003,6 +3107,82 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return;
             if (room.players[0]?.userId !== currentUserId) return;
             room.draftState = null;
+            broadcastRoomState(io, room);
+        });
+
+        // ─── TOURNAMENT BRACKET ─────────────────────────────────────────
+
+        // tournament:start — host starts a tournament bracket after decks are built
+        socket.on('tournament:start', () => {
+            const room = getRoom(currentRoom);
+            if (!room) return;
+            if (room.players[0]?.userId !== currentUserId) return;
+            const bracket = generateBracket(room.players);
+            if (!room.draftState) room.draftState = { mode: 'tournament', phase: 'complete' };
+            room.draftState.tournament = bracket;
+            // Mark first round matches as active
+            for (const m of bracket.rounds[0]) {
+                if (m.player1 && m.player2 && m.status === 'pending') m.status = 'active';
+            }
+            broadcastRoomState(io, room);
+            addAndBroadcastAction(room, io, {
+                type: 'tournament',
+                message: `Tournament started! ${room.players.length} players, ${bracket.rounds.length} rounds.`,
+            });
+        });
+
+        // tournament:reportResult — report a match result (host or either player in the match)
+        socket.on('tournament:reportResult', ({ matchId, winnerId }) => {
+            const room = getRoom(currentRoom);
+            if (!room?.draftState?.tournament) return;
+            const t = room.draftState.tournament;
+            // Find the match
+            let match = null;
+            let roundIdx = -1;
+            for (let r = 0; r < t.rounds.length; r++) {
+                const found = t.rounds[r].find(m => m.id === matchId);
+                if (found) { match = found; roundIdx = r; break; }
+            }
+            if (!match || match.status === 'done') return;
+            // Validate: only host or a player in the match can report
+            const isHost = room.players[0]?.userId === currentUserId;
+            const isInMatch = match.player1?.userId === currentUserId || match.player2?.userId === currentUserId;
+            if (!isHost && !isInMatch) return;
+            // Validate winner is in the match
+            if (winnerId !== match.player1?.userId && winnerId !== match.player2?.userId) return;
+
+            match.winner = winnerId;
+            match.status = 'done';
+            const winnerName = match.player1?.userId === winnerId ? match.player1.username : match.player2.username;
+            const loserName = match.player1?.userId === winnerId ? match.player2.username : match.player1.username;
+
+            // Advance bracket
+            advanceBracket(t.rounds);
+            t.currentRound = findCurrentRound(t.rounds);
+
+            // Activate newly ready matches in the current round
+            for (const m of t.rounds[t.currentRound] || []) {
+                if (m.player1 && m.player2 && m.status === 'pending') m.status = 'active';
+            }
+
+            // Check if tournament is over (finals decided)
+            const finalMatch = t.rounds[t.rounds.length - 1]?.[0];
+            if (finalMatch?.winner) {
+                t.champion = finalMatch.winner;
+                const champName = finalMatch.player1?.userId === finalMatch.winner ? finalMatch.player1.username : finalMatch.player2.username;
+                addAndBroadcastAction(room, io, {
+                    type: 'tournament',
+                    message: `${champName} wins the tournament!`,
+                });
+                // Fire victory animation for the champion
+                io.to(currentRoom).emit('victory', { username: champName });
+            } else {
+                addAndBroadcastAction(room, io, {
+                    type: 'tournament',
+                    message: `${winnerName} defeats ${loserName} in round ${roundIdx + 1}!`,
+                });
+            }
+
             broadcastRoomState(io, room);
         });
 

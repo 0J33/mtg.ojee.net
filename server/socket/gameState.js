@@ -339,6 +339,7 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
             round: room.draftState.round,
             totalRounds: room.draftState.totalRounds,
             submitted: room.draftState.submitted || {},
+            tournament: room.draftState.tournament || null,
         } : null,
         viewerIsSpectator: isSpectator,
         viewerPerspectiveOf: perspective,

@@ -2963,3 +2963,30 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .sealed-land-row { gap: 4px; }
     .sealed-land-label { min-width: 60px; font-size: 0.7em; }
 }
+
+/* ─── TOURNAMENT BRACKET ───────────────────────────────────── */
+.tournament-modal { max-width: 800px; width: 95vw; max-height: 90vh; overflow-y: auto; }
+.bracket-container { display: flex; gap: 20px; overflow-x: auto; padding: 12px 0; min-height: 200px; align-items: center; }
+.bracket-round { flex-shrink: 0; min-width: 160px; }
+.bracket-round-title { font-size: 0.75em; text-transform: uppercase; letter-spacing: 2px; color: var(--text-mid); text-align: center; margin-bottom: 10px; font-weight: 600; }
+.bracket-matches { display: flex; flex-direction: column; gap: 16px; justify-content: center; min-height: 100%; }
+.bracket-match { background: var(--bg-deep); border: 1px solid var(--border-soft, #333); border-radius: 6px; padding: 8px 10px; position: relative; }
+.bracket-match.active { border-color: var(--accent); box-shadow: 0 0 8px rgba(136,170,255,0.2); }
+.bracket-match.finals { border-color: #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.2); }
+.bracket-match.done { opacity: 0.7; }
+.bracket-player { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 0.85em; }
+.bracket-player.winner { color: #4caf50; font-weight: 600; }
+.bracket-player.loser { color: var(--text-faint); text-decoration: line-through; }
+.bracket-player-name { flex: 1; }
+.bracket-vs { text-align: center; font-size: 0.65em; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1px; padding: 2px 0; }
+.bracket-win-btn { background: var(--accent); color: #000; border: none; border-radius: 3px; padding: 2px 8px; font-size: 0.7em; font-weight: bold; cursor: pointer; }
+.bracket-win-btn:hover { background: #aac8ff; }
+.bracket-result { font-size: 0.7em; color: var(--accent); text-align: center; margin-top: 4px; }
+.bracket-champion { text-align: center; padding: 16px; font-size: 1.1em; margin-top: 12px; border-top: 1px solid var(--border-soft, #333); }
+.bracket-trophy { font-size: 1.5em; margin-right: 8px; }
+.bracket-hint { text-align: center; font-size: 0.75em; padding: 8px 0; }
+
+@media (max-width: 700px) {
+    .bracket-container { flex-direction: column; align-items: stretch; }
+    .bracket-round { min-width: auto; }
+}
