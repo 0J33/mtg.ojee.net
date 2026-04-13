@@ -144,14 +144,13 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             return;
         }
         // Touch devices: behavior depends on the active touch mode.
-        //   'normal' = tap toggles selection (default, same as before)
-        //   'select' = tap always adds to selection (like holding ctrl)
-        //   'menu'   = tap opens the context menu
+        //   'normal' = tap maximizes/views the card (like desktop left-click)
+        //   'select' = tap toggles selection (like holding ctrl on desktop)
+        //   'menu'   = tap opens the context menu (like right-click)
         if (touchMode) {
             e.preventDefault();
             e.stopPropagation();
             if (touchInteractMode === 'menu') {
-                // Find which zone this card is in for the context menu
                 const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commandZone', 'sideboard', 'companions', 'foretell'];
                 let cardZone = 'battlefield';
                 for (const z of zones) {
@@ -170,8 +169,13 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 }, card, cardZone);
                 return;
             }
-            // 'normal' and 'select' both toggle selection
-            onToggleSelect?.(card.instanceId);
+            if (touchInteractMode === 'select') {
+                onToggleSelect?.(card.instanceId);
+                return;
+            }
+            // 'normal' — view the card (same as desktop click)
+            if (selectedIds && selectedIds.size > 0) onClearSelection?.();
+            onMaximizeCard(card);
             return;
         }
         // Normal desktop click — clear selection and maximize
@@ -182,13 +186,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     const handleCardContext = (e, card, zone) => {
         e.preventDefault();
         e.stopPropagation();
-        // Spectators don't get a card context menu — everything in it mutates
-        // state that the server would reject anyway.
         if (spectating) return;
-        // On touch devices the right-click context menu is unreachable; the
-        // sticky bottom toolbar is the equivalent. Suppress the menu so a
-        // long-press doesn't open something with no good way to dismiss it.
-        if (touchMode) return;
         const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commandZone'];
 
         const bfRowItems = (zone === 'battlefield') ? [
