@@ -224,12 +224,16 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
     }, []);
 
     // Draft/sealed socket listeners
+    const [draftIsNewPack, setDraftIsNewPack] = useState(false);
+    const [draftSetCode, setDraftSetCode] = useState(null);
     useEffect(() => {
-        const onPack = ({ pack, round, pickNumber, totalRounds }) => {
+        const onPack = ({ pack, round, pickNumber, totalRounds, isNewPack, setCode }) => {
             setDraftPack(pack);
             setDraftRound(round);
             setDraftPickNumber(pickNumber);
             setDraftTotalRounds(totalRounds);
+            setDraftIsNewPack(!!isNewPack);
+            if (setCode) setDraftSetCode(setCode);
         };
         const onPicked = ({ card, picks }) => {
             setDraftPicks(picks);
@@ -1338,6 +1342,8 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                             pickNumber={draftPickNumber}
                             totalRounds={draftTotalRounds}
                             picks={draftPicks}
+                            isNewPack={draftIsNewPack}
+                            setCode={draftSetCode}
                             onMaximize={setMaximizedCard}
                         />
                     </div>

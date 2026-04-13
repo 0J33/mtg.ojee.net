@@ -2805,13 +2805,15 @@ module.exports = function registerSocketHandlers(io) {
                     pickTimeSec: pickTimeSec || 60,
                     decks: {},
                 };
-                // Send each player their first pack
+                // Send each player their first pack (isNewPack = true for opening animation)
                 for (const p of room.players) {
                     if (p.socketId) {
                         io.to(p.socketId).emit('draft:pack', {
                             pack: room.draftState.currentPacks[p.userId],
                             round: 0, pickNumber: 0,
                             totalRounds: numPacks,
+                            isNewPack: true,
+                            setCode,
                         });
                     }
                 }
@@ -2855,6 +2857,7 @@ module.exports = function registerSocketHandlers(io) {
             ds.pickNumber++;
 
             // Check if current round's packs are empty
+            let isNewRound = false;
             const anyPacksLeft = ds.seatOrder.some(id => ds.currentPacks[id]?.length > 0);
             if (!anyPacksLeft) {
                 // Move to next round
@@ -2876,6 +2879,7 @@ module.exports = function registerSocketHandlers(io) {
                 ds.passDirection = ds.passDirection === 'left' ? 'right' : 'left';
                 ds.pickNumber = 0;
                 ds.currentPacks = { ...ds.allPacks[ds.round] };
+                isNewRound = true;
             } else {
                 // Pass remaining packs to the next player
                 const order = ds.seatOrder;
@@ -2888,6 +2892,7 @@ module.exports = function registerSocketHandlers(io) {
                     newPacks[order[toIdx]] = ds.currentPacks[order[fromIdx]];
                 }
                 ds.currentPacks = newPacks;
+                isNewRound = false;
             }
 
             // Send each player their new pack
@@ -2897,6 +2902,8 @@ module.exports = function registerSocketHandlers(io) {
                         pack: ds.currentPacks[p.userId],
                         round: ds.round, pickNumber: ds.pickNumber,
                         totalRounds: ds.totalRounds,
+                        isNewPack: isNewRound,
+                        setCode: ds.setCode,
                     });
                 }
             }

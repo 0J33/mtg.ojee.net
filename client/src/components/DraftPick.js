@@ -1,51 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
 
 /**
- * Draft pick interface. Shows the current pack, lets the player pick a card.
- * After picking, shows a "waiting" state until all players have picked.
+ * Draft pick interface with pack opening animation.
+ * Shows the current pack, lets the player pick a card, tracks all picks.
  */
-export default function DraftPick({ pack, round, pickNumber, totalRounds, picks, onMaximize }) {
+export default function DraftPick({ pack, round, pickNumber, totalRounds, picks, isNewPack, setCode, onMaximize }) {
     const [selectedIdx, setSelectedIdx] = useState(null);
     const [waiting, setWaiting] = useState(false);
+    const [opening, setOpening] = useState(false); // pack opening animation
+    const [revealed, setRevealed] = useState(false); // cards revealed after animation
 
-    // Reset selection when a new pack arrives
+    // When a new pack arrives, reset state
     useEffect(() => {
         setSelectedIdx(null);
         setWaiting(false);
-    }, [pack]);
+        if (isNewPack) {
+            // Show pack opening animation for new rounds
+            setOpening(true);
+            setRevealed(false);
+            const timer = setTimeout(() => {
+                setOpening(false);
+                setRevealed(true);
+            }, 1500);
+            return () => clearTimeout(timer);
+        } else {
+            // Passed pack — show cards immediately
+            setOpening(false);
+            setRevealed(true);
+        }
+    }, [pack, isNewPack]);
 
     useEscapeKey(() => setSelectedIdx(null));
 
-    const confirmPick = () => {
+    const confirmPick = useCallback(() => {
         if (selectedIdx === null || !pack || waiting) return;
         socket.emit('draft:pick', { cardIndex: selectedIdx });
         setWaiting(true);
-    };
+    }, [selectedIdx, pack, waiting]);
 
     if (!pack || pack.length === 0) {
         return (
             <div className="draft-pick-panel">
-                <div className="draft-pick-header">
-                    <h3>Waiting for next pack...</h3>
+                <div className="draft-waiting">
+                    <div className="muted">Waiting for next pack...</div>
                 </div>
             </div>
         );
     }
 
-    const direction = round % 2 === 0 ? '→' : '←';
+    const direction = round % 2 === 0 ? 'left' : 'right';
+    const dirArrow = direction === 'left' ? '\u2190' : '\u2192';
+    const packSize = pack.length;
+    const totalPicksInRound = packSize + pickNumber;
+    const setIconUrl = setCode ? `https://svgs.scryfall.io/sets/${setCode.toLowerCase()}.svg` : null;
+
+    // Pack opening animation
+    if (opening) {
+        return (
+            <div className="draft-pick-panel">
+                <div className="draft-pack-opening">
+                    <div className="draft-pack-wrapper">
+                        {setIconUrl && <img src={setIconUrl} alt="" className="draft-pack-art" />}
+                        <div className="draft-pack-label">Pack {round + 1}</div>
+                        <div className="draft-pack-shimmer" />
+                    </div>
+                    <div className="draft-opening-text">Opening pack...</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="draft-pick-panel">
+            {/* Header — round/pick info + pass direction */}
             <div className="draft-pick-header">
-                <h3>Pack {round + 1}/{totalRounds} · Pick {pickNumber + 1}/{pack.length + (picks?.length > 0 ? 0 : 0)}</h3>
-                <span className="muted">Pass {direction} · {pack.length} cards remaining</span>
+                <div className="draft-pick-info">
+                    {setIconUrl && <img src={setIconUrl} alt="" className="draft-header-icon" />}
+                    <h3>Pack {round + 1} of {totalRounds}</h3>
+                    <span className="draft-pick-num">Pick {pickNumber + 1} of {totalPicksInRound}</span>
+                </div>
+                <div className="draft-pass-indicator">
+                    <span className="draft-pass-dir">{dirArrow} Passing {direction}</span>
+                    <span className="draft-cards-left">{packSize} cards in pack</span>
+                </div>
             </div>
 
             {waiting ? (
                 <div className="draft-waiting">
-                    <div className="muted">Waiting for other players to pick...</div>
+                    <div className="draft-waiting-text">Waiting for other players to pick...</div>
                     {picks && picks.length > 0 && (
                         <div className="draft-picks-summary">
                             <strong>Your picks ({picks.length})</strong>
@@ -61,34 +105,38 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                 </div>
             ) : (
                 <>
-                    <div className="draft-pack-grid">
+                    {/* Pack cards — grid of selectable cards */}
+                    <div className={`draft-pack-grid ${revealed ? 'revealed' : ''}`}>
                         {pack.map((card, i) => (
                             <div
                                 key={card.scryfallId || i}
                                 className={`draft-pack-card ${selectedIdx === i ? 'selected' : ''}`}
+                                style={{ animationDelay: revealed ? `${i * 40}ms` : '0ms' }}
                                 onClick={() => setSelectedIdx(i)}
-                                onDoubleClick={() => { setSelectedIdx(i); setTimeout(confirmPick, 0); }}
+                                onDoubleClick={() => { setSelectedIdx(i); setTimeout(() => { socket.emit('draft:pick', { cardIndex: i }); setWaiting(true); }, 0); }}
                             >
                                 {card.imageUri ? (
                                     <img src={card.imageUri} alt={card.name} />
                                 ) : (
                                     <div className="draft-card-name">{card.name}</div>
                                 )}
-                                <div className="draft-card-rarity">{card.rarity?.[0]?.toUpperCase()}</div>
+                                <div className={`draft-card-rarity rarity-${card.rarity}`}>{card.rarity?.[0]?.toUpperCase()}</div>
                             </div>
                         ))}
                     </div>
 
+                    {/* Pick button */}
                     <div className="draft-pick-actions">
                         <button
                             className="primary-btn"
                             onClick={confirmPick}
                             disabled={selectedIdx === null}
                         >
-                            {selectedIdx !== null ? `Pick: ${pack[selectedIdx]?.name}` : 'Select a card'}
+                            {selectedIdx !== null ? `Pick: ${pack[selectedIdx]?.name}` : 'Select a card to pick'}
                         </button>
                     </div>
 
+                    {/* Picks so far — collapsible strip at bottom */}
                     {picks && picks.length > 0 && (
                         <div className="draft-picks-summary">
                             <strong>Your picks ({picks.length})</strong>

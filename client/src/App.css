@@ -2858,21 +2858,69 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Draft pick screen */
 .draft-pick-modal { max-width: 900px; width: 95vw; max-height: 90vh; overflow-y: auto; }
 .draft-pick-panel { padding: 8px 0; }
-.draft-pick-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.draft-pick-header h3 { margin: 0; font-size: 1em; }
+.draft-pick-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.draft-pick-info { display: flex; align-items: center; gap: 8px; }
+.draft-pick-info h3 { margin: 0; font-size: 1em; }
+.draft-header-icon { width: 20px; height: 20px; filter: invert(0.7); }
+.draft-pick-num { font-size: 0.8em; color: var(--text-mid); }
+.draft-pass-indicator { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.8em; }
+.draft-pass-dir { color: var(--accent); font-weight: 600; }
+.draft-cards-left { color: var(--text-faint); }
+
+/* Pack opening animation */
+.draft-pack-opening { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; }
+.draft-pack-wrapper { position: relative; width: 180px; height: 240px; background: linear-gradient(145deg, #1a1a2e, #16213e); border: 2px solid var(--accent-dim, #556); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; overflow: hidden; animation: packPulse 1.5s ease-in-out; }
+.draft-pack-art { width: 60px; height: 60px; filter: invert(0.8) drop-shadow(0 0 8px rgba(136,170,255,0.5)); animation: packIconGlow 1.5s ease-in-out; }
+.draft-pack-label { color: var(--text); font-size: 1.1em; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; font-family: 'Cinzel', serif; }
+.draft-pack-shimmer { position: absolute; inset: 0; background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%); animation: shimmer 1.2s ease-in-out; }
+.draft-opening-text { margin-top: 16px; color: var(--text-mid); font-size: 0.9em; animation: fadeInUp 0.5s ease 0.3s both; }
+
+@keyframes packPulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    30% { transform: scale(1.05); opacity: 1; }
+    60% { transform: scale(1); }
+    85% { transform: scale(1.02); box-shadow: 0 0 30px rgba(136,170,255,0.3); }
+    100% { transform: scale(1); opacity: 0.5; }
+}
+@keyframes packIconGlow {
+    0% { opacity: 0; transform: scale(0.5); }
+    40% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Card reveal animation */
 .draft-pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.draft-pack-grid.revealed .draft-pack-card { animation: cardReveal 0.3s ease-out both; }
+@keyframes cardReveal {
+    from { opacity: 0; transform: translateY(20px) scale(0.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .draft-pack-card { position: relative; cursor: pointer; border-radius: 8px; overflow: hidden; border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s; }
 .draft-pack-card:hover { transform: scale(1.03); }
-.draft-pack-card.selected { border-color: var(--accent); box-shadow: 0 0 12px rgba(136,170,255,0.4); }
+.draft-pack-card.selected { border-color: var(--accent); box-shadow: 0 0 12px rgba(136,170,255,0.4); transform: scale(1.04); }
 .draft-pack-card img { width: 100%; display: block; border-radius: 6px; }
 .draft-card-rarity { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); color: #fff; font-size: 0.6em; padding: 2px 4px; border-radius: 3px; font-weight: bold; }
+.draft-card-rarity.rarity-mythic { color: #ff8c00; }
+.draft-card-rarity.rarity-rare { color: #ffd700; }
+.draft-card-rarity.rarity-uncommon { color: #c0c0c0; }
 .draft-card-name { padding: 8px; font-size: 0.75em; }
 .draft-pick-actions { text-align: center; margin-bottom: 12px; }
 .draft-waiting { text-align: center; padding: 30px 0; }
+.draft-waiting-text { font-size: 0.95em; color: var(--text-mid); }
 .draft-picks-summary { margin-top: 12px; border-top: 1px solid var(--border-soft, #333); padding-top: 8px; }
 .draft-picks-summary strong { font-size: 0.85em; display: block; margin-bottom: 6px; }
 .draft-picks-grid { display: flex; flex-wrap: wrap; gap: 4px; }
-.draft-pick-thumb { width: 50px; cursor: pointer; border-radius: 4px; overflow: hidden; }
+.draft-pick-thumb { width: 50px; cursor: pointer; border-radius: 4px; overflow: hidden; transition: transform 0.1s; }
+.draft-pick-thumb:hover { transform: scale(1.1); }
 .draft-pick-thumb img { width: 100%; display: block; }
 
 /* Sealed deck builder */
@@ -2893,9 +2941,24 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .rarity-mythic { box-shadow: 0 0 4px rgba(255,140,0,0.4); }
 .rarity-rare { box-shadow: 0 0 4px rgba(255,215,0,0.3); }
 .sealed-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-soft, #333); }
+.sealed-ready { color: #4caf50; font-weight: 600; }
+
+/* Basic lands section */
+.sealed-lands { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-soft, #333); }
+.sealed-lands strong { font-size: 0.85em; display: block; margin-bottom: 6px; }
+.sealed-land-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.sealed-land-btn { display: flex; align-items: center; gap: 4px; }
+.sealed-land-label { font-size: 0.8em; min-width: 80px; text-align: center; }
+.mana-W { color: #f9faf4; }
+.mana-U { color: #0e68ab; }
+.mana-B { color: #a69f9d; }
+.mana-R { color: #d51b21; }
+.mana-G { color: #00733e; }
 
 @media (max-width: 700px) {
     .sealed-panels { flex-direction: column; }
     .sealed-panel { max-height: 40vh; }
     .draft-pack-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+    .sealed-land-row { gap: 4px; }
+    .sealed-land-label { min-width: 60px; font-size: 0.7em; }
 }
