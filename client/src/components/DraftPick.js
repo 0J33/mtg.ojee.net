@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
 
@@ -9,8 +10,9 @@ import { useEscapeKey } from '../utils';
 export default function DraftPick({ pack, round, pickNumber, totalRounds, picks, isNewPack, setCode, onMaximize }) {
     const [selectedIdx, setSelectedIdx] = useState(null);
     const [waiting, setWaiting] = useState(false);
-    const [opening, setOpening] = useState(false); // pack opening animation
-    const [revealed, setRevealed] = useState(false); // cards revealed after animation
+    const [opening, setOpening] = useState(false);
+    const [revealed, setRevealed] = useState(false);
+    const [hover, setHover] = useState(null); // { imageUri, x, y }
 
     // When a new pack arrives, reset state
     useEffect(() => {
@@ -114,6 +116,8 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                                 style={{ animationDelay: revealed ? `${i * 40}ms` : '0ms' }}
                                 onClick={() => setSelectedIdx(i)}
                                 onDoubleClick={() => { setSelectedIdx(i); setTimeout(() => { socket.emit('draft:pick', { cardIndex: i }); setWaiting(true); }, 0); }}
+                                onMouseMove={(e) => card.imageUri && setHover({ imageUri: card.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
+                                onMouseLeave={() => setHover(null)}
                             >
                                 {card.imageUri ? (
                                     <img src={card.imageUri} alt={card.name} />
@@ -150,6 +154,14 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Hover zoom portal */}
+            {hover && hover.imageUri && createPortal(
+                <div className="card-zoom" style={{ position: 'fixed', left: hover.x, top: hover.y, zIndex: 3000, pointerEvents: 'none' }}>
+                    <img src={hover.imageUri} alt="" />
+                </div>,
+                document.body
             )}
         </div>
     );

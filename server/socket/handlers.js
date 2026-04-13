@@ -379,6 +379,27 @@ module.exports = function registerSocketHandlers(io) {
             socket.join(roomCode);
             broadcastRoomState(io, room);
             callback({ success: true, state: getRoomStateForPlayer(room, userId) });
+
+            // Restore draft/sealed state on reconnect
+            const ds = room.draftState;
+            if (ds) {
+                if (ds.mode === 'draft' && ds.phase === 'picking' && ds.currentPacks?.[userId]) {
+                    socket.emit('draft:pack', {
+                        pack: ds.currentPacks[userId],
+                        round: ds.round,
+                        pickNumber: ds.pickNumber,
+                        totalRounds: ds.totalRounds,
+                        isNewPack: false,
+                        setCode: ds.setCode,
+                    });
+                    if (ds.picks?.[userId]?.length > 0) {
+                        socket.emit('draft:picked', { card: null, picks: ds.picks[userId] });
+                    }
+                } else if (ds.phase === 'building') {
+                    const pool = ds.mode === 'draft' ? ds.picks?.[userId] : ds.pools?.[userId];
+                    if (pool) socket.emit('sealed:pool', { pool });
+                }
+            }
         });
 
         socket.on('joinRoomAsSpectator', ({ roomCode, userId, username }, callback) => {
