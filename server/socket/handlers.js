@@ -292,6 +292,7 @@ const SPECTATOR_ALLOWED_EVENTS = new Set([
     'cursorMove',
     // Spectator-specific features that don't mutate game state.
     'setSpectatorPerspective',
+    'requestState',
     'disconnect', 'disconnecting',
 ]);
 
@@ -2621,6 +2622,25 @@ module.exports = function registerSocketHandlers(io) {
                 cardName: card.name, toZone: dest, shuffled: !!shuffle,
             });
             broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Client-side watchdog: if a client hasn't received a gameState in a
+        // while, it pokes this to get a fresh full state. No mutation, no
+        // snapshot, no action log — just a one-off full broadcast to this
+        // socket.
+        socket.on('requestState', (callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            if (isSpectator) {
+                const spec = getSpectatorInRoom(room, currentUserId);
+                socket.emit('gameState', getRoomStateForPlayer(room, currentUserId, {
+                    isSpectator: true,
+                    spectatorPerspectiveOf: spec?.perspectiveOf || null,
+                }));
+            } else {
+                socket.emit('gameState', getRoomStateForPlayer(room, currentUserId));
+            }
             callback?.({ success: true });
         });
 

@@ -100,7 +100,11 @@ export default function App() {
         socket.on('connect', onConnect);
         socket.on('disconnect', (reason) => console.log('[socket] DISCONNECTED reason=', reason));
         socket.on('connect_error', (err) => console.error('[socket] CONNECT ERROR:', err.message, err));
+        // Track last gameState arrival time for the staleness watchdog below.
+        let lastGameStateAt = Date.now();
+
         socket.on('gameState', (state) => {
+            lastGameStateAt = Date.now();
             // The server trims actionHistory + chat from debounced broadcasts
             // to reduce payload. If the incoming state has empty arrays, merge
             // with the client's existing data instead of wiping it.
@@ -116,6 +120,16 @@ export default function App() {
                 return merged;
             });
         });
+
+        // Staleness watchdog: if no gameState has arrived in 10 seconds and
+        // we're connected, poke the server with a no-op event to trigger a
+        // fresh broadcast. This self-corrects any state that got lost due to
+        // a dropped packet or debounce swallowing.
+        const watchdog = setInterval(() => {
+            if (socket.connected && Date.now() - lastGameStateAt > 10000) {
+                socket.emit('requestState');
+            }
+        }, 10000);
         // Append-only action log entries (one per mutation instead of full
         // history in every gameState broadcast).
         socket.on('actionEntry', (entry) => {
@@ -174,6 +188,7 @@ export default function App() {
             socket.off('newStroke');
             socket.off('actionEntry');
             socket.off('kicked');
+            clearInterval(watchdog);
             socket.disconnect();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
