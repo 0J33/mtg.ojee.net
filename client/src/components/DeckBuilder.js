@@ -11,13 +11,19 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
     const [commanders, setCommanders] = useState([]);
     const [mainboard, setMainboard] = useState([]);
     const [sideboard, setSideboard] = useState([]);
+    const [tokens, setTokens] = useState([]);
+    const [importedFrom, setImportedFrom] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [savedCustomCards, setSavedCustomCards] = useState([]);
-    const [tab, setTab] = useState('search'); // search, custom, deck
+    const [tab, setTab] = useState('search'); // search, custom, tokens, deck
     const [saving, setSaving] = useState(false);
+    const [tokenQuery, setTokenQuery] = useState('');
+    const [tokenResults, setTokenResults] = useState([]);
+    const [tokenLoading, setTokenLoading] = useState(false);
     const debounceRef = useRef(null);
+    const tokenDebounceRef = useRef(null);
 
     useEffect(() => {
         if (deckId) {
@@ -27,6 +33,8 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                     setCommanders(data.deck.commanders || []);
                     setMainboard(data.deck.mainboard || []);
                     setSideboard(data.deck.sideboard || []);
+                    setTokens(data.deck.tokens || []);
+                    setImportedFrom(data.deck.importedFrom || '');
                 }
             });
         }
@@ -46,6 +54,26 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
             setSearchLoading(false);
         }, 300);
     };
+
+    const handleTokenSearch = (q) => {
+        setTokenQuery(q);
+        if (tokenDebounceRef.current) clearTimeout(tokenDebounceRef.current);
+        if (q.length < 2) { setTokenResults([]); return; }
+        tokenDebounceRef.current = setTimeout(async () => {
+            setTokenLoading(true);
+            const data = await scryfall.search(`t:token ${q}`);
+            setTokenResults(data.data || []);
+            setTokenLoading(false);
+        }, 300);
+    };
+
+    const addToken = (card) => {
+        const entry = scryfallCardToEntry(card);
+        if (tokens.some(t => t.name === entry.name)) return; // dedup by name
+        setTokens(prev => [...prev, entry]);
+    };
+
+    const removeToken = (idx) => setTokens(prev => prev.filter((_, i) => i !== idx));
 
     const scryfallCardToEntry = (card) => {
         const face = card.card_faces?.[0];
@@ -119,7 +147,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
 
     const handleSave = async () => {
         setSaving(true);
-        const payload = { name, format: 'commander', commanders, mainboard, sideboard };
+        const payload = { name, format: 'commander', commanders, mainboard, sideboard, tokens, importedFrom: importedFrom || null };
         try {
             if (deckId) await decks.update(deckId, payload);
             else await decks.create(payload);
@@ -176,13 +204,17 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                     <input type="text" placeholder="Deck name" value={name} onChange={e => setName(e.target.value)} />
                     <span className="muted">{totalCount} cards</span>
                 </div>
+                <div className="db-source-row">
+                    <input type="text" placeholder="Moxfield / source URL (optional)" value={importedFrom} onChange={e => setImportedFrom(e.target.value)} className="db-source-input" />
+                </div>
 
                 <div className="db-body">
                     {/* Left: search/custom cards */}
                     <div className="db-left">
                         <div className="tab-row">
-                            <button className={tab === 'search' ? 'active' : ''} onClick={() => setTab('search')}>Search Cards</button>
-                            <button className={tab === 'custom' ? 'active' : ''} onClick={() => setTab('custom')}>Custom Cards</button>
+                            <button className={tab === 'search' ? 'active' : ''} onClick={() => setTab('search')}>Search</button>
+                            <button className={tab === 'custom' ? 'active' : ''} onClick={() => setTab('custom')}>Custom</button>
+                            <button className={tab === 'tokens' ? 'active' : ''} onClick={() => setTab('tokens')}>Tokens ({tokens.length})</button>
                         </div>
 
                         {tab === 'search' && (
@@ -234,6 +266,51 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                                     </div>
                                 ))}
                             </div>
+                        )}
+
+                        {tab === 'tokens' && (
+                            <>
+                                <input
+                                    type="text"
+                                    placeholder="Search tokens (e.g. soldier, treasure, food)"
+                                    value={tokenQuery}
+                                    onChange={e => handleTokenSearch(e.target.value)}
+                                />
+                                {tokens.length > 0 && (
+                                    <div className="db-token-list">
+                                        <strong>Deck tokens ({tokens.length})</strong>
+                                        {tokens.map((t, i) => (
+                                            <div key={i} className="db-search-item">
+                                                {t.imageUri && <img src={t.imageUri.replace('/normal/', '/small/')} alt={t.name} />}
+                                                <div className="db-search-info"><strong>{t.name}</strong></div>
+                                                <button className="delete-btn" onClick={() => removeToken(i)} title="Remove token">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="db-search-results">
+                                    {tokenLoading && <div className="muted">Searching...</div>}
+                                    {tokenResults.map(card => {
+                                        const face = card.card_faces?.[0];
+                                        const img = card.image_uris?.small || face?.image_uris?.small || '';
+                                        const already = tokens.some(t => t.name === card.name);
+                                        return (
+                                            <div key={card.id} className="db-search-item">
+                                                {img && <img src={img} alt={card.name} />}
+                                                <div className="db-search-info">
+                                                    <strong>{card.name}</strong>
+                                                    <div className="muted">{card.type_line}</div>
+                                                </div>
+                                                <div className="db-search-actions">
+                                                    <button onClick={() => addToken(card)} disabled={already}>{already ? 'Added' : '+ Token'}</button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
                         )}
                     </div>
 

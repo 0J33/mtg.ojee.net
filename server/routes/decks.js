@@ -102,12 +102,13 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 router.put('/:id', requireAuth, async (req, res) => {
-    const { name, format, commanders, companions, mainboard, sideboard, tokens } = req.body;
+    const { name, format, commanders, companions, mainboard, sideboard, tokens, importedFrom } = req.body;
     // Only update fields that are provided (avoid clearing data on partial updates like rename)
     const update = { updatedAt: Date.now() };
     if (name !== undefined) update.name = name;
     if (format !== undefined) update.format = format;
     if (tokens !== undefined) update.tokens = tokens;
+    if (importedFrom !== undefined) update.importedFrom = importedFrom;
     // Re-hydrate authorUsername on any newly-added custom entries before
     // saving so edits made in DeckBuilder pick up the right name without
     // the client having to compute it.
