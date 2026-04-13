@@ -54,8 +54,9 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
         </div>
     );
 
-    const totalCount = (deck.commanders?.length || 0) +
-        (deck.mainboard?.reduce((s, c) => s + (c.quantity || 1), 0) || 0);
+    const allEntries = [...(deck.commanders || []), ...(deck.mainboard || []), ...(deck.sideboard || []), ...(deck.companions || [])];
+    const totalCount = allEntries.reduce((s, c) => s + (c.quantity || 1), 0);
+    const uniqueCount = allEntries.length;
 
     const renderCardList = (cards) => (
         <div className="deck-card-list">
@@ -84,9 +85,13 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                     <button className="close-btn" onClick={onClose}>x</button>
                 </div>
                 <p className="muted">
-                    {totalCount} cards · {deck.format}
+                    {totalCount} cards ({uniqueCount} unique) · {deck.format}
+                    {deck.tokens?.length > 0 && ` · ${deck.tokens.length} tokens`}
                     {deck.sharedByUsername && (
                         <> · <span className="deck-author-badge">shared by {deck.sharedByUsername}</span></>
+                    )}
+                    {deck.importedFrom && (
+                        <> · <a href={deck.importedFrom} target="_blank" rel="noopener noreferrer" className="deck-source-link">source</a></>
                     )}
                 </p>
 
@@ -110,6 +115,12 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                     <div className="preview-section">
                         <strong>Sideboard ({deck.sideboard.length})</strong>
                         {renderCardList(deck.sideboard)}
+                    </div>
+                )}
+                {deck.tokens?.length > 0 && (
+                    <div className="preview-section">
+                        <strong>Tokens ({deck.tokens.length})</strong>
+                        {renderCardList(deck.tokens)}
                     </div>
                 )}
                 {deck.notFound?.length > 0 && (

@@ -2444,6 +2444,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     max-width: 100%;
 }
 
+/* Card count + source link in deck views */
+.deck-card-counts { font-size: 0.9em; color: var(--text-faint, #666); }
+.deck-source-link { color: var(--accent, #88aaff); text-decoration: none; }
+.deck-source-link:hover { text-decoration: underline; }
+
 /* Disclaimer */
 .lobby-disclaimer {
     text-align: center;
@@ -2550,11 +2555,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-skin-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 8px;
     font-size: 0.85em;
+    flex-wrap: wrap;
 }
-.card-skin-header strong { flex: 1; }
+.card-skin-header strong { flex: 1; min-width: 60px; }
+.card-skin-header .small-btn { padding: 4px 10px; }
 .card-skin-gallery {
     display: flex;
     gap: 6px;
@@ -2590,13 +2597,16 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     display: flex;
     gap: 4px;
     align-items: center;
-    margin-top: 4px;
+    margin-top: 6px;
+    flex-wrap: wrap;
 }
 .card-skin-url-row input {
     flex: 1;
-    padding: 4px 8px;
+    min-width: 150px;
+    padding: 5px 8px;
     font-size: 12px;
 }
+.card-skin-url-row .small-btn { padding: 4px 10px; }
 
 /* DFC preview button in CardMaximized */
 .card-max-image-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
@@ -2731,6 +2741,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .mana-pool-widget .mana-sym-img { width: 10px; height: 10px; }
     .extra-turn-indicator,
     .stack-indicator { display: none; }
-    /* They're informational; the stack panel itself still pops up. The
-       topbar can recover the space. */
+    /* Timers: hide game timer, keep turn timer compact */
+    .game-timer { display: none; }
+    .turn-timer { font-size: 0.75em; }
+    .player-turn-time { display: none; }
+    /* Modals: full-width, no margin overflow */
+    .modal { max-width: 100vw !important; margin: 0 4px; }
+    .deck-viewer, .library-search-modal, .card-search-modal, .browse-library-modal { width: 100%; }
+    /* Topbar groups: tighter on very small screens */
+    .topbar-group { padding: 0 1px; border-right: none; }
+    .topbar-group .small-btn { padding: 3px 6px; font-size: 0.58em; }
+    /* Selection bar: scrollable if too wide */
+    .selection-bar { overflow-x: auto; flex-wrap: nowrap; }
+    .selection-bar button { white-space: nowrap; flex-shrink: 0; }
+    /* Deck import: stack buttons vertically */
+    .modal-actions { flex-direction: column; }
+    .modal-actions button { width: 100%; }
 }

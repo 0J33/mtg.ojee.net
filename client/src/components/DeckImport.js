@@ -101,6 +101,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose, initialSh
             sideboard: preview.sideboard || [],
             tokens: preview.tokens || [],
             notFound,
+            importedFrom: preview._importedFrom || null,
         });
     };
 
@@ -138,6 +139,8 @@ export default function DeckImport({ onImport, onDeckCreated, onClose, initialSh
                 const slug = url.match(/moxfield\.com\/decks\/([A-Za-z0-9_-]+)/)?.[1];
                 if (slug) setDeckName(`Moxfield ${slug.slice(0, 8)}`);
             }
+            // Stash the source URL so it's saved with the deck
+            data._importedFrom = url;
             setPreview(data);
         } catch (err) {
             setError(err.message || 'Import failed');
@@ -314,7 +317,18 @@ export default function DeckImport({ onImport, onDeckCreated, onClose, initialSh
                     <>
                         <div className="import-preview">
                             <h3>Select Commander(s)</h3>
-                            <p className="muted">Click legendary cards to mark them as commanders. Selected: {commanderIds.size}</p>
+                            <p className="muted">
+                                Click legendary cards to mark them as commanders. Selected: {commanderIds.size}
+                                <br />
+                                <span className="deck-card-counts">
+                                    {(() => {
+                                        const total = allCards.reduce((s, c) => s + (c.quantity || 1), 0);
+                                        return `${total} cards (${allCards.length} unique)`;
+                                    })()}
+                                    {preview.sideboard?.length > 0 && ` · ${preview.sideboard.reduce((s, c) => s + (c.quantity || 1), 0)} sideboard`}
+                                    {preview.tokens?.length > 0 && ` · ${preview.tokens.length} tokens`}
+                                </span>
+                            </p>
 
                             {legendaries.length > 0 ? (
                                 <div className="preview-section">
