@@ -2850,6 +2850,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .draft-set-info { display: flex; flex-direction: column; gap: 2px; }
 .draft-set-info strong { font-size: 0.85em; }
 .draft-set-info .muted { font-size: 0.7em; }
+.draft-selected-set { font-size: 0.85em; color: var(--accent); margin-bottom: 8px; padding: 6px 10px; background: rgba(136,170,255,0.08); border-radius: 4px; border-left: 3px solid var(--accent); }
 .draft-options { display: flex; gap: 16px; margin-bottom: 10px; font-size: 0.85em; }
 .draft-options label { display: flex; align-items: center; gap: 6px; }
 .draft-options input[type="number"] { width: 50px; }

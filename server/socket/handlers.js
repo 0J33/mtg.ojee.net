@@ -2722,8 +2722,9 @@ module.exports = function registerSocketHandlers(io) {
 
         // sealed:start — host generates sealed pools for all players
         socket.on('sealed:start', async ({ setCode, packCount }, callback) => {
+            console.log('[sealed:start]', { setCode, packCount, currentUserId });
             const room = getRoom(currentRoom);
-            if (!room) return;
+            if (!room) { console.log('[sealed:start] no room'); return; }
             const host = room.players[0];
             if (!host || host.userId !== currentUserId) {
                 return typeof callback === 'function' && callback({ error: 'Only host can start sealed' });
@@ -2770,8 +2771,9 @@ module.exports = function registerSocketHandlers(io) {
 
         // draft:start — host starts a draft
         socket.on('draft:start', async ({ setCode, packsPerPlayer, pickTimeSec }, callback) => {
+            console.log('[draft:start]', { setCode, packsPerPlayer, currentUserId });
             const room = getRoom(currentRoom);
-            if (!room) return;
+            if (!room) { console.log('[draft:start] no room'); return; }
             const host = room.players[0];
             if (!host || host.userId !== currentUserId) {
                 return typeof callback === 'function' && callback({ error: 'Only host can start draft' });

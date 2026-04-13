@@ -98,6 +98,12 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
                     ))}
                 </div>
 
+                {selectedSet && (
+                    <div className="draft-selected-set">
+                        Selected: <strong>{selectedSet.name}</strong> ({selectedSet.code.toUpperCase()})
+                    </div>
+                )}
+
                 <div className="draft-options">
                     <label>
                         Packs per player:
@@ -126,7 +132,7 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
                         onClick={handleStart}
                         disabled={!selectedSet || !isHost || starting}
                     >
-                        {starting ? 'Generating packs...' : `Start ${mode === 'sealed' ? 'Sealed' : 'Draft'}`}
+                        {starting ? 'Generating packs (this may take a moment)...' : !selectedSet ? 'Select a set first' : `Start ${mode === 'sealed' ? 'Sealed' : 'Draft'}`}
                     </button>
                 </div>
             </div>
