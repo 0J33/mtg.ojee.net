@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import socket from '../socket';
 
 const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G', 'C', 'M', 'L'];
@@ -30,6 +31,7 @@ const MANA_SYMBOLS = { W: '\u2600', U: '\ud83d\udca7', B: '\ud83d\udc80', R: '\u
 export default function SealedBuilder({ pool, onSubmit, mode, onMaximize }) {
     const [main, setMain] = useState([]);
     const [sideboard, setSideboard] = useState([...pool]);
+    const [hover, setHover] = useState(null);
     const [sortBy, setSortBy] = useState('color');
     const [landCounts, setLandCounts] = useState({ Plains: 0, Island: 0, Swamp: 0, Mountain: 0, Forest: 0 });
 
@@ -120,7 +122,9 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize }) {
             className={`sealed-card rarity-${card.rarity || 'common'}`}
             onClick={() => onClick(idx)}
             onContextMenu={(e) => { e.preventDefault(); onMaximize?.(card); }}
-            title={`${card.name}\n${card.typeLine}\nClick to move · Right-click to view`}
+            onMouseMove={(e) => card.imageUri && setHover({ imageUri: card.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
+            onMouseLeave={() => setHover(null)}
+            title={`${card.name}\n${card.typeLine}`}
         >
             {card.imageUri ? (
                 <img src={card.imageUri.replace('/normal/', '/small/')} alt={card.name} />
@@ -199,6 +203,13 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize }) {
                     Submit Deck
                 </button>
             </div>
+
+            {hover && hover.imageUri && createPortal(
+                <div className="card-zoom" style={{ position: 'fixed', left: hover.x, top: hover.y, zIndex: 3000, pointerEvents: 'none' }}>
+                    <img src={hover.imageUri} alt="" />
+                </div>,
+                document.body
+            )}
         </div>
     );
 }
