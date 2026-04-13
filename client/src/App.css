@@ -2444,28 +2444,37 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     max-width: 100%;
 }
 
-/* Touch card options button — visible only on touch devices via the
-   touchMode prop check in PlayerZone. Small ⋮ in the corner of each card. */
-.card-options-touch {
-    position: absolute;
-    top: 1px;
-    right: 1px;
-    z-index: 5;
-    background: rgba(0,0,0,0.65);
-    color: #fff;
-    border: none;
-    font-size: 11px;
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border-radius: 3px;
-    cursor: pointer;
-    line-height: 1;
+/* Touch mode toggle buttons — fixed bottom-left on touch devices.
+   Two buttons: checkmark (select mode) and dots (menu mode). */
+.touch-mode-btns {
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.touch-mode-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--bg-panel, #1a1a2e);
+    border: 2px solid var(--border, #444);
+    color: var(--text-mid, #aaa);
     display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    transition: all 0.15s;
 }
-.card-options-touch:hover { background: rgba(0,0,0,0.85); }
+.touch-mode-btn.active {
+    background: var(--accent, #88aaff);
+    border-color: var(--accent, #88aaff);
+    color: #000;
+}
+.touch-mode-btn svg { display: block; }
 
 /* Card count + source link in deck views */
 .deck-card-counts { font-size: 0.9em; color: var(--text-faint, #666); }

@@ -62,7 +62,7 @@ function fmtTimer(ms) {
     return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer, touchInteractMode }) {
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -143,11 +143,34 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             onToggleSelect?.(card.instanceId);
             return;
         }
-        // Touch devices: tap toggles selection (the sticky toolbar takes over).
-        // Desktop behavior is unchanged.
+        // Touch devices: behavior depends on the active touch mode.
+        //   'normal' = tap toggles selection (default, same as before)
+        //   'select' = tap always adds to selection (like holding ctrl)
+        //   'menu'   = tap opens the context menu
         if (touchMode) {
             e.preventDefault();
             e.stopPropagation();
+            if (touchInteractMode === 'menu') {
+                // Find which zone this card is in for the context menu
+                const zones = ['hand', 'battlefield', 'graveyard', 'exile', 'commandZone', 'sideboard', 'companions', 'foretell'];
+                let cardZone = 'battlefield';
+                for (const z of zones) {
+                    const arr = player.zones[z];
+                    if (Array.isArray(arr) && arr.some(c => c.instanceId === card.instanceId)) {
+                        cardZone = z;
+                        break;
+                    }
+                }
+                const rect = e.currentTarget?.getBoundingClientRect?.() || { left: e.clientX || 100, bottom: (e.clientY || 100) + 4 };
+                handleCardContext({
+                    preventDefault: () => {},
+                    stopPropagation: () => {},
+                    clientX: rect.left,
+                    clientY: rect.bottom + 4,
+                }, card, cardZone);
+                return;
+            }
+            // 'normal' and 'select' both toggle selection
             onToggleSelect?.(card.instanceId);
             return;
         }
@@ -411,23 +434,6 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         e.dataTransfer.dropEffect = 'move';
     };
 
-    // On touch devices, render a small ⋮ button on each card so the
-    // context menu is accessible without long-press.
-    const renderCardOptionsBtn = (card, zone) => {
-        if (!touchMode || spectating) return null;
-        return (
-            <button
-                className="card-options-touch"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    handleCardContext({ preventDefault: () => {}, stopPropagation: () => {}, clientX: rect.left, clientY: rect.bottom + 4 }, card, zone);
-                }}
-                title="Card options"
-            >⋮</button>
-        );
-    };
-
     const renderZoneCards = (cards, zone) => {
         if (!cards || cards.length === 0) return <div className="zone-empty">Empty</div>;
         return cards.map(card => {
@@ -443,12 +449,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                         card={card}
                         onClick={(e) => handleCardClick(e, card)}
                         onContextMenu={(e) => handleCardContext(e, card, zone)}
-                        draggable={isOwner}
+                        draggable={isOwner && !touchMode}
                         onDragStart={(e) => handleDragStart(e, card, zone)}
                         attachedToName={attachedToName[card.instanceId]}
                         attachments={attachmentsOn[card.instanceId]}
                     />
-                    {renderCardOptionsBtn(card, zone)}
                 </div>
             );
         });
@@ -637,12 +642,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 card={card}
                                 onClick={(e) => handleCardClick(e, card)}
                                 onContextMenu={(e) => handleCardContext(e, card, dragZone)}
-                                draggable={isOwner}
+                                draggable={isOwner && !touchMode}
                                 onDragStart={(e) => handleDragStart(e, card, dragZone)}
                                 attachedToName={attachedToName[card.instanceId]}
                                 attachments={attachmentsOn[card.instanceId]}
                             />
-                            {renderCardOptionsBtn(card, dragZone)}
                         </div>
                     );
                 });
