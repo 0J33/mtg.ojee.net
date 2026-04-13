@@ -430,6 +430,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .room-code-copied { margin-left: 6px; font-size: 0.75em; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
 .turn-info { font-size: 0.85em; color: var(--text-mid); font-style: italic; }
 .turn-info strong { color: var(--text); font-style: normal; font-family: 'Cinzel', serif; letter-spacing: 1px; }
+.turn-timer { font-size: 0.85em; color: var(--accent, #88aaff); font-style: normal; font-family: monospace; }
+.game-timer { font-size: 0.8em; color: var(--text-faint, #555); font-family: monospace; letter-spacing: 1px; }
+.player-turn-time { font-size: 0.75em; color: var(--text-faint, #555); font-family: monospace; margin-left: 4px; }
 .topbar-right { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 /* Visually group related buttons with a subtle divider between groups */
 .topbar-group {

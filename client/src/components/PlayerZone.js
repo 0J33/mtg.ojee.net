@@ -53,7 +53,16 @@ function ManaPoolWidget({ pool, isOwner, playerId, spectating }) {
     );
 }
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer }) {
+function fmtTimer(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer }) {
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
     // glow each land card in hand until you've played a land. Purely visual
@@ -485,6 +494,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 <span className={`player-name ${player.connected ? 'online' : 'offline'}`}>
                     {player.username}
                     {player.conceded && <span className="conceded-badge" title="Conceded"> · conceded</span>}
+                    {gameStarted && (cumulativeTurnTime > 0 || currentTurnElapsed > 0) && (
+                        <span className="player-turn-time" title="Total time on their turns">
+                            {' '}{fmtTimer(cumulativeTurnTime + currentTurnElapsed)}
+                        </span>
+                    )}
                 </span>
                 {/* Always show the options button (not just touch) so desktop
                     users know they can access player actions without needing

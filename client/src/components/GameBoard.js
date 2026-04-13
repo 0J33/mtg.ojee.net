@@ -23,6 +23,16 @@ import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 import { VERSION } from '../version';
 
+// Format milliseconds as M:SS or H:MM:SS
+function fmtTimer(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export default function GameBoard({ user, gameState, roomCode, isSpectator, onLeave, revealedCard, onDismissReveal, revealedHand, onDismissRevealedHand }) {
     const dialog = useDialog();
     const isTouch = useIsTouchDevice();
@@ -74,6 +84,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     const [revealPickerOpen, setRevealPickerOpen] = useState(false);
     const [mulliganBottomOpen, setMulliganBottomOpen] = useState(false);
     const [stackPanelOpen, setStackPanelOpen] = useState(true); // auto-collapse?
+
+    // Timers declared below after gameStarted is defined.
     // Two-step "pick target" mode — used by Attach, Attack, Reveal-to, and any
     // future action where clicking an inline submenu with N options would bloat
     // the context menu. State shape: { type, sourceInstanceId, message, extra? }
@@ -670,6 +682,41 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
     // 3 draws 5 → blocked. Allow up to 3 mulligans total.
     const canMulligan = !gameStarted || inMulliganPhase || myMulliganCount < 3;
 
+    // ─── Timers (purely client-side, no server needed) ──────────────
+    const [gameStartTime] = useState(() => Date.now());
+    const [gameElapsed, setGameElapsed] = useState(0);
+    const [turnStartTime, setTurnStartTime] = useState(() => Date.now());
+    const [turnElapsed, setTurnElapsed] = useState(0);
+    const [cumulativeTurnTime, setCumulativeTurnTime] = useState(() => ({}));
+    const prevTurnIndexRef = useRef(gameState?.turnIndex);
+
+    useEffect(() => {
+        if (!gameStarted) return;
+        const timer = setInterval(() => {
+            setGameElapsed(Date.now() - gameStartTime);
+            setTurnElapsed(Date.now() - turnStartTime);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [gameStarted, gameStartTime, turnStartTime]);
+
+    useEffect(() => {
+        if (!gameStarted) return;
+        const currentIdx = gameState?.turnIndex;
+        if (currentIdx !== prevTurnIndexRef.current) {
+            const prevPlayer = gameState?.players?.[prevTurnIndexRef.current];
+            if (prevPlayer) {
+                const elapsed = Date.now() - turnStartTime;
+                setCumulativeTurnTime(prev => ({
+                    ...prev,
+                    [prevPlayer.userId]: (prev[prevPlayer.userId] || 0) + elapsed,
+                }));
+            }
+            setTurnStartTime(Date.now());
+            setTurnElapsed(0);
+            prevTurnIndexRef.current = currentIdx;
+        }
+    }, [gameState?.turnIndex, gameStarted, turnStartTime]);
+
     const handleRollForFirstPlayer = () => {
         socket.emit('rollForFirstPlayer', {}, (res) => {
             if (res?.error) dialog.alert(res.error, { title: 'Roll' });
@@ -854,7 +901,17 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                         <>
                             <span className="turn-info">
                                 Turn: <strong>{turnPlayer?.username || '?'}</strong>
+                                {gameStarted && (
+                                    <span className="turn-timer" title={`This turn: ${fmtTimer(turnElapsed)}\nTotal for ${turnPlayer?.username || '?'}: ${fmtTimer((cumulativeTurnTime[turnPlayer?.userId] || 0) + (gameState?.turnIndex === prevTurnIndexRef.current ? turnElapsed : 0))}`}>
+                                        {' '}{fmtTimer(turnElapsed)}
+                                    </span>
+                                )}
                             </span>
+                            {gameStarted && (
+                                <span className="game-timer" title="Total game time">
+                                    {fmtTimer(gameElapsed)}
+                                </span>
+                            )}
                             {gameStarted && !isSpectator && (
                                 <button onClick={handleNextTurn} className="small-btn turn-end-btn">End Turn</button>
                             )}
@@ -1026,6 +1083,8 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                                     onCastFromZone={handleCastFromZone}
                                     onForetellCard={handleForetell}
                                     onCastForetold={handleCastForetold}
+                                    cumulativeTurnTime={cumulativeTurnTime[player.userId] || 0}
+                                    currentTurnElapsed={idx === gameState.turnIndex ? turnElapsed : 0}
                                     pendingAction={pendingAction}
                                     onStartPendingAction={setPendingAction}
                                     onResolvePendingCard={resolvePendingCard}
