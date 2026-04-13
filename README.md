@@ -67,4 +67,4 @@ Magic: The Gathering, MTG, the MTG logo, and all associated card names, images, 
 
 ## license
 
-no license yet. ask me if you want to fork or run your own.
+[MIT](LICENSE). covers the source code only — card images, names, and game mechanics belong to wizards of the coast. card data from scryfall, deck import from moxfield, under their respective terms.
