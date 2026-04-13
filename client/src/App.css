@@ -2561,7 +2561,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     flex-wrap: wrap;
 }
 .card-skin-header strong { flex: 1; min-width: 60px; }
-.card-skin-header .small-btn { padding: 4px 10px; }
+.card-skin-section .small-btn { padding: 5px 12px; font-size: 0.72em; }
 .card-skin-gallery {
     display: flex;
     gap: 6px;
@@ -2606,7 +2606,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     padding: 5px 8px;
     font-size: 12px;
 }
-.card-skin-url-row .small-btn { padding: 4px 10px; }
+/* Inherit consistent sizing from .card-skin-section .small-btn above */
 
 /* DFC preview button in CardMaximized */
 .card-max-image-wrap { position: relative; display: flex; flex-direction: column; align-items: center; }
