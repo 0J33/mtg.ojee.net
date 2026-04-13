@@ -330,6 +330,16 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
         // Send the recent action log so late joiners / spectators see history.
         // actionHistory is already capped at 200 entries by addAction().
         actionHistory: room.actionHistory || [],
+        // Draft/sealed state — send mode, phase, and submitted status (but NOT
+        // the packs/pools themselves, those are sent via private events).
+        draftState: room.draftState ? {
+            mode: room.draftState.mode,
+            phase: room.draftState.phase,
+            setCode: room.draftState.setCode,
+            round: room.draftState.round,
+            totalRounds: room.draftState.totalRounds,
+            submitted: room.draftState.submitted || {},
+        } : null,
         viewerIsSpectator: isSpectator,
         viewerPerspectiveOf: perspective,
         players: room.players.map(p => {

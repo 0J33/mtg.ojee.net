@@ -2718,7 +2718,15 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         // ─── SEALED / DRAFT ──────────────────────────────────────────────
+        console.log('[socket] registering draft/sealed handlers for', socket.id);
         const { generatePack, generateSealedPool } = require('../services/packGenerator');
+
+        // Debug: log any draft/sealed events that arrive
+        socket.onAny((eventName, ...args) => {
+            if (eventName.startsWith('draft:') || eventName.startsWith('sealed:')) {
+                console.log('[socket] draft/sealed event received:', eventName, 'from', socket.id);
+            }
+        });
 
         // sealed:start — host generates sealed pools for all players
         socket.on('sealed:start', async ({ setCode, packCount }, callback) => {
@@ -2781,6 +2789,7 @@ module.exports = function registerSocketHandlers(io) {
             try {
                 const numPacks = packsPerPlayer || 3;
                 const seatOrder = room.players.map(p => p.userId);
+                console.log('[draft:start] generating', numPacks * seatOrder.length, 'packs for', seatOrder.length, 'players');
                 // Generate all packs upfront
                 const allPacks = {}; // round → playerId → pack
                 for (let round = 0; round < numPacks; round++) {
@@ -2788,7 +2797,9 @@ module.exports = function registerSocketHandlers(io) {
                     for (const pid of seatOrder) {
                         allPacks[round][pid] = await generatePack(setCode);
                     }
+                    console.log('[draft:start] round', round, 'generated');
                 }
+                console.log('[draft:start] all packs generated, setting state');
                 room.draftState = {
                     mode: 'draft',
                     phase: 'picking',

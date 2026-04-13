@@ -37,7 +37,8 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
     });
 
     const handleStart = () => {
-        if (!selectedSet || !isHost) return;
+        console.log('[DraftSetup] handleStart', { selectedSet: selectedSet?.code, isHost, mode });
+        if (!selectedSet || !isHost) { console.log('[DraftSetup] blocked — no set or not host'); return; }
         setStarting(true);
         setError('');
         if (mode === 'sealed') {
@@ -47,6 +48,7 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
                 else onClose();
             });
         } else {
+            console.log('[DraftSetup] emitting draft:start', { setCode: selectedSet.code, packsPerPlayer: packCount, pickTimeSec: pickTime, socketConnected: socket.connected });
             socket.emit('draft:start', { setCode: selectedSet.code, packsPerPlayer: packCount, pickTimeSec: pickTime }, (res) => {
                 setStarting(false);
                 if (res?.error) setError(res.error);
