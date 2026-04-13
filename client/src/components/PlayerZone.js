@@ -85,8 +85,15 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     // Long-press (300ms) a card to start dragging on touch devices.
     // A floating ghost follows the finger; releasing over a zone
     // (identified by data-drop-zone) emits moveCard.
-    const touchDragRef = useRef(null);   // { instanceId, fromZone, fromPlayerId, ghost, highlightEl }
+    //
+    // Key details:
+    //  - touchDragRef.started distinguishes "timer pending" from "drag active"
+    //  - Movement < 10px doesn't cancel the pending timer (finger wiggle)
+    //  - Once drag starts, contextmenu is suppressed (Android long-press menu)
+    //  - On touchend after drag, a flag suppresses the synthetic click event
+    const touchDragRef = useRef(null);
     const touchTimerRef = useRef(null);
+    const touchDragDidDropRef = useRef(false); // suppresses click after drop
 
     const cleanupTouchDrag = useCallback(() => {
         if (touchTimerRef.current) { clearTimeout(touchTimerRef.current); touchTimerRef.current = null; }
@@ -94,25 +101,25 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         if (td) {
             if (td.ghost?.parentNode) td.ghost.parentNode.removeChild(td.ghost);
             if (td.highlightEl) td.highlightEl.classList.remove('touch-drop-highlight');
-            touchDragRef.current = null;
         }
+        touchDragRef.current = null;
     }, []);
 
     useEffect(() => cleanupTouchDrag, [cleanupTouchDrag]);
 
     const onTouchStartCard = useCallback((e, card, zone) => {
         if (!touchMode || !isOwner || spectating) return;
-        // Only single-finger touches
         if (e.touches.length !== 1) return;
         const touch = e.touches[0];
         const startX = touch.clientX;
         const startY = touch.clientY;
-        // Get the card image for the ghost
         const cardEl = e.currentTarget.querySelector('.card') || e.currentTarget;
         const imgEl = cardEl.querySelector('img');
 
+        // Store start position so we can check distance in touchmove
+        touchDragRef.current = { startX, startY, started: false };
+
         touchTimerRef.current = setTimeout(() => {
-            // Create floating ghost
             const ghost = document.createElement('div');
             ghost.className = 'touch-drag-ghost';
             if (imgEl) {
@@ -132,28 +139,35 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 fromPlayerId: player.userId,
                 ghost,
                 highlightEl: null,
+                started: true,
             };
-            // Vibrate briefly if available
             if (navigator.vibrate) navigator.vibrate(30);
         }, 300);
     }, [touchMode, isOwner, spectating, player.userId]);
 
     const onTouchMoveCard = useCallback((e) => {
         const td = touchDragRef.current;
-        if (!td) {
-            // If finger moved too far before long-press fires, cancel
-            if (touchTimerRef.current) {
+        if (!td) return;
+
+        const touch = e.touches[0];
+
+        // Before drag starts: cancel if finger moved > 10px (it's a scroll)
+        if (!td.started) {
+            const dx = touch.clientX - td.startX;
+            const dy = touch.clientY - td.startY;
+            if (dx * dx + dy * dy > 100) {
                 clearTimeout(touchTimerRef.current);
                 touchTimerRef.current = null;
+                touchDragRef.current = null;
             }
             return;
         }
-        e.preventDefault(); // prevent scrolling while dragging
-        const touch = e.touches[0];
+
+        // Drag is active — move ghost and highlight zones
+        e.preventDefault();
         td.ghost.style.left = touch.clientX + 'px';
         td.ghost.style.top = touch.clientY + 'px';
 
-        // Find zone under finger
         td.ghost.style.pointerEvents = 'none';
         const el = document.elementFromPoint(touch.clientX, touch.clientY);
         td.ghost.style.pointerEvents = '';
@@ -172,10 +186,15 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     const onTouchEndCard = useCallback((e) => {
         if (touchTimerRef.current) { clearTimeout(touchTimerRef.current); touchTimerRef.current = null; }
         const td = touchDragRef.current;
-        if (!td) return;
+        if (!td || !td.started) {
+            // No drag was active — let normal tap/click handlers fire
+            touchDragRef.current = null;
+            return;
+        }
+
+        // Drag was active — prevent the synthetic click that follows touchend
         e.preventDefault();
 
-        // Find zone under last touch
         const touch = e.changedTouches[0];
         if (td.ghost) td.ghost.style.pointerEvents = 'none';
         const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -193,7 +212,18 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             }
         }
         cleanupTouchDrag();
+        // Flag to suppress the click event that some browsers still fire
+        touchDragDidDropRef.current = true;
+        setTimeout(() => { touchDragDidDropRef.current = false; }, 400);
     }, [player.userId, cleanupTouchDrag]);
+
+    // Suppress Android's native long-press context menu when a drag is pending/active
+    const onContextMenuCard = useCallback((e) => {
+        if (touchDragRef.current) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, []);
 
     useEscapeKey(() => {
         if (expandedZone) setExpandedZone(null);
@@ -229,6 +259,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     };
 
     const handleCardClick = (e, card) => {
+        // After a touch drag drop, the browser fires a synthetic click — ignore it.
+        if (touchDragDidDropRef.current) return;
         // When a pending action is active, card clicks resolve it instead of
         // any normal behavior (selection, maximize, etc.). For attach, only
         // allow clicking battlefield cards (not command zone / hand / etc).
@@ -563,7 +595,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     <Card
                         card={card}
                         onClick={(e) => handleCardClick(e, card)}
-                        onContextMenu={(e) => handleCardContext(e, card, zone)}
+                        onContextMenu={(e) => { if (touchDragRef.current) { e.preventDefault(); e.stopPropagation(); return; } handleCardContext(e, card, zone); }}
                         draggable={isOwner && !touchMode}
                         onDragStart={(e) => handleDragStart(e, card, zone)}
                         attachedToName={attachedToName[card.instanceId]}
@@ -759,7 +791,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                             <Card
                                 card={card}
                                 onClick={(e) => handleCardClick(e, card)}
-                                onContextMenu={(e) => handleCardContext(e, card, dragZone)}
+                                onContextMenu={(e) => { if (touchDragRef.current) { e.preventDefault(); e.stopPropagation(); return; } handleCardContext(e, card, dragZone); }}
                                 draggable={isOwner && !touchMode}
                                 onDragStart={(e) => handleDragStart(e, card, dragZone)}
                                 attachedToName={attachedToName[card.instanceId]}
