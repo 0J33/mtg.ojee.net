@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import socket from '../socket';
 import Card from './Card';
 import ContextMenu from './ContextMenu';
@@ -80,6 +80,120 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     const [counterModal, setCounterModal] = useState(null);
     const [noteEditor, setNoteEditor] = useState(null);
     const [collapsedRows, setCollapsedRows] = useState(new Set());
+
+    // ── Touch drag system ──────────────────────────────────────
+    // Long-press (300ms) a card to start dragging on touch devices.
+    // A floating ghost follows the finger; releasing over a zone
+    // (identified by data-drop-zone) emits moveCard.
+    const touchDragRef = useRef(null);   // { instanceId, fromZone, fromPlayerId, ghost, highlightEl }
+    const touchTimerRef = useRef(null);
+
+    const cleanupTouchDrag = useCallback(() => {
+        if (touchTimerRef.current) { clearTimeout(touchTimerRef.current); touchTimerRef.current = null; }
+        const td = touchDragRef.current;
+        if (td) {
+            if (td.ghost?.parentNode) td.ghost.parentNode.removeChild(td.ghost);
+            if (td.highlightEl) td.highlightEl.classList.remove('touch-drop-highlight');
+            touchDragRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => cleanupTouchDrag, [cleanupTouchDrag]);
+
+    const onTouchStartCard = useCallback((e, card, zone) => {
+        if (!touchMode || !isOwner || spectating) return;
+        // Only single-finger touches
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        const startX = touch.clientX;
+        const startY = touch.clientY;
+        // Get the card image for the ghost
+        const cardEl = e.currentTarget.querySelector('.card') || e.currentTarget;
+        const imgEl = cardEl.querySelector('img');
+
+        touchTimerRef.current = setTimeout(() => {
+            // Create floating ghost
+            const ghost = document.createElement('div');
+            ghost.className = 'touch-drag-ghost';
+            if (imgEl) {
+                const img = document.createElement('img');
+                img.src = imgEl.src;
+                ghost.appendChild(img);
+            } else {
+                ghost.textContent = card.name || '?';
+            }
+            ghost.style.left = startX + 'px';
+            ghost.style.top = startY + 'px';
+            document.body.appendChild(ghost);
+
+            touchDragRef.current = {
+                instanceId: card.instanceId,
+                fromZone: zone,
+                fromPlayerId: player.userId,
+                ghost,
+                highlightEl: null,
+            };
+            // Vibrate briefly if available
+            if (navigator.vibrate) navigator.vibrate(30);
+        }, 300);
+    }, [touchMode, isOwner, spectating, player.userId]);
+
+    const onTouchMoveCard = useCallback((e) => {
+        const td = touchDragRef.current;
+        if (!td) {
+            // If finger moved too far before long-press fires, cancel
+            if (touchTimerRef.current) {
+                clearTimeout(touchTimerRef.current);
+                touchTimerRef.current = null;
+            }
+            return;
+        }
+        e.preventDefault(); // prevent scrolling while dragging
+        const touch = e.touches[0];
+        td.ghost.style.left = touch.clientX + 'px';
+        td.ghost.style.top = touch.clientY + 'px';
+
+        // Find zone under finger
+        td.ghost.style.pointerEvents = 'none';
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        td.ghost.style.pointerEvents = '';
+        const zoneEl = el?.closest?.('[data-drop-zone]');
+        if (td.highlightEl && td.highlightEl !== zoneEl) {
+            td.highlightEl.classList.remove('touch-drop-highlight');
+        }
+        if (zoneEl) {
+            zoneEl.classList.add('touch-drop-highlight');
+            td.highlightEl = zoneEl;
+        } else {
+            td.highlightEl = null;
+        }
+    }, []);
+
+    const onTouchEndCard = useCallback((e) => {
+        if (touchTimerRef.current) { clearTimeout(touchTimerRef.current); touchTimerRef.current = null; }
+        const td = touchDragRef.current;
+        if (!td) return;
+        e.preventDefault();
+
+        // Find zone under last touch
+        const touch = e.changedTouches[0];
+        if (td.ghost) td.ghost.style.pointerEvents = 'none';
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        const zoneEl = el?.closest?.('[data-drop-zone]');
+        if (zoneEl) {
+            const toZone = zoneEl.getAttribute('data-drop-zone');
+            const toPlayerId = zoneEl.getAttribute('data-drop-player');
+            if (toZone) {
+                socket.emit('moveCard', {
+                    instanceId: td.instanceId,
+                    fromZone: td.fromZone,
+                    toZone,
+                    targetPlayerId: toPlayerId || player.userId,
+                });
+            }
+        }
+        cleanupTouchDrag();
+    }, [player.userId, cleanupTouchDrag]);
 
     useEscapeKey(() => {
         if (expandedZone) setExpandedZone(null);
@@ -442,7 +556,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             return (
                 <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''} ${pendingLand ? 'turn-nudge-land' : ''}`}
                     onMouseDown={(e) => handleCardMouseDown(e, card)}
-                    onMouseEnter={(e) => handleCardMouseEnter(e, card)}>
+                    onMouseEnter={(e) => handleCardMouseEnter(e, card)}
+                    onTouchStart={(e) => onTouchStartCard(e, card, zone)}
+                    onTouchMove={onTouchMoveCard}
+                    onTouchEnd={onTouchEndCard}>
                     <Card
                         card={card}
                         onClick={(e) => handleCardClick(e, card)}
@@ -635,7 +752,10 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     return (
                         <div key={card.instanceId} className={`card-wrapper ${isSelected ? 'selected' : ''}`}
                             onMouseDown={(e) => handleCardMouseDown(e, card)}
-                            onMouseEnter={(e) => handleCardMouseEnter(e, card)}>
+                            onMouseEnter={(e) => handleCardMouseEnter(e, card)}
+                            onTouchStart={(e) => onTouchStartCard(e, card, dragZone)}
+                            onTouchMove={onTouchMoveCard}
+                            onTouchEnd={onTouchEndCard}>
                             <Card
                                 card={card}
                                 onClick={(e) => handleCardClick(e, card)}
@@ -665,6 +785,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleDrop(e, 'battlefield')}
                             grow={dynamicGrow(cards)}
+                            playerId={player.userId}
                         />
                     );
                 };
@@ -681,6 +802,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 grow={dynamicGrow(player.zones.commandZone || [])}
                                 isCollapsed={collapsedRows.has('commandZone')}
                                 onToggle={() => toggleRow('commandZone')}
+                                playerId={player.userId}
                             />
 
                             {renderRow('lands', 'Lands', groups.lands, 'battlefield-lands')}
@@ -704,11 +826,12 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 renderZoneCards={renderZoneCards}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'hand')}
+                playerId={player.userId}
             />
 
             {/* Side zones */}
             <div className="side-zones">
-                <div className="zone graveyard-zone"
+                <div className="zone graveyard-zone" data-drop-zone="graveyard" data-drop-player={player.userId}
                     onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'graveyard')}
                     onClick={() => setExpandedZone(expandedZone === 'graveyard' ? null : 'graveyard')}>
                     <div className="zone-label">Graveyard ({player.zones.graveyard?.length || 0})</div>
@@ -716,7 +839,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                         <div className="zone-cards expanded">{renderZoneCards(player.zones.graveyard, 'graveyard')}</div>
                     )}
                 </div>
-                <div className="zone exile-zone"
+                <div className="zone exile-zone" data-drop-zone="exile" data-drop-player={player.userId}
                     onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'exile')}
                     onClick={() => setExpandedZone(expandedZone === 'exile' ? null : 'exile')}>
                     <div className="zone-label">Exile ({player.zones.exile?.length || 0})</div>
@@ -729,7 +852,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     so existing 4-zone (Graveyard / Exile / Library) layouts are
                     visually unchanged for users who don't use these. */}
                 {(player.zones.foretellCount > 0 || (player.zones.foretell && player.zones.foretell.length > 0)) && (
-                    <div className="zone foretell-zone"
+                    <div className="zone foretell-zone" data-drop-zone="foretell" data-drop-player={player.userId}
                         onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'foretell')}
                         onClick={() => setExpandedZone(expandedZone === 'foretell' ? null : 'foretell')}>
                         <div className="zone-label">Foretell ({player.zones.foretellCount ?? player.zones.foretell?.length ?? 0})</div>
@@ -739,7 +862,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     </div>
                 )}
                 {(player.zones.sideboardCount > 0 || (player.zones.sideboard && player.zones.sideboard.length > 0)) && (
-                    <div className="zone sideboard-zone"
+                    <div className="zone sideboard-zone" data-drop-zone="sideboard" data-drop-player={player.userId}
                         onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'sideboard')}
                         onClick={() => setExpandedZone(expandedZone === 'sideboard' ? null : 'sideboard')}>
                         <div className="zone-label">Sideboard ({player.zones.sideboardCount ?? player.zones.sideboard?.length ?? 0})</div>
@@ -749,7 +872,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     </div>
                 )}
                 {(player.zones.companionsCount > 0 || (player.zones.companions && player.zones.companions.length > 0)) && (
-                    <div className="zone companions-zone"
+                    <div className="zone companions-zone" data-drop-zone="companions" data-drop-player={player.userId}
                         onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'companions')}
                         onClick={() => setExpandedZone(expandedZone === 'companions' ? null : 'companions')}>
                         <div className="zone-label">Wishboard ({player.zones.companionsCount ?? player.zones.companions?.length ?? 0})</div>
@@ -780,7 +903,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     </div>
                 )}
 
-                <div className="zone library-zone"
+                <div className="zone library-zone" data-drop-zone="library" data-drop-player={player.userId}
                     onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'library')}>
                     <div className="zone-label"
                         onClick={() => isOwner ? onViewLibrary?.() : null}
@@ -826,10 +949,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     );
 }
 
-function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, renderCards, onDragOver, onDrop, grow }) {
+function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, renderCards, onDragOver, onDrop, grow, playerId }) {
     const ref = useHorizontalWheel();
     return (
         <div className={`zone battlefield bf-cell ${extraClass} ${isCollapsed ? 'collapsed' : ''}`}
+            data-drop-zone="battlefield" data-drop-player={playerId}
             onDragOver={onDragOver}
             onDrop={onDrop}
             style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
@@ -848,10 +972,11 @@ function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, rende
     );
 }
 
-function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow, isCollapsed, onToggle }) {
+function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow, isCollapsed, onToggle, playerId }) {
     const ref = useHorizontalWheel();
     return (
         <div className={`zone command-zone bf-cell ${isCollapsed ? 'collapsed' : ''}`}
+            data-drop-zone="commandZone" data-drop-player={playerId}
             onDragOver={onDragOver}
             onDrop={onDrop}
             style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
@@ -874,12 +999,12 @@ function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow, isColl
     );
 }
 
-function HandZone({ player, isOwner, spectating, renderZoneCards, onDragOver, onDrop }) {
+function HandZone({ player, isOwner, spectating, renderZoneCards, onDragOver, onDrop, playerId }) {
     const ref = useHorizontalWheel();
     // Spectators see every player's hand, not just their own (which they don't have).
     const showHand = isOwner || spectating;
     return (
-        <div className="zone hand-zone" onDragOver={onDragOver} onDrop={onDrop}>
+        <div className="zone hand-zone" data-drop-zone="hand" data-drop-player={playerId} onDragOver={onDragOver} onDrop={onDrop}>
             <div className="zone-label">
                 Hand ({player.zones.handCount ?? player.zones.hand?.length ?? 0})
             </div>

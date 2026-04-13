@@ -2486,6 +2486,32 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .touch-mode-btn svg { display: block; }
 
+/* Touch drag ghost — floating card thumbnail that follows finger */
+.touch-drag-ghost {
+    position: fixed;
+    z-index: 9999;
+    width: 60px;
+    height: 84px;
+    transform: translate(-50%, -80%);
+    pointer-events: none;
+    opacity: 0.85;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+    background: #000;
+}
+.touch-drag-ghost img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 5px;
+}
+/* Highlight zone when a touch-dragged card hovers over it */
+[data-drop-zone].touch-drop-highlight {
+    outline: 2px solid var(--accent, #88aaff) !important;
+    background: rgba(136, 170, 255, 0.12) !important;
+}
+
 /* Card count + source link in deck views */
 .deck-card-counts { font-size: 0.9em; color: var(--text-faint, #666); }
 .deck-source-link { color: var(--accent, #88aaff); text-decoration: none; }
