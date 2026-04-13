@@ -97,7 +97,9 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                             <strong>Your picks ({picks.length})</strong>
                             <div className="draft-picks-grid">
                                 {picks.map((c, i) => (
-                                    <div key={i} className="draft-pick-thumb" title={c.name} onClick={() => onMaximize?.(c)}>
+                                    <div key={i} className="draft-pick-thumb" title={c.name} onClick={() => onMaximize?.(c)}
+                                        onMouseMove={(e) => c.imageUri && setHover({ imageUri: c.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
+                                        onMouseLeave={() => setHover(null)}>
                                         {c.imageUri && <img src={c.imageUri.replace('/normal/', '/small/')} alt={c.name} />}
                                     </div>
                                 ))}
@@ -146,7 +148,9 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                             <strong>Your picks ({picks.length})</strong>
                             <div className="draft-picks-grid">
                                 {picks.map((c, i) => (
-                                    <div key={i} className="draft-pick-thumb" title={c.name} onClick={() => onMaximize?.(c)}>
+                                    <div key={i} className="draft-pick-thumb" title={c.name} onClick={() => onMaximize?.(c)}
+                                        onMouseMove={(e) => c.imageUri && setHover({ imageUri: c.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
+                                        onMouseLeave={() => setHover(null)}>
                                         {c.imageUri && <img src={c.imageUri.replace('/normal/', '/small/')} alt={c.name} />}
                                     </div>
                                 ))}
