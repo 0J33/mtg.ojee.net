@@ -183,11 +183,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     background: none;
     border: none;
     color: var(--text-faint);
-    font-size: 1.1em;
+    font-size: 0;
     padding: 4px 10px;
     letter-spacing: 0;
+    width: 28px;
+    height: 28px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
+    background-size: 14px;
+    background-repeat: no-repeat;
+    background-position: center;
 }
-.delete-btn:hover { color: var(--danger); background: none; }
+.delete-btn:hover { color: var(--danger); background-color: transparent; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b04444' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E"); }
 /* Icon-only button — square, transparent background, used for rename / share
    / similar actions where the icon carries the whole meaning. */
 .icon-btn {
@@ -212,7 +218,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     background: none;
     border: none;
     color: var(--text-dim);
-    font-size: 1.4em;
+    font-size: 0;
     cursor: pointer;
     position: absolute;
     top: 12px;
@@ -222,6 +228,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     height: 24px;
     line-height: 1;
     z-index: 6;
+    /* SVG X icon via inline background so we don't need to edit 30+ JSX files */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
+    background-size: 16px;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+.close-btn:hover {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ddd' stroke-width='2' stroke-linecap='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
 }
 /* Inside a sticky modal-header the button flows with the header instead of
    pinning to the modal's scroll origin (where it would scroll out of view). */

@@ -544,7 +544,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 clientY: rect.bottom + 4,
                             });
                         }}
-                    >⋮</button>
+                    ><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
                 )}
 
                 <div className="life-counter">
@@ -837,7 +837,7 @@ function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, rende
             style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
             <div className="bf-row-label">
                 <span className="bf-row-toggle" onClick={onToggle}>
-                    <span className="bf-collapse-icon">{isCollapsed ? '▶' : '▼'}</span>
+                    <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
                     {label} ({cards.length})
                 </span>
             </div>
@@ -859,7 +859,7 @@ function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow, isColl
             style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
             <div className="bf-row-label">
                 <span className="bf-row-toggle" onClick={onToggle}>
-                    <span className="bf-collapse-icon">{isCollapsed ? '▶' : '▼'}</span>
+                    <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
                     Command ({player.zones.commandZone?.length || 0})
                     {player.commanderDeaths > 0 && <span className="death-counter"> · Deaths: {player.commanderDeaths}</span>}
                     {player.commanderTax > 0 && <span className="tax-counter"> · Tax: {player.commanderTax}</span>}

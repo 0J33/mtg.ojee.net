@@ -70,22 +70,21 @@ export function useIsTouchDevice() {
         const handler = (e) => setIsTouch(e.matches);
         if (mq.addEventListener) mq.addEventListener('change', handler);
         else mq.addListener(handler);
-        // Fallback: if a real mouse event fires, this is NOT a touch-only device.
-        // Firefox on some touchscreen laptops misreports the media query.
-        const onMouse = (e) => {
-            // pointerType check: only "mouse" counts, not "touch" or "pen"
-            if (e.pointerType && e.pointerType !== 'mouse') return;
+        // Fallback: if a real mouse pointer event fires, this is NOT a touch-only
+        // device. Firefox on some touchscreen laptops misreports the media query.
+        // ONLY use pointermove (which has pointerType) — NOT mousemove, because
+        // taps on mobile generate synthetic mousemove events that would
+        // incorrectly flip isTouch to false.
+        const onPointer = (e) => {
+            if (e.pointerType !== 'mouse') return;
             setIsTouch(false);
-            window.removeEventListener('mousemove', onMouse);
-            window.removeEventListener('pointermove', onMouse);
+            window.removeEventListener('pointermove', onPointer);
         };
-        window.addEventListener('mousemove', onMouse, { once: true });
-        window.addEventListener('pointermove', onMouse);
+        window.addEventListener('pointermove', onPointer);
         return () => {
             if (mq.removeEventListener) mq.removeEventListener('change', handler);
             else mq.removeListener(handler);
-            window.removeEventListener('mousemove', onMouse);
-            window.removeEventListener('pointermove', onMouse);
+            window.removeEventListener('pointermove', onPointer);
         };
     }, []);
     return isTouch;
