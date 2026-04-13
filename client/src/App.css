@@ -2471,8 +2471,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     gap: 6px;
 }
 .touch-mode-btn {
-    width: 44px;
-    height: 44px;
+    padding: 10px;
     border-radius: 4px;
     background: var(--bg-panel, #1a1a2e);
     border: 1px solid var(--border, #444);
