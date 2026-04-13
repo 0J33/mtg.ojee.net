@@ -1121,6 +1121,16 @@ export default function GameBoard({ user, gameState, roomCode, isSpectator, onLe
                             </>
                         );
                     }
+                    // Clockwise visual: for 4+ players in a 2-row grid, the
+                    // bottom row reads right-to-left so the turn order flows
+                    // clockwise around the table instead of Z-pattern.
+                    const total = gameState.players.length;
+                    if (total >= 4) {
+                        const cols = total <= 4 ? 2 : total <= 6 ? 3 : 4;
+                        const topRow = gameState.players.slice(0, cols);
+                        const bottomRow = [...gameState.players.slice(cols)].reverse();
+                        return [...topRow, ...bottomRow].map(p => renderPlayer(p, gameState.players.indexOf(p)));
+                    }
                     return gameState.players.map((p, i) => renderPlayer(p, i));
                 })()}
             </div>
