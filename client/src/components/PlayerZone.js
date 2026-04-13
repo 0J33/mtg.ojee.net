@@ -827,7 +827,14 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
                 return (
                     <div className="bf-grid">
-                        {/* Top row: command zone (commander formats only) + lands */}
+                        {/* Top row: creatures + artifacts (+ other if any) */}
+                        <div className="bf-mid-row">
+                            {renderRow('creatures', 'Creatures', groups.creatures, 'battlefield-creatures')}
+                            {renderRow('artifacts', 'Artifacts/Enchant.', groups.artifacts, 'battlefield-artifacts')}
+                            {groups.other.length > 0 && renderRow('other', 'Other', groups.other, 'battlefield-other')}
+                        </div>
+
+                        {/* Bottom row: command zone + lands */}
                         <div className="bf-top-row">
                             {hasCommanderZone && (
                                 <CommandZoneCell
@@ -841,15 +848,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                     playerId={player.userId}
                                 />
                             )}
-
                             {renderRow('lands', 'Lands', groups.lands, 'battlefield-lands')}
-                        </div>
-
-                        {/* Middle: creatures + artifacts (+ other if any) side-by-side, growing with content */}
-                        <div className="bf-mid-row">
-                            {renderRow('creatures', 'Creatures', groups.creatures, 'battlefield-creatures')}
-                            {renderRow('artifacts', 'Artifacts/Enchant.', groups.artifacts, 'battlefield-artifacts')}
-                            {groups.other.length > 0 && renderRow('other', 'Other', groups.other, 'battlefield-other')}
                         </div>
                     </div>
                 );

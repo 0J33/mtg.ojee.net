@@ -2085,7 +2085,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .mana-pool-pip .mana-sym-img { width: 14px; height: 14px; }
 .mana-pool-count { font-size: 11px; font-weight: 600; min-width: 10px; text-align: center; }
-.mana-pool-pip.has-mana .mana-pool-count { color: var(--accent, #88aaff); }
+/* Pastel mana colors for active pip counts — close to actual MTG mana symbol hues */
+.mana-pool-pip.mana-W.has-mana .mana-pool-count { color: #f5e6b8; }
+.mana-pool-pip.mana-U.has-mana .mana-pool-count { color: #8ac4e8; }
+.mana-pool-pip.mana-B.has-mana .mana-pool-count { color: #c4b4c8; }
+.mana-pool-pip.mana-R.has-mana .mana-pool-count { color: #e89488; }
+.mana-pool-pip.mana-G.has-mana .mana-pool-count { color: #88c89c; }
+.mana-pool-pip.mana-C.has-mana .mana-pool-count { color: #c0c0c0; }
 .mana-btn {
     background: transparent;
     border: none;
@@ -2100,6 +2106,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     text-align: center;
 }
 .mana-btn:hover { color: var(--text, #ddd); }
+.mana-W .mana-btn { color: #b8a878; } .mana-W .mana-btn:hover { color: #f5e6b8; }
+.mana-U .mana-btn { color: #5a8aa8; } .mana-U .mana-btn:hover { color: #8ac4e8; }
+.mana-B .mana-btn { color: #8a7a8e; } .mana-B .mana-btn:hover { color: #c4b4c8; }
+.mana-R .mana-btn { color: #a86458; } .mana-R .mana-btn:hover { color: #e89488; }
+.mana-G .mana-btn { color: #58886c; } .mana-G .mana-btn:hover { color: #88c89c; }
+.mana-C .mana-btn { color: #888; } .mana-C .mana-btn:hover { color: #c0c0c0; }
 .mana-btn:disabled { opacity: 0.3; cursor: default; }
 .mana-pool-clear {
     background: transparent;
@@ -2853,7 +2865,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .draft-selected-set { font-size: 0.85em; color: var(--accent); margin-bottom: 8px; padding: 6px 10px; background: rgba(136,170,255,0.08); border-radius: 4px; border-left: 3px solid var(--accent); }
 .draft-options { display: flex; gap: 16px; margin-bottom: 10px; font-size: 0.85em; }
 .draft-options label { display: flex; align-items: center; gap: 6px; }
-.draft-options input[type="number"] { width: 50px; }
+.draft-options input[type="number"] { width: 60px; }
+.draft-options select { background: var(--bg-deep, #111); color: var(--text, #ddd); border: 1px solid var(--border, #444); padding: 4px 8px; border-radius: 3px; }
 .draft-error { color: var(--danger); font-size: 0.8em; margin-bottom: 8px; }
 
 /* Draft pick screen */
