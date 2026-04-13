@@ -2085,13 +2085,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .mana-pool-pip .mana-sym-img { width: 14px; height: 14px; }
 .mana-pool-count { font-size: 11px; font-weight: 600; min-width: 10px; text-align: center; }
-/* Pastel mana colors for active pip counts — close to actual MTG mana symbol hues */
-.mana-pool-pip.mana-W.has-mana .mana-pool-count { color: #f5e6b8; }
-.mana-pool-pip.mana-U.has-mana .mana-pool-count { color: #8ac4e8; }
-.mana-pool-pip.mana-B.has-mana .mana-pool-count { color: #c4b4c8; }
-.mana-pool-pip.mana-R.has-mana .mana-pool-count { color: #e89488; }
-.mana-pool-pip.mana-G.has-mana .mana-pool-count { color: #88c89c; }
-.mana-pool-pip.mana-C.has-mana .mana-pool-count { color: #c0c0c0; }
+/* Pastel mana colors — close to actual MTG mana symbol hues */
+.mana-pool-pip.mana-W .mana-pool-count { color: #f5e6b8; }
+.mana-pool-pip.mana-U .mana-pool-count { color: #8ac4e8; }
+.mana-pool-pip.mana-B .mana-pool-count { color: #c4b4c8; }
+.mana-pool-pip.mana-R .mana-pool-count { color: #e89488; }
+.mana-pool-pip.mana-G .mana-pool-count { color: #88c89c; }
+.mana-pool-pip.mana-C .mana-pool-count { color: #c0c0c0; }
 .mana-btn {
     background: transparent;
     border: none;
