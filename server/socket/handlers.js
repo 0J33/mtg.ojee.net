@@ -281,6 +281,42 @@ function broadcastToRoom(io, room, event, data, excludeSocketId = null) {
     }
 }
 
+// Load submitted draft/sealed decks into player zones. Called when all players
+// have submitted their decks. Each player's main goes to library, sideboard
+// goes to sideboard zone, basic lands are created as card instances.
+function loadDraftDecks(room) {
+    const ds = room.draftState;
+    if (!ds?.decks) return;
+    for (const p of room.players) {
+        const deck = ds.decks[p.userId];
+        if (!deck) continue;
+        // Reset zones
+        p.zones = {
+            hand: [], library: [], battlefield: [], graveyard: [],
+            exile: [], commandZone: [],
+            sideboard: [], companions: [], foretell: [], emblems: [],
+        };
+        p.life = room.settings.startingLife;
+        p.counters = { poison: 0, energy: 0, experience: 0 };
+        p.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+        p.commanderDamageFrom = {};
+        // Main → library
+        for (const card of (deck.main || [])) {
+            p.zones.library.push(createCardInstance(card));
+        }
+        // Sideboard → sideboard
+        for (const card of (deck.sideboard || [])) {
+            p.zones.sideboard.push(createCardInstance(card));
+        }
+        // Shuffle library
+        shuffleArray(p.zones.library);
+    }
+    // Clear draft state (keep phase=complete so client knows draft is over)
+    ds.pools = null;
+    ds.allPacks = null;
+    ds.currentPacks = null;
+}
+
 // Events a spectator is allowed to emit. Everything else is dropped server-side
 // with an error callback (if the packet carries one) so a client can't escalate
 // out of spectator mode by spoofing events.
@@ -2792,9 +2828,12 @@ module.exports = function registerSocketHandlers(io) {
             if (!room?.draftState) return;
             room.draftState.decks[currentUserId] = { main, sideboard };
             room.draftState.submitted[currentUserId] = true;
-            // Check if all players submitted
             const allDone = room.players.every(p => room.draftState.submitted[p.userId]);
-            if (allDone) room.draftState.phase = 'complete';
+            if (allDone) {
+                room.draftState.phase = 'complete';
+                // Load each player's submitted deck into their zones
+                loadDraftDecks(room);
+            }
             broadcastRoomState(io, room);
         });
 
@@ -2951,7 +2990,10 @@ module.exports = function registerSocketHandlers(io) {
             room.draftState.decks[currentUserId] = { main, sideboard };
             room.draftState.submitted[currentUserId] = true;
             const allDone = room.players.every(p => room.draftState.submitted[p.userId]);
-            if (allDone) room.draftState.phase = 'complete';
+            if (allDone) {
+                room.draftState.phase = 'complete';
+                loadDraftDecks(room);
+            }
             broadcastRoomState(io, room);
         });
 
