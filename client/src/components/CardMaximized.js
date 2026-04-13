@@ -328,7 +328,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
 
                             {/* Custom URL input */}
                             {!showSkinInput ? (
-                                <button className="small-btn" onClick={() => setShowSkinInput(true)} style={{ marginTop: 6 }}>
+                                <button className="small-btn" onClick={() => setShowSkinInput(true)}>
                                     Custom URL...
                                 </button>
                             ) : (
