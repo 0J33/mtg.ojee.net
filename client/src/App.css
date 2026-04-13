@@ -232,7 +232,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .close-btn:hover { color: var(--text); background: none; }
 
 /* ─── DECK LIST ───────────────────────────────────────────── */
-.deck-list { display: flex; flex-direction: column; gap: 7px; max-height: 400px; overflow-y: auto; }
+.deck-list { display: flex; flex-direction: column; gap: 7px; max-height: 350px; overflow-y: auto; }
 .deck-item {
     display: flex;
     align-items: center;
