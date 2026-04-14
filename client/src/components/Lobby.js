@@ -5,6 +5,7 @@ import DeckImport from './DeckImport';
 import DeckViewer from './DeckViewer';
 import DeckBuilder from './DeckBuilder';
 import CustomCardManager from './CustomCardManager';
+import Changelog from './Changelog';
 import { useDialog } from './Dialog';
 import { IconPencil, IconShare } from './Icons';
 import { VERSION } from '../version';
@@ -17,6 +18,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
     const [selectedDeck, setSelectedDeck] = useState(null);
     const [showImport, setShowImport] = useState(false);
     const [viewingDeck, setViewingDeck] = useState(null);
+    const [changelogOpen, setChangelogOpen] = useState(false);
     const [buildingDeck, setBuildingDeck] = useState(null); // null = closed, false = new, deckId = edit
     const [renamingDeck, setRenamingDeck] = useState(null); // deckId currently being renamed
     const [renameValue, setRenameValue] = useState('');
@@ -181,7 +183,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
             <div className="lobby-header">
                 <h1>
                     <img src="/mtg.png" alt="" className="mtg-logo" />
-                    mtg.ojee.net <span className="lobby-version">v{VERSION}</span>
+                    mtg.ojee.net <span className="lobby-version lobby-version-link" onClick={() => setChangelogOpen(true)} title="View changelog">v{VERSION}</span>
                 </h1>
                 <div className="lobby-user">
                     <span>{user.username}</span>
@@ -290,6 +292,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
             {customCardsOpen && (
                 <CustomCardManager onClose={() => setCustomCardsOpen(false)} />
             )}
+            {changelogOpen && <Changelog onClose={() => setChangelogOpen(false)} />}
             <div className="lobby-disclaimer">
                 Magic: The Gathering, MTG, and all associated names, logos, card images, and symbols are trademarks of Wizards of the Coast LLC. This is an unofficial fan project — not produced, endorsed, or supported by Wizards of the Coast. Card data provided by Scryfall. Deck import powered by Moxfield's API — Moxfield is not affiliated with this project.
             </div>
