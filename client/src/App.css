@@ -783,10 +783,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .keyword-desc { color: var(--text-mid, #aaa); font-size: 0.82em; display: block; }
 
 /* ─── FOIL EFFECT ─────────────────────────────────────────────
-   Holographic shimmer using a conic gradient overlay + animated
-   position. Applied to .card.foil, .card-zoom.foil, .card-max-image-wrap.foil.
-   The animation runs slowly (12s) to avoid being distracting. */
-.card.foil, .card-zoom.foil, .card-max-image-wrap.foil { position: relative; }
+   Subtle holographic shimmer. Single layer, soft-light blend, low opacity. */
+.card.foil, .card-zoom.foil, .card-max-image-wrap.foil { position: relative; overflow: hidden; }
+.card.foil { border-radius: 5px; }
+.card-zoom.foil { border-radius: 16px; }
+.card-max-image-wrap.foil { border-radius: 16px; }
 .card.foil::before,
 .card-zoom.foil::before,
 .card-max-image-wrap.foil::before {
@@ -798,17 +799,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 2;
     background: linear-gradient(
         115deg,
-        transparent 10%,
-        rgba(255, 120, 180, 0.28) 25%,
-        rgba(255, 220, 120, 0.28) 35%,
-        rgba(120, 255, 180, 0.28) 45%,
-        rgba(120, 180, 255, 0.28) 55%,
-        rgba(200, 120, 255, 0.28) 65%,
-        transparent 80%
+        transparent 20%,
+        rgba(255, 140, 200, 0.12) 30%,
+        rgba(255, 220, 140, 0.12) 38%,
+        rgba(140, 255, 200, 0.12) 46%,
+        rgba(140, 200, 255, 0.12) 54%,
+        rgba(200, 140, 255, 0.12) 62%,
+        transparent 72%
     );
     background-size: 300% 300%;
-    mix-blend-mode: color-dodge;
-    animation: foilShimmer 8s linear infinite;
+    mix-blend-mode: soft-light;
+    animation: foilShimmer 10s linear infinite;
 }
 .card.foil::after,
 .card-zoom.foil::after,
@@ -821,13 +822,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 3;
     background: linear-gradient(
         70deg,
-        transparent 40%,
-        rgba(255, 255, 255, 0.15) 50%,
-        transparent 60%
+        transparent 42%,
+        rgba(255, 255, 255, 0.07) 50%,
+        transparent 58%
     );
     background-size: 200% 200%;
     mix-blend-mode: overlay;
-    animation: foilStreak 5s linear infinite;
+    animation: foilStreak 6s linear infinite;
 }
 @keyframes foilShimmer {
     0% { background-position: 0% 0%; }
@@ -837,9 +838,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     0% { background-position: -100% 0%; }
     100% { background-position: 200% 0%; }
 }
-/* Force card container to clip children for the overlay */
-.card.foil { overflow: hidden; }
-.card-max-image-wrap.foil { border-radius: 16px; overflow: hidden; box-shadow: 0 0 20px rgba(200, 180, 255, 0.4); }
 
 /* "!" indicator on cards with notes */
 .card.has-effects { box-shadow: 0 0 12px rgba(212, 175, 111, 0.4), 0 2px 6px rgba(0,0,0,0.5); }
