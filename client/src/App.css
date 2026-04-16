@@ -841,6 +841,58 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     100% { background-position: 100% 0%; }
 }
 
+/* ─── ETCHED EFFECT ──────────────────────────────────────────
+   Metallic border shimmer — subtler than foil, focused on the
+   frame/edges rather than the full art. */
+.card.etched { position: relative; overflow: hidden; border-radius: 5px; }
+.card-zoom.etched { position: relative; overflow: hidden; border-radius: 16px; }
+.card-max-image-wrap.etched { position: relative; overflow: hidden; border-radius: 16px; }
+.card.etched::before, .card.etched::after,
+.card-zoom.etched::before, .card-zoom.etched::after,
+.card-max-image-wrap.etched::before, .card-max-image-wrap.etched::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.card.etched::before, .card-zoom.etched::before, .card-max-image-wrap.etched::before {
+    z-index: 2;
+    /* Metallic silver-gold shimmer around the border area */
+    background: radial-gradient(
+        ellipse at 50% 50%,
+        transparent 45%,
+        rgba(200, 190, 170, 0.35) 60%,
+        rgba(220, 215, 200, 0.4) 70%,
+        rgba(180, 175, 165, 0.35) 80%,
+        rgba(200, 190, 170, 0.25) 90%,
+        transparent 100%
+    );
+    background-size: 200% 200%;
+    mix-blend-mode: overlay;
+    animation: etchedShimmer 6s ease-in-out infinite alternate;
+}
+.card.etched::after, .card-zoom.etched::after, .card-max-image-wrap.etched::after {
+    z-index: 3;
+    /* Subtle edge highlight */
+    background: linear-gradient(
+        135deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.12) 50%,
+        transparent 70%
+    );
+    background-size: 300% 300%;
+    mix-blend-mode: overlay;
+    animation: etchedGlint 4s ease-in-out infinite alternate;
+}
+@keyframes etchedShimmer {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 100% 100%; }
+}
+@keyframes etchedGlint {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 100% 100%; }
+}
+
 /* "!" indicator on cards with notes */
 .card.has-effects { box-shadow: 0 0 12px rgba(212, 175, 111, 0.4), 0 2px 6px rgba(0,0,0,0.5); }
 .effect-indicator { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--bg-deep); font-weight: 700; font-size: 0.7em; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.6); z-index: 5; }
@@ -1274,6 +1326,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .db-promote, .db-remove, .db-foil-btn, .db-skin-btn { padding: 2px 7px; font-size: 0.75em; background: transparent; border: none; cursor: pointer; color: var(--text-faint, #666); }
 .db-foil-btn:hover, .db-skin-btn:hover { color: var(--accent); }
 .db-foil-btn.active { color: transparent; background: linear-gradient(90deg, #ff7a9e, #ffd47a, #78ffa0, #78a0ff, #c878ff); -webkit-background-clip: text; background-clip: text; text-shadow: 0 0 4px rgba(200, 180, 255, 0.4); }
+.db-foil-btn.etched { color: #c0b89e; text-shadow: 0 0 3px rgba(200, 190, 170, 0.5); }
 .db-skin-btn.active { color: var(--accent); }
 .small-btn.foil-active { background: linear-gradient(90deg, rgba(255,122,158,0.15), rgba(255,212,122,0.15), rgba(120,255,160,0.15), rgba(120,160,255,0.15), rgba(200,120,255,0.15)); border-color: #c4b4c8; }
 

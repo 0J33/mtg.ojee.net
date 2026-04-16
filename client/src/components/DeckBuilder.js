@@ -149,11 +149,12 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
         });
     };
 
-    const toggleFoil = (idx, section) => {
+    const cycleFoil = (idx, section) => {
         const setter = section === 'commanders' ? setCommanders : section === 'sideboard' ? setSideboard : setMainboard;
         setter(prev => {
             const next = [...prev];
-            next[idx] = { ...next[idx], foil: !next[idx].foil };
+            const cur = next[idx].foil;
+            next[idx] = { ...next[idx], foil: !cur ? 'foil' : cur === 'foil' ? 'etched' : null };
             return next;
         });
     };
@@ -215,10 +216,10 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                     <span className="db-card-name">{c.name}</span>
                     {c.manaCost && <ManaCost cost={c.manaCost} />}
                     <button
-                        className={`db-foil-btn ${c.foil ? 'active' : ''}`}
-                        title={c.foil ? 'Remove foil' : 'Make foil'}
-                        onClick={() => toggleFoil(i, section)}
-                    >✦</button>
+                        className={`db-foil-btn ${c.foil === 'foil' ? 'active' : ''} ${c.foil === 'etched' ? 'etched' : ''}`}
+                        title={!c.foil ? 'Make foil' : c.foil === 'foil' ? 'Switch to etched' : 'Remove effect'}
+                        onClick={() => cycleFoil(i, section)}
+                    >{c.foil === 'etched' ? 'E' : '✦'}</button>
                     {!c.isCustom && c.scryfallId && (
                         <button
                             className={`db-skin-btn ${c.skinUrl ? 'active' : ''}`}

@@ -100,7 +100,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         <>
             <div
                 ref={cardRef}
-                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''} ${card.rotated180 ? 'rotated-180' : ''} ${card.foil && !isFaceDown ? 'foil' : ''}`}
+                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''} ${card.rotated180 ? 'rotated-180' : ''} ${card.foil && !isFaceDown ? card.foil : ''}`}
                 onClick={onClick}
                 onContextMenu={onContextMenu}
                 onMouseEnter={handleMouseEnter}
@@ -129,7 +129,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
             {/* Hover zoom + side effects panel */}
             {hoverPos && !isDragging && !isFaceDown && createPortal(
                 <div className="card-zoom-wrapper" style={{ left: hoverPos.x, top: hoverPos.y }}>
-                    <div className={`card-zoom ${card.foil ? 'foil' : ''}`}>
+                    <div className={`card-zoom ${card.foil || ''}`}>
                         <img src={largeImageUrl} alt={card.name} />
                     </div>
                     {showSidePanel && (

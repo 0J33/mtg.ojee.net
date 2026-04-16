@@ -196,7 +196,9 @@ router.post('/moxfield', async (req, res) => {
                 const face0 = card.card_faces?.[0];
                 const face1 = card.card_faces?.[1];
                 // Moxfield marks foil via entry.isFoil (v2) or entry.finish === 'foil' (v3)
-                const isFoil = !!entry.isFoil || entry.finish === 'foil' || entry.finish === 'etched';
+                const foilFinish = entry.finish === 'etched' ? 'etched'
+                    : (!!entry.isFoil || entry.finish === 'foil') ? 'foil'
+                    : null;
                 target.push({
                     scryfallId: sid,
                     name: card.name,
@@ -214,7 +216,7 @@ router.post('/moxfield', async (req, res) => {
                     colorIdentity: card.color_identity || [],
                     producedMana: card.produced_mana || face0?.produced_mana || [],
                     layout: card.layout || 'normal',
-                    foil: isFoil,
+                    foil: foilFinish,
                 });
             }
         };

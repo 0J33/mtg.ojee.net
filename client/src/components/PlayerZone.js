@@ -482,7 +482,9 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             ...adventureItems,
             ...bfRowItems,
             // Foil works in any zone — mark it before casting, while in hand, etc.
-            { label: card.foil ? 'Remove foil' : 'Make foil', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: !card.foil }) },
+            { label: 'Make foil', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'foil' }), disabled: card.foil === 'foil' },
+            { label: 'Make etched', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'etched' }), disabled: card.foil === 'etched' },
+            ...(card.foil ? [{ label: 'Remove effect', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: null }) }] : []),
             ...stateActionItems,
             ...combatItems,
             ...castFromZoneItems,

@@ -2317,8 +2317,10 @@ module.exports = function registerSocketHandlers(io) {
 
             if (field === 'damage' || field === 'suspendCounters') {
                 card[field] = clampGameValue(value, { allowNegative: false });
-            } else if (field === 'phasedOut' || field === 'goaded' || field === 'rotated180' || field === 'foil') {
+            } else if (field === 'phasedOut' || field === 'goaded' || field === 'rotated180') {
                 card[field] = !!value;
+            } else if (field === 'foil') {
+                card[field] = value || null; // 'foil' | 'etched' | null
             } else if (field === 'attackingPlayerId' || field === 'controllerOriginal' || field === 'attachedTo') {
                 card[field] = value || null;
             }

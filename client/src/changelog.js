@@ -4,6 +4,16 @@
 
 export const CHANGELOG = [
     {
+        version: '2.3',
+        date: '2026-04-15',
+        changes: [
+            'Etched foil effect — metallic border shimmer, subtler than regular foil',
+            'Context menu: separate Make foil / Make etched / Remove effect options',
+            'Deck builder foil button cycles: none → foil → etched → none',
+            'Moxfield import detects etched finish separately from foil',
+        ],
+    },
+    {
         version: '2.2',
         date: '2026-04-14',
         changes: [

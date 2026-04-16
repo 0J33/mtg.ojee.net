@@ -100,7 +100,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
         <div className="modal-overlay card-max-overlay">
             <div className="card-maximized">
                 <div className="card-max-image-col">
-                    <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? 'foil' : ''}`}>
+                    <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? card.foil : ''}`}>
                         <img src={largeUrl} alt={card.name} />
                     </div>
                     {hasDFC && !isFaceDown && (
@@ -257,10 +257,13 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                 )}
                                 <button
                                     className={`small-btn ${card.foil ? 'foil-active' : ''}`}
-                                    onClick={() => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: !card.foil })}
-                                    title={card.foil ? 'Remove foil' : 'Make foil'}
+                                    onClick={() => {
+                                        const next = !card.foil ? 'foil' : card.foil === 'foil' ? 'etched' : null;
+                                        socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: next });
+                                    }}
+                                    title={!card.foil ? 'Make foil' : card.foil === 'foil' ? 'Switch to etched' : 'Remove effect'}
                                 >
-                                    {card.foil ? '\u2726 Foil' : '\u2727 Foil'}
+                                    {!card.foil ? '\u2727 Foil' : card.foil === 'foil' ? '\u2726 Foil' : '\u2726 Etched'}
                                 </button>
                             </div>
 
