@@ -793,12 +793,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-max-image-wrap.foil::before, .card-max-image-wrap.foil::after {
     content: '';
     position: absolute;
+    inset: 0;
     pointer-events: none;
 }
-/* Inset the overlay so it doesn't leak past the card art's own rounded corners */
-.card.foil::before, .card.foil::after { inset: 3px; border-radius: 3px; }
-.card-zoom.foil::before, .card-zoom.foil::after { inset: 6px; border-radius: 12px; }
-.card-max-image-wrap.foil::before, .card-max-image-wrap.foil::after { inset: 6px; border-radius: 12px; }
 .card.foil::before, .card-zoom.foil::before, .card-max-image-wrap.foil::before {
     z-index: 2;
     /* Repeating gradient with wide transparent zones so the loop is seamless */
