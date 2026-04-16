@@ -312,11 +312,13 @@ router.post('/moxfield', async (req, res) => {
                     const tfJson = await tfRes.json();
                     for (const c of (tfJson.data || [])) {
                         // Heuristic: textless flag is the strongest signal, but some
-                        // printings are effectively textless too (art series, tokens).
-                        // Users can manually toggle via context menu for misses.
+                        // printings are effectively textless too (art series, tokens,
+                        // Secret Lair "poster" treatments with stylized hard-to-read
+                        // text). Users can manually toggle via context menu for misses.
                         const isTextless = !!c.textless
                             || c.layout === 'art_series'
-                            || (c.layout === 'token' && !c.oracle_text);
+                            || (c.layout === 'token' && !c.oracle_text)
+                            || (Array.isArray(c.promo_types) && c.promo_types.includes('poster'));
                         cardFlags.set(c.id, {
                             textless: isTextless,
                             nonEnglish: c.lang && c.lang !== 'en',
