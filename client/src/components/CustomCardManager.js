@@ -119,7 +119,7 @@ export default function CustomCardManager({ onClose }) {
                             <button className="small-btn" onClick={importShare}>Import Share</button>
                         </div>
                         {loading ? (
-                            <p className="muted">Loading...</p>
+                            <p className="muted muted-centered">Loading...</p>
                         ) : cards.length === 0 ? (
                             <p className="muted">No custom cards yet. Create one above — it'll be available in any deck you build.</p>
                         ) : (

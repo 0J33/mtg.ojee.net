@@ -238,7 +238,7 @@ export default function LibrarySearch({ onClose, onMaximizeCard, sortMode: initi
                     </div>
                 )}
                 {loading ? (
-                    <p className="muted">Loading...</p>
+                    <p className="muted muted-centered">Loading...</p>
                 ) : isDeckView ? (
                     /* ─── Deck view: flat alphabetical list of every card ── */
                     <div className="library-grid">

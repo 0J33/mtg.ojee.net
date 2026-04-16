@@ -32,6 +32,7 @@ h1, h2, h3, h4 { font-family: 'Cinzel', serif; font-weight: 600; letter-spacing:
 
 /* ─── LOADING ─────────────────────────────────────────────── */
 .app-loading { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 1.2em; color: var(--text-dim); font-family: 'Cinzel', serif; letter-spacing: 2px; }
+.muted.centered, .muted-centered { text-align: center; padding: 24px 0; }
 
 /* ─── LOGIN ───────────────────────────────────────────────── */
 .login-page {
@@ -1352,7 +1353,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .custom-card-info { flex: 1; }
 .custom-card-info strong { font-family: 'Cinzel', serif; }
 .custom-card-actions { display: flex; gap: 4px; }
-.custom-card-mana { display: inline-flex; align-items: center; }
+.custom-card-mana { display: inline-flex; align-items: center; margin-left: 8px; }
 .pt-row { display: flex; gap: 10px; }
 .pt-row input { flex: 1; }
 
