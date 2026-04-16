@@ -799,17 +799,18 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 2;
     background: linear-gradient(
         115deg,
-        transparent 20%,
-        rgba(255, 140, 200, 0.12) 30%,
-        rgba(255, 220, 140, 0.12) 38%,
-        rgba(140, 255, 200, 0.12) 46%,
-        rgba(140, 200, 255, 0.12) 54%,
-        rgba(200, 140, 255, 0.12) 62%,
-        transparent 72%
+        transparent 15%,
+        rgba(255, 140, 200, 0.18) 28%,
+        rgba(255, 220, 140, 0.18) 36%,
+        rgba(140, 255, 200, 0.18) 44%,
+        rgba(140, 200, 255, 0.18) 52%,
+        rgba(200, 140, 255, 0.18) 60%,
+        transparent 75%
     );
     background-size: 300% 300%;
-    mix-blend-mode: soft-light;
+    mix-blend-mode: color-dodge;
     animation: foilShimmer 10s linear infinite;
+    opacity: 0.6;
 }
 .card.foil::after,
 .card-zoom.foil::after,
@@ -822,9 +823,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 3;
     background: linear-gradient(
         70deg,
-        transparent 42%,
-        rgba(255, 255, 255, 0.07) 50%,
-        transparent 58%
+        transparent 40%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 60%
     );
     background-size: 200% 200%;
     mix-blend-mode: overlay;
