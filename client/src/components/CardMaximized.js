@@ -99,8 +99,10 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     return createPortal(
         <div className="modal-overlay card-max-overlay">
             <div className="card-maximized">
-                <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? 'foil' : ''}`}>
-                    <img src={largeUrl} alt={card.name} />
+                <div className="card-max-image-col">
+                    <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? 'foil' : ''}`}>
+                        <img src={largeUrl} alt={card.name} />
+                    </div>
                     {hasDFC && !isFaceDown && (
                         <button
                             className="card-max-flip-preview"

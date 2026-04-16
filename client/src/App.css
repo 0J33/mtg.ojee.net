@@ -801,28 +801,27 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 2;
     background: linear-gradient(
         115deg,
-        rgba(255, 180, 220, 0.18) 0%,
-        rgba(255, 230, 180, 0.18) 20%,
-        rgba(180, 255, 210, 0.18) 40%,
-        rgba(180, 210, 255, 0.18) 60%,
-        rgba(220, 180, 255, 0.18) 80%,
-        rgba(255, 180, 220, 0.18) 100%
+        rgba(255, 200, 230, 0.22) 0%,
+        rgba(255, 240, 200, 0.22) 20%,
+        rgba(200, 255, 220, 0.22) 40%,
+        rgba(200, 220, 255, 0.22) 60%,
+        rgba(230, 200, 255, 0.22) 80%,
+        rgba(255, 200, 230, 0.22) 100%
     );
     background-size: 200% 200%;
-    mix-blend-mode: color-dodge;
+    mix-blend-mode: soft-light;
     animation: foilShimmer 8s ease-in-out infinite alternate;
-    opacity: 0.8;
 }
 .card.foil::after, .card-zoom.foil::after, .card-max-image-wrap.foil::after {
     z-index: 3;
     background: linear-gradient(
         70deg,
         rgba(255, 255, 255, 0.0) 0%,
-        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.18) 50%,
         rgba(255, 255, 255, 0.0) 100%
     );
     background-size: 200% 100%;
-    mix-blend-mode: overlay;
+    mix-blend-mode: soft-light;
     animation: foilStreak 5s ease-in-out infinite alternate;
 }
 @keyframes foilShimmer {
@@ -892,8 +891,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-maximized { display: flex; gap: 28px; align-items: flex-start; background: var(--bg-panel); padding: 28px; border: 1px solid var(--border); border-radius: 4px; max-width: 760px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 20px 80px rgba(0,0,0,0.8); }
 .card-max-info { min-width: 0; flex: 1; }
 .card-maximized > img,
+.card-max-image-col { flex-shrink: 0; width: 320px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .card-max-image-wrap img { width: 320px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
-.card-max-image-wrap { flex-shrink: 0; width: 320px; }
+.card-max-image-wrap { width: 320px; }
 .card-max-info { max-width: 320px; }
 .card-max-info h3 { font-family: 'Cinzel', serif; font-size: 1.3em; margin-bottom: 10px; color: var(--text); letter-spacing: 1px; }
 .mana-cost { color: var(--accent); margin: 6px 0; }
@@ -1402,7 +1402,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     .card-maximized > .close-btn { position: fixed; top: 14px; right: 14px; background: rgba(20,20,20,0.8); border: 1px solid var(--border); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
     .card-maximized > img,
     .card-max-image-wrap img { width: 100%; max-width: 280px; align-self: center; }
-    .card-max-image-wrap { width: auto; flex-shrink: 1; align-self: center; }
+    .card-max-image-col { width: auto; flex-shrink: 1; align-self: center; }
+    .card-max-image-wrap { width: auto; }
     .card-max-info { max-width: 100%; }
 
     /* Game topbar */
