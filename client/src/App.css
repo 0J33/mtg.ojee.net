@@ -777,6 +777,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .effect-card-thumb { width: 36px; height: 50px; object-fit: cover; border-radius: 3px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 
 /* Keyword tooltips — shown in hover panel and maximized view */
+/* Oracle text in hover panel */
+.hover-oracle-group { font-size: 0.88em; }
+.hover-type-line { color: var(--accent); font-family: 'Cinzel', serif; font-size: 0.75em; letter-spacing: 1px; margin-bottom: 4px; }
+.hover-oracle { color: var(--text-mid, #aaa); line-height: 1.4; white-space: pre-wrap; }
+.hover-pt { color: var(--text); font-weight: 600; margin-top: 4px; font-size: 0.9em; }
+
 .keyword-effect { padding: 5px 0; border-bottom: 1px solid var(--border-soft); line-height: 1.35; }
 .keyword-effect:last-child { border-bottom: none; }
 .keyword-name { color: var(--accent); font-family: 'Cinzel', serif; font-size: 0.8em; text-transform: capitalize; letter-spacing: 1px; display: block; margin-bottom: 2px; }

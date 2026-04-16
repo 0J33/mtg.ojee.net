@@ -43,7 +43,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         // counters/notes to display. Before this fix we reserved 260px + gap
         // even for empty cards, which pushed left-side placements 260px too
         // far off the left edge of the card the user was hovering.
-        const hasSideEffects = (Array.isArray(card.notes) && card.notes.length > 0)
+        const hasSideEffects = !!card.oracleText
+            || (Array.isArray(card.notes) && card.notes.length > 0)
             || (card.counters && Object.values(card.counters).some(v => v !== 0))
             || (card.attachedTo && attachedToName)
             || (Array.isArray(attachments) && attachments.length > 0)
@@ -88,12 +89,11 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     // Only count attach/equip info in hasEffects if we actually have data to
     // show — otherwise the hover panel opens empty.
     const hasAttachInfo = (attached && !!attachedToName) || hasAttachments;
+    const hasOracleText = !!card.oracleText;
     // hasEffects drives the "!" badge on the card thumbnail (real effects).
     // Keywords alone don't trigger the badge — almost every card has them.
     const hasEffects = hasCounters || hasNotes || hasAttachInfo;
-    // Whether to render the side panel on hover. Includes keywords so hover
-    // always shows keyword reminder text.
-    const showSidePanel = hasEffects || hasKeywords;
+    const showSidePanel = hasEffects || hasKeywords || hasOracleText;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (
@@ -134,6 +134,13 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                     </div>
                     {showSidePanel && (
                         <div className="card-effects-panel">
+                            {hasOracleText && (
+                                <div className="effect-group hover-oracle-group">
+                                    {card.typeLine && <div className="hover-type-line">{card.typeLine}</div>}
+                                    <div className="hover-oracle"><OracleText text={card.oracleText} /></div>
+                                    {(card.power || card.toughness) && <div className="hover-pt">{card.power}/{card.toughness}</div>}
+                                </div>
+                            )}
                             {hasKeywords && (
                                 <div className="effect-group">
                                     <div className="effect-group-label">Keywords</div>
