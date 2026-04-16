@@ -801,28 +801,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-max-image-wrap.foil::before, .card-max-image-wrap.foil::after { inset: 6px; border-radius: 12px; }
 .card.foil::before, .card-zoom.foil::before, .card-max-image-wrap.foil::before {
     z-index: 2;
-    background: linear-gradient(
+    /* Repeating gradient with wide transparent zones so the loop is seamless */
+    background: repeating-linear-gradient(
         115deg,
-        transparent 15%,
-        rgba(255, 140, 200, 0.18) 28%,
-        rgba(255, 220, 140, 0.18) 36%,
-        rgba(140, 255, 200, 0.18) 44%,
-        rgba(140, 200, 255, 0.18) 52%,
-        rgba(200, 140, 255, 0.18) 60%,
-        transparent 75%
+        transparent 0%,
+        rgba(255, 140, 200, 0.18) 8%,
+        rgba(255, 220, 140, 0.18) 16%,
+        rgba(140, 255, 200, 0.18) 24%,
+        rgba(140, 200, 255, 0.18) 32%,
+        rgba(200, 140, 255, 0.18) 40%,
+        transparent 50%,
+        transparent 100%
     );
-    background-size: 300% 300%;
+    background-size: 200% 200%;
     mix-blend-mode: color-dodge;
     animation: foilShimmer 10s linear infinite;
     opacity: 0.6;
 }
 .card.foil::after, .card-zoom.foil::after, .card-max-image-wrap.foil::after {
     z-index: 3;
-    background: linear-gradient(
+    background: repeating-linear-gradient(
         70deg,
-        transparent 40%,
-        rgba(255, 255, 255, 0.1) 50%,
-        transparent 60%
+        transparent 0%,
+        rgba(255, 255, 255, 0.1) 25%,
+        transparent 50%,
+        transparent 100%
     );
     background-size: 200% 200%;
     mix-blend-mode: overlay;
@@ -830,10 +833,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 @keyframes foilShimmer {
     0% { background-position: 0% 0%; }
-    100% { background-position: 300% 300%; }
+    100% { background-position: 200% 200%; }
 }
 @keyframes foilStreak {
-    0% { background-position: -100% 0%; }
+    0% { background-position: 0% 0%; }
     100% { background-position: 200% 0%; }
 }
 
