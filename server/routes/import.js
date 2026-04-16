@@ -33,7 +33,7 @@ function scryfallCardToEntry(card) {
         colorIdentity: card.color_identity || [],
         producedMana: card.produced_mana || face?.produced_mana || [],
         layout: card.layout || 'normal',
-        textless: !!card.textless || !!card.full_art,
+        textless: !!card.textless,
         nonEnglish: !!(card.lang && card.lang !== 'en'),
     };
 }
@@ -312,7 +312,8 @@ router.post('/moxfield', async (req, res) => {
                     const tfJson = await tfRes.json();
                     for (const c of (tfJson.data || [])) {
                         cardFlags.set(c.id, {
-                            textless: !!(c.textless || c.full_art),
+                            // Only true textless — full_art cards (like full-art lands, showcase) often still have text
+                            textless: !!c.textless,
                             nonEnglish: c.lang && c.lang !== 'en',
                         });
                     }
