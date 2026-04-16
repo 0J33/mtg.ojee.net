@@ -28,6 +28,7 @@ const cardEntrySchema = new mongoose.Schema({
     // effectively immutable in this app, so it doesn't matter).
     customCardAuthorUsername: { type: String },
     skinUrl: { type: String, default: null },
+    foil: { type: Boolean, default: false },
 }, { _id: false });
 
 const deckSchema = new mongoose.Schema({

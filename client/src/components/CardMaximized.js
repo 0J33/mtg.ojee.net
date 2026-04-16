@@ -253,6 +253,13 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                 {onAddNote && (
                                     <button className="small-btn" onClick={() => onAddNote(card.instanceId)}>+ Note</button>
                                 )}
+                                <button
+                                    className={`small-btn ${card.foil ? 'foil-active' : ''}`}
+                                    onClick={() => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: !card.foil })}
+                                    title={card.foil ? 'Remove foil' : 'Make foil'}
+                                >
+                                    {card.foil ? '\u2726 Foil' : '\u2727 Foil'}
+                                </button>
                             </div>
 
                             {/* Move card to a different zone */}

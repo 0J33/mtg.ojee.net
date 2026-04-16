@@ -4,6 +4,25 @@
 
 export const CHANGELOG = [
     {
+        version: '2.2',
+        date: '2026-04-14',
+        changes: [
+            'Counter modal: separate Add and Set buttons (Add deltas the current value, Set replaces it)',
+            'Multi-select Flip works — flips each selected card (DFC swap or face-down toggle per-card)',
+            'Multi-select counter modal shows "· N cards" in header',
+        ],
+    },
+    {
+        version: '2.1',
+        date: '2026-04-14',
+        changes: [
+            'Deck builder: foil toggle + alternate art picker per card (saves to deck)',
+            'CardMaximized: foil toggle button in quick actions',
+            'Context menu: foil works in all zones (not just battlefield)',
+            'Moxfield import: detects isFoil / finish=foil and marks cards as foil',
+        ],
+    },
+    {
         version: '2.0',
         date: '2026-04-14',
         changes: [

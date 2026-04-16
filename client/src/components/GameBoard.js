@@ -1249,13 +1249,22 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     {selectedIds.size === 1 && firstSelectedCard && (
                         <>
                             <button onClick={() => setMaximizedCard(firstSelectedCard)}>View</button>
-                            <button onClick={() => socket.emit(
-                                firstSelectedCard.backImageUri ? 'flipCard' : 'toggleFaceDown',
-                                { instanceId: firstSelectedCard.instanceId },
-                            )}>Flip</button>
                             <button onClick={() => socket.emit('revealCard', { instanceId: firstSelectedCard.instanceId, targetPlayerIds: 'all' })}>Reveal</button>
                         </>
                     )}
+                    {/* Flip works on any number of selected cards. Each card gets the
+                        right event based on whether it's a DFC (has backImageUri). */}
+                    <button
+                        onClick={() => {
+                            const ids = Array.from(selectedIds);
+                            for (const id of ids) {
+                                const c = findCardWithZone(id)?.card;
+                                const ev = c?.backImageUri ? 'flipCard' : 'toggleFaceDown';
+                                socket.emit(ev, { instanceId: id });
+                            }
+                        }}
+                        title="Flip — swap sides on DFCs, toggle face-down otherwise"
+                    >Flip</button>
                     {/* Counter + Note work for any number of selected cards.
                         For multi-select, the counter/note is applied to every
                         selected card. */}
@@ -1586,14 +1595,15 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
             {counterModalCard && (
                 <CounterModal
                     card={counterModalCard}
-                    onAdd={(name, val) => {
+                    multiCount={selectedIds.size > 1 ? selectedIds.size : 1}
+                    onApply={(name, val, mode) => {
                         // Apply to all selected cards if multi-selected,
                         // otherwise just the one card.
                         const targets = selectedIds.size > 1
                             ? Array.from(selectedIds)
                             : [counterModalCard.instanceId];
                         for (const id of targets) {
-                            socket.emit('setCardCounter', { instanceId: id, counter: name, value: val });
+                            socket.emit('setCardCounter', { instanceId: id, counter: name, value: val, mode });
                         }
                         setCounterModalCard(null);
                     }}

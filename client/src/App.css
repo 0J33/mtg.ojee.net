@@ -1270,7 +1270,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .db-card-qty { display: flex; gap: 2px; align-items: center; }
 .db-card-qty button { padding: 0 6px; font-size: 0.85em; min-width: 20px; letter-spacing: 0; }
 .db-card-name { flex: 1; }
-.db-promote, .db-remove { padding: 2px 7px; font-size: 0.75em; background: transparent; border: none; }
+.db-promote, .db-remove, .db-foil-btn, .db-skin-btn { padding: 2px 7px; font-size: 0.75em; background: transparent; border: none; cursor: pointer; color: var(--text-faint, #666); }
+.db-foil-btn:hover, .db-skin-btn:hover { color: var(--accent); }
+.db-foil-btn.active { color: transparent; background: linear-gradient(90deg, #ff7a9e, #ffd47a, #78ffa0, #78a0ff, #c878ff); -webkit-background-clip: text; background-clip: text; text-shadow: 0 0 4px rgba(200, 180, 255, 0.4); }
+.db-skin-btn.active { color: var(--accent); }
+.small-btn.foil-active { background: linear-gradient(90deg, rgba(255,122,158,0.15), rgba(255,212,122,0.15), rgba(120,255,160,0.15), rgba(120,160,255,0.15), rgba(200,120,255,0.15)); border-color: #c4b4c8; }
+
+/* Deck builder skin picker modal */
+.db-skin-modal { max-width: 720px; width: 95vw; max-height: 85vh; overflow-y: auto; }
+.db-skin-actions { margin-bottom: 10px; }
+.db-skin-url-row { display: flex; gap: 8px; margin-top: 12px; }
+.db-skin-url-row input { flex: 1; padding: 6px 10px; font-size: 0.85em; }
 .db-remove:hover { color: var(--danger); background: none; }
 .db-promote:hover { color: var(--accent); background: none; }
 

@@ -1558,14 +1558,20 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
-        socket.on('setCardCounter', ({ instanceId, counter, value }, callback) => {
+        socket.on('setCardCounter', ({ instanceId, counter, value, mode }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
 
             const card = findCardAnywhere(room, instanceId);
             if (!card) return callback?.({ error: 'Card not found' });
             if (typeof card.counters !== 'object') card.counters = {};
-            const clamped = clampGameValue(value);
+            // mode: 'set' (default) replaces, 'add' adds delta to current value
+            let newValue = value;
+            if (mode === 'add') {
+                const current = card.counters[counter] || 0;
+                newValue = current + value;
+            }
+            const clamped = clampGameValue(newValue);
             if (clamped === 0) {
                 delete card.counters[counter];
             } else {

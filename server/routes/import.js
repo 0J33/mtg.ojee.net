@@ -189,16 +189,14 @@ router.post('/moxfield', async (req, res) => {
                 const card = entry.card;
                 if (!card) continue;
                 const sid = card.scryfall_id || card.id;
-                // v3 strips image_uris entirely from the card payload —
-                // construct them from the well-known cards.scryfall.io paths.
-                // v2 does include image_uris so the chain prefers them when
-                // present.
                 const frontFromId = scryfallImageFromId(sid, 'front');
                 const backFromId = card.card_faces && card.card_faces.length > 1
                     ? scryfallImageFromId(sid, 'back')
                     : '';
                 const face0 = card.card_faces?.[0];
                 const face1 = card.card_faces?.[1];
+                // Moxfield marks foil via entry.isFoil (v2) or entry.finish === 'foil' (v3)
+                const isFoil = !!entry.isFoil || entry.finish === 'foil' || entry.finish === 'etched';
                 target.push({
                     scryfallId: sid,
                     name: card.name,
@@ -216,6 +214,7 @@ router.post('/moxfield', async (req, res) => {
                     colorIdentity: card.color_identity || [],
                     producedMana: card.produced_mana || face0?.produced_mana || [],
                     layout: card.layout || 'normal',
+                    foil: isFoil,
                 });
             }
         };

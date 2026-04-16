@@ -22,6 +22,10 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
     const [tokenQuery, setTokenQuery] = useState('');
     const [tokenResults, setTokenResults] = useState([]);
     const [tokenLoading, setTokenLoading] = useState(false);
+    const [skinPicker, setSkinPicker] = useState(null); // { idx, section, cardName }
+    const [skinPrints, setSkinPrints] = useState([]);
+    const [skinLoading, setSkinLoading] = useState(false);
+    const [skinUrlInput, setSkinUrlInput] = useState('');
     const debounceRef = useRef(null);
     const tokenDebounceRef = useRef(null);
 
@@ -145,6 +149,41 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
         });
     };
 
+    const toggleFoil = (idx, section) => {
+        const setter = section === 'commanders' ? setCommanders : section === 'sideboard' ? setSideboard : setMainboard;
+        setter(prev => {
+            const next = [...prev];
+            next[idx] = { ...next[idx], foil: !next[idx].foil };
+            return next;
+        });
+    };
+
+    const openSkinPicker = async (idx, section) => {
+        const card = (section === 'commanders' ? commanders : section === 'sideboard' ? sideboard : mainboard)[idx];
+        if (!card?.name) return;
+        setSkinPicker({ idx, section, cardName: card.name, currentImageUri: card.imageUri, skinUrl: card.skinUrl });
+        setSkinUrlInput('');
+        setSkinLoading(true);
+        setSkinPrints([]);
+        try {
+            const data = await scryfall.prints(card.name);
+            setSkinPrints(data.data || []);
+        } catch (_) {}
+        setSkinLoading(false);
+    };
+
+    const applySkin = (url) => {
+        if (!skinPicker) return;
+        const { idx, section } = skinPicker;
+        const setter = section === 'commanders' ? setCommanders : section === 'sideboard' ? setSideboard : setMainboard;
+        setter(prev => {
+            const next = [...prev];
+            next[idx] = { ...next[idx], skinUrl: url || null };
+            return next;
+        });
+        setSkinPicker(null);
+    };
+
     const handleSave = async () => {
         setSaving(true);
         const payload = { name, format: 'commander', commanders, mainboard, sideboard, tokens, importedFrom: importedFrom || null };
@@ -175,6 +214,18 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                     </span>
                     <span className="db-card-name">{c.name}</span>
                     {c.manaCost && <ManaCost cost={c.manaCost} />}
+                    <button
+                        className={`db-foil-btn ${c.foil ? 'active' : ''}`}
+                        title={c.foil ? 'Remove foil' : 'Make foil'}
+                        onClick={() => toggleFoil(i, section)}
+                    >✦</button>
+                    {!c.isCustom && c.scryfallId && (
+                        <button
+                            className={`db-skin-btn ${c.skinUrl ? 'active' : ''}`}
+                            title={c.skinUrl ? 'Change / remove alternate art' : 'Pick alternate art'}
+                            onClick={() => openSkinPicker(i, section)}
+                        >🎨</button>
+                    )}
                     {section !== 'commanders' && (
                         <button className="db-promote" title="Make commander" onClick={() => {
                             removeFromSection(i, section);
@@ -329,6 +380,44 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                     </button>
                 </div>
             </div>
+
+            {skinPicker && (
+                <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setSkinPicker(null); }}>
+                    <div className="modal db-skin-modal">
+                        <div className="modal-header">
+                            <h3>Alternate art · {skinPicker.cardName}</h3>
+                            <button className="close-btn" onClick={() => setSkinPicker(null)}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+                        <div className="db-skin-actions">
+                            {skinPicker.skinUrl && (
+                                <button className="small-btn" onClick={() => applySkin(null)}>Reset to default</button>
+                            )}
+                        </div>
+                        {skinLoading && <div className="muted">Loading printings...</div>}
+                        {!skinLoading && skinPrints.length > 0 && (
+                            <div className="card-skin-gallery">
+                                {skinPrints.map(art => (
+                                    <div
+                                        key={art.id}
+                                        className={`card-skin-thumb ${skinPicker.skinUrl === art.imageUri ? 'active' : ''}`}
+                                        onClick={() => applySkin(art.imageUri)}
+                                        title={`${art.set} (${art.setCode})`}
+                                    >
+                                        <img src={art.imageUri?.replace('/normal/', '/small/')} alt={art.set} />
+                                        <span className="card-skin-set">{art.setCode}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="db-skin-url-row">
+                            <input type="text" placeholder="Or paste any image URL" value={skinUrlInput} onChange={e => setSkinUrlInput(e.target.value)} />
+                            <button className="small-btn" onClick={() => skinUrlInput && applySkin(skinUrlInput.trim())} disabled={!skinUrlInput.trim()}>Apply</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
