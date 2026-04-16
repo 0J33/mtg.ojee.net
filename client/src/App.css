@@ -801,12 +801,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 2;
     background: linear-gradient(
         115deg,
-        rgba(255, 120, 200, 0.25) 0%,
-        rgba(255, 220, 120, 0.25) 20%,
-        rgba(120, 255, 180, 0.25) 40%,
-        rgba(120, 180, 255, 0.25) 60%,
-        rgba(200, 120, 255, 0.25) 80%,
-        rgba(255, 120, 200, 0.25) 100%
+        rgba(255, 180, 220, 0.18) 0%,
+        rgba(255, 230, 180, 0.18) 20%,
+        rgba(180, 255, 210, 0.18) 40%,
+        rgba(180, 210, 255, 0.18) 60%,
+        rgba(220, 180, 255, 0.18) 80%,
+        rgba(255, 180, 220, 0.18) 100%
     );
     background-size: 200% 200%;
     mix-blend-mode: color-dodge;
