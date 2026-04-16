@@ -311,9 +311,14 @@ router.post('/moxfield', async (req, res) => {
                 if (tfRes.ok) {
                     const tfJson = await tfRes.json();
                     for (const c of (tfJson.data || [])) {
+                        // Heuristic: textless flag is the strongest signal, but some
+                        // printings are effectively textless too (art series, tokens).
+                        // Users can manually toggle via context menu for misses.
+                        const isTextless = !!c.textless
+                            || c.layout === 'art_series'
+                            || (c.layout === 'token' && !c.oracle_text);
                         cardFlags.set(c.id, {
-                            // Only true textless — full_art cards (like full-art lands, showcase) often still have text
-                            textless: !!c.textless,
+                            textless: isTextless,
                             nonEnglish: c.lang && c.lang !== 'en',
                         });
                     }

@@ -485,6 +485,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             { label: 'Make foil', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'foil' }), disabled: card.foil === 'foil' },
             { label: 'Make etched', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'etched' }), disabled: card.foil === 'etched' },
             ...(card.foil ? [{ label: 'Remove effect', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: null }) }] : []),
+            { label: card.textless ? 'Hide oracle on hover' : 'Show oracle on hover', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'textless', value: !card.textless }) },
             ...stateActionItems,
             ...combatItems,
             ...castFromZoneItems,

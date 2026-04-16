@@ -265,6 +265,13 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                 >
                                     {!card.foil ? '\u2727 Foil' : card.foil === 'foil' ? '\u2726 Foil' : '\u2726 Etched'}
                                 </button>
+                                <button
+                                    className={`small-btn ${card.textless ? 'active' : ''}`}
+                                    onClick={() => socket.emit('setCardField', { instanceId: card.instanceId, field: 'textless', value: !card.textless })}
+                                    title={card.textless ? 'Hide oracle text on hover (card has visible rules text)' : 'Show oracle text on hover (textless / no visible rules)'}
+                                >
+                                    {card.textless ? '\u2713 Show text' : 'Show text'}
+                                </button>
                             </div>
 
                             {/* Move card to a different zone */}
