@@ -4,6 +4,15 @@
 
 export const CHANGELOG = [
     {
+        version: '1.99',
+        date: '2026-04-14',
+        changes: [
+            'Keyword tooltips — hover/maximize a card to see reminder text for its keywords (Flying, Trample, Deathtouch, etc.)',
+            'Foil cards — right-click a card on the battlefield → "Make foil" for a holographic shimmer effect',
+            'Fix maximize view overflow — long effect lists now scroll instead of getting clipped',
+        ],
+    },
+    {
         version: '1.98',
         date: '2026-04-14',
         changes: [

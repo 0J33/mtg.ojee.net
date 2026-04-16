@@ -451,6 +451,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
         const stateActionItems = (zone === 'battlefield') ? [
             { divider: true },
             { label: card.rotated180 ? 'Unrotate' : 'Rotate 180°', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'rotated180', value: !card.rotated180 }) },
+            { label: card.foil ? 'Remove foil' : 'Make foil', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: !card.foil }) },
             { label: card.phasedOut ? 'Phase in' : 'Phase out', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'phasedOut', value: !card.phasedOut }) },
             { label: card.goaded ? 'Remove goad' : 'Goad', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'goaded', value: !card.goaded }) },
             { label: `Mark damage... (${card.damage || 0})`, onClick: () => onShowCardFieldEditor?.(card, 'damage') },

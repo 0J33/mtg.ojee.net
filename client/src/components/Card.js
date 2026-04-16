@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { OracleText } from './ManaCost';
+import { detectKeywords } from '../keywords';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
@@ -45,7 +46,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         const hasSideEffects = (Array.isArray(card.notes) && card.notes.length > 0)
             || (card.counters && Object.values(card.counters).some(v => v !== 0))
             || (card.attachedTo && attachedToName)
-            || (Array.isArray(attachments) && attachments.length > 0);
+            || (Array.isArray(attachments) && attachments.length > 0)
+            || detectKeywords(card).length > 0;
         const panelW = hasSideEffects ? 260 : 0;
         const gap = hasSideEffects ? 8 : 0;
         const totalWidth = zoomW + panelW + gap;
@@ -73,6 +75,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const counterEntries = Object.entries(card.counters || {}).filter(([, v]) => v !== 0);
     const hasCounters = counterEntries.length > 0;
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
+    const detectedKeywords = !isFaceDown ? detectKeywords(card) : [];
+    const hasKeywords = detectedKeywords.length > 0;
     const damage = typeof card.damage === 'number' && card.damage > 0 ? card.damage : 0;
     const phasedOut = !!card.phasedOut;
     const suspendCount = typeof card.suspendCounters === 'number' && card.suspendCounters > 0 ? card.suspendCounters : 0;
@@ -84,14 +88,19 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     // Only count attach/equip info in hasEffects if we actually have data to
     // show — otherwise the hover panel opens empty.
     const hasAttachInfo = (attached && !!attachedToName) || hasAttachments;
+    // hasEffects drives the "!" badge on the card thumbnail (real effects).
+    // Keywords alone don't trigger the badge — almost every card has them.
     const hasEffects = hasCounters || hasNotes || hasAttachInfo;
+    // Whether to render the side panel on hover. Includes keywords so hover
+    // always shows keyword reminder text.
+    const showSidePanel = hasEffects || hasKeywords;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (
         <>
             <div
                 ref={cardRef}
-                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''} ${card.rotated180 ? 'rotated-180' : ''}`}
+                className={`card ${card.tapped ? 'tapped' : ''} ${isDragging ? 'dragging' : ''} ${isFaceDown ? 'face-down' : ''} ${hasEffects ? 'has-effects' : ''} ${phasedOut ? 'phased-out' : ''} ${attacking ? 'attacking' : ''} ${tempControlled ? 'temp-controlled' : ''} ${card.rotated180 ? 'rotated-180' : ''} ${card.foil && !isFaceDown ? 'foil' : ''}`}
                 onClick={onClick}
                 onContextMenu={onContextMenu}
                 onMouseEnter={handleMouseEnter}
@@ -120,11 +129,22 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
             {/* Hover zoom + side effects panel */}
             {hoverPos && !isDragging && !isFaceDown && createPortal(
                 <div className="card-zoom-wrapper" style={{ left: hoverPos.x, top: hoverPos.y }}>
-                    <div className="card-zoom">
+                    <div className={`card-zoom ${card.foil ? 'foil' : ''}`}>
                         <img src={largeImageUrl} alt={card.name} />
                     </div>
-                    {hasEffects && (
+                    {showSidePanel && (
                         <div className="card-effects-panel">
+                            {hasKeywords && (
+                                <div className="effect-group">
+                                    <div className="effect-group-label">Keywords</div>
+                                    {detectedKeywords.map(({ keyword, description }) => (
+                                        <div key={keyword} className="effect-line keyword-effect">
+                                            <span className="keyword-name">{keyword.replace(/\b\w/g, c => c.toUpperCase())}</span>
+                                            <span className="keyword-desc">{description}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                             {hasCounters && (
                                 <div className="effect-group">
                                     <div className="effect-group-label">Counters</div>

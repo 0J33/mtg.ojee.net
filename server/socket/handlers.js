@@ -2300,6 +2300,7 @@ module.exports = function registerSocketHandlers(io) {
         const ALLOWED_CARD_FIELDS = new Set([
             'damage', 'phasedOut', 'suspendCounters', 'goaded',
             'attackingPlayerId', 'controllerOriginal', 'attachedTo', 'rotated180',
+            'foil',
         ]);
         socket.on('setCardField', ({ instanceId, field, value }, callback) => {
             const room = getRoom(currentRoom);
@@ -2310,7 +2311,7 @@ module.exports = function registerSocketHandlers(io) {
 
             if (field === 'damage' || field === 'suspendCounters') {
                 card[field] = clampGameValue(value, { allowNegative: false });
-            } else if (field === 'phasedOut' || field === 'goaded' || field === 'rotated180') {
+            } else if (field === 'phasedOut' || field === 'goaded' || field === 'rotated180' || field === 'foil') {
                 card[field] = !!value;
             } else if (field === 'attackingPlayerId' || field === 'controllerOriginal' || field === 'attachedTo') {
                 card[field] = value || null;

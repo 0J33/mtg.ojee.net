@@ -65,6 +65,7 @@ function createCardInstance(cardData, overrides = {}) {
         returnZone: null,
         rotated180: false,
         skinUrl: cardData.skinUrl || null, // custom art override — visible to everyone
+        foil: !!cardData.foil,            // holographic shimmer effect — visible to everyone
         ...overrides,
     };
 }

@@ -4,6 +4,7 @@ import socket from '../socket';
 import { scryfall } from '../api';
 import { useEscapeKey } from '../utils';
 import ManaCost, { OracleText } from './ManaCost';
+import { detectKeywords } from '../keywords';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
@@ -82,6 +83,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const largeUrl = imageUrl.replace('/normal/', '/large/').replace('/small/', '/large/');
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
     const counterEntries = Object.entries(card.counters || {}).filter(([, v]) => v !== 0);
+    const detectedKeywords = !isFaceDown ? detectKeywords(card) : [];
 
     const handleThumbHover = (e, imageUri) => {
         if (!imageUri) return;
@@ -97,7 +99,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     return createPortal(
         <div className="modal-overlay card-max-overlay">
             <div className="card-maximized">
-                <div className="card-max-image-wrap">
+                <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? 'foil' : ''}`}>
                     <img src={largeUrl} alt={card.name} />
                     {hasDFC && !isFaceDown && (
                         <button
@@ -121,6 +123,17 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                     <p className="type-line">{card.typeLine}</p>
                     {card.oracleText && <p className="oracle-text"><OracleText text={card.oracleText} /></p>}
                     {(card.power || card.toughness) && <p className="pt">{card.power}/{card.toughness}</p>}
+                    {detectedKeywords.length > 0 && (
+                        <div className="card-effects-section">
+                            <div className="card-effects-section-head"><strong>Keywords</strong></div>
+                            {detectedKeywords.map(({ keyword, description }) => (
+                                <div key={keyword} className="keyword-effect">
+                                    <span className="keyword-name">{keyword.replace(/\b\w/g, c => c.toUpperCase())}</span>
+                                    <span className="keyword-desc">{description}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     {counterEntries.length > 0 && (
                         <div className="card-effects-section">
                             <div className="card-effects-section-head">

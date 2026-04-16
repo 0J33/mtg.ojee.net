@@ -776,6 +776,71 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .counter-icon { background: var(--accent); color: var(--bg-deep); }
 .effect-card-thumb { width: 36px; height: 50px; object-fit: cover; border-radius: 3px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 
+/* Keyword tooltips — shown in hover panel and maximized view */
+.keyword-effect { padding: 5px 0; border-bottom: 1px solid var(--border-soft); line-height: 1.35; }
+.keyword-effect:last-child { border-bottom: none; }
+.keyword-name { color: var(--accent); font-family: 'Cinzel', serif; font-size: 0.8em; text-transform: capitalize; letter-spacing: 1px; display: block; margin-bottom: 2px; }
+.keyword-desc { color: var(--text-mid, #aaa); font-size: 0.82em; display: block; }
+
+/* ─── FOIL EFFECT ─────────────────────────────────────────────
+   Holographic shimmer using a conic gradient overlay + animated
+   position. Applied to .card.foil, .card-zoom.foil, .card-max-image-wrap.foil.
+   The animation runs slowly (12s) to avoid being distracting. */
+.card.foil, .card-zoom.foil, .card-max-image-wrap.foil { position: relative; }
+.card.foil::before,
+.card-zoom.foil::before,
+.card-max-image-wrap.foil::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 2;
+    background: linear-gradient(
+        115deg,
+        transparent 10%,
+        rgba(255, 120, 180, 0.28) 25%,
+        rgba(255, 220, 120, 0.28) 35%,
+        rgba(120, 255, 180, 0.28) 45%,
+        rgba(120, 180, 255, 0.28) 55%,
+        rgba(200, 120, 255, 0.28) 65%,
+        transparent 80%
+    );
+    background-size: 300% 300%;
+    mix-blend-mode: color-dodge;
+    animation: foilShimmer 8s linear infinite;
+}
+.card.foil::after,
+.card-zoom.foil::after,
+.card-max-image-wrap.foil::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    background: linear-gradient(
+        70deg,
+        transparent 40%,
+        rgba(255, 255, 255, 0.15) 50%,
+        transparent 60%
+    );
+    background-size: 200% 200%;
+    mix-blend-mode: overlay;
+    animation: foilStreak 5s linear infinite;
+}
+@keyframes foilShimmer {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 300% 300%; }
+}
+@keyframes foilStreak {
+    0% { background-position: -100% 0%; }
+    100% { background-position: 200% 0%; }
+}
+/* Force card container to clip children for the overlay */
+.card.foil { overflow: hidden; }
+.card-max-image-wrap.foil { border-radius: 16px; overflow: hidden; box-shadow: 0 0 20px rgba(200, 180, 255, 0.4); }
+
 /* "!" indicator on cards with notes */
 .card.has-effects { box-shadow: 0 0 12px rgba(212, 175, 111, 0.4), 0 2px 6px rgba(0,0,0,0.5); }
 .effect-indicator { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--bg-deep); font-weight: 700; font-size: 0.7em; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.6); z-index: 5; }
@@ -831,7 +896,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .note-selected-card img { width: 36px; height: 50px; object-fit: cover; border-radius: 3px; }
 
 /* ─── CARD MAXIMIZED ──────────────────────────────────────── */
-.card-maximized { display: flex; gap: 28px; align-items: flex-start; background: var(--bg-panel); padding: 28px; border: 1px solid var(--border); border-radius: 4px; max-width: 760px; position: relative; box-shadow: 0 20px 80px rgba(0,0,0,0.8); }
+.card-maximized { display: flex; gap: 28px; align-items: flex-start; background: var(--bg-panel); padding: 28px; border: 1px solid var(--border); border-radius: 4px; max-width: 760px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 20px 80px rgba(0,0,0,0.8); }
+.card-max-info { min-width: 0; flex: 1; }
 .card-maximized > img,
 .card-max-image-wrap img { width: 320px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
 .card-max-image-wrap { flex-shrink: 0; width: 320px; }
