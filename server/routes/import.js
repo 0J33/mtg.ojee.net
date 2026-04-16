@@ -34,6 +34,7 @@ function scryfallCardToEntry(card) {
         producedMana: card.produced_mana || face?.produced_mana || [],
         layout: card.layout || 'normal',
         textless: !!card.textless || !!card.full_art,
+        nonEnglish: !!(card.lang && card.lang !== 'en'),
     };
 }
 
@@ -298,7 +299,7 @@ router.post('/moxfield', async (req, res) => {
         // doesn't include this. We use /cards/collection (75 per call).
         const allCards = [...result.commanders, ...result.companions, ...result.mainboard, ...result.sideboard];
         const uniqueIds = [...new Set(allCards.filter(c => c.scryfallId).map(c => c.scryfallId))];
-        const textlessSet = new Set();
+        const cardFlags = new Map(); // scryfallId → { textless, nonEnglish }
         for (let i = 0; i < uniqueIds.length; i += 75) {
             const batch = uniqueIds.slice(i, i + 75);
             try {
@@ -310,15 +311,20 @@ router.post('/moxfield', async (req, res) => {
                 if (tfRes.ok) {
                     const tfJson = await tfRes.json();
                     for (const c of (tfJson.data || [])) {
-                        if (c.textless || c.full_art) textlessSet.add(c.id);
+                        cardFlags.set(c.id, {
+                            textless: !!(c.textless || c.full_art),
+                            nonEnglish: c.lang && c.lang !== 'en',
+                        });
                     }
                 }
             } catch (err) {
-                console.error('[moxfield import] textless fetch failed:', err.message);
+                console.error('[moxfield import] card flags fetch failed:', err.message);
             }
         }
         for (const c of allCards) {
-            c.textless = textlessSet.has(c.scryfallId) || false;
+            const flags = cardFlags.get(c.scryfallId);
+            c.textless = flags?.textless || false;
+            c.nonEnglish = flags?.nonEnglish || false;
         }
 
         const total = result.commanders.length + result.companions.length

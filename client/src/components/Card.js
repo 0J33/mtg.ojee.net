@@ -91,9 +91,9 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     // hasEffects drives the "!" badge on the card thumbnail (real effects).
     // Keywords alone don't trigger the badge — almost every card has them.
     const hasEffects = hasCounters || hasNotes || hasAttachInfo;
-    // Show oracle text for textless/full-art cards where the image has no
-    // readable rules text. Requires re-import for the flag to be set.
-    const showOracleFallback = !!card.textless && !!card.oracleText;
+    // Show oracle text for textless/full-art cards or non-English printings
+    // where the image has no readable English rules text.
+    const showOracleFallback = (!!card.textless || !!card.nonEnglish) && !!card.oracleText;
     const showSidePanel = hasEffects || hasKeywords || showOracleFallback;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
