@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '2.0',
+        date: '2026-04-14',
+        changes: [
+            'Fix Moxfield token import — tokens now get correct art by batch-fetching from Scryfall\u2019s collection API',
+        ],
+    },
+    {
         version: '1.99',
         date: '2026-04-14',
         changes: [

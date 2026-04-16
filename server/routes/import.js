@@ -227,10 +227,14 @@ router.post('/moxfield', async (req, res) => {
 
         // Extract related tokens from the d.tokens array. Moxfield includes
         // all related cards (tokens, emblems, copies); filter to actual tokens
-        // by checking layout or type_line. Deduplicate by name so duplicate
-        // art variants don't clutter the list.
+        // by checking layout or type_line. Deduplicate by name.
+        //
+        // Moxfield v3 strips image_uris and some data from these entries, so
+        // we batch-fetch the full card data from Scryfall's /cards/collection
+        // endpoint to get real art, type line, oracle text, etc.
         if (Array.isArray(data.tokens)) {
             const seenTokenNames = new Set();
+            const tokenRefs = [];
             for (const card of data.tokens) {
                 const tl = (card.type_line || '').toLowerCase();
                 const layout = (card.layout || '').toLowerCase();
@@ -238,23 +242,53 @@ router.post('/moxfield', async (req, res) => {
                     if (seenTokenNames.has(card.name)) continue;
                     seenTokenNames.add(card.name);
                     const sid = card.scryfall_id || card.id;
-                    result.tokens.push({
-                        scryfallId: sid,
-                        name: card.name,
-                        quantity: 1,
-                        imageUri: card.image_uris?.normal || scryfallImageFromId(sid, 'front'),
-                        backImageUri: '',
-                        manaCost: card.mana_cost || '',
-                        typeLine: card.type_line || '',
-                        oracleText: card.oracle_text || '',
-                        power: card.power || '',
-                        toughness: card.toughness || '',
-                        colors: card.colors || [],
-                        colorIdentity: card.color_identity || [],
-                        producedMana: [],
-                        layout: card.layout || 'token',
-                    });
+                    tokenRefs.push({ sid, moxCard: card });
                 }
+            }
+
+            // Batch-fetch up to 75 cards at a time from Scryfall's collection API
+            const scryfallTokens = new Map(); // scryfallId → full card
+            for (let i = 0; i < tokenRefs.length; i += 75) {
+                const batch = tokenRefs.slice(i, i + 75).filter(r => r.sid);
+                if (batch.length === 0) continue;
+                try {
+                    const res = await fetch(`${SCRYFALL_BASE}/cards/collection`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            identifiers: batch.map(r => ({ id: r.sid })),
+                        }),
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        for (const c of (json.data || [])) {
+                            scryfallTokens.set(c.id, c);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[moxfield import] Scryfall token fetch failed:', err.message);
+                }
+            }
+
+            for (const { sid, moxCard } of tokenRefs) {
+                const sc = scryfallTokens.get(sid);
+                const face = sc?.card_faces?.[0];
+                result.tokens.push({
+                    scryfallId: sc?.id || sid,
+                    name: sc?.name || moxCard.name,
+                    quantity: 1,
+                    imageUri: sc?.image_uris?.normal || face?.image_uris?.normal || scryfallImageFromId(sid, 'front'),
+                    backImageUri: sc?.card_faces?.[1]?.image_uris?.normal || '',
+                    manaCost: sc?.mana_cost || face?.mana_cost || moxCard.mana_cost || '',
+                    typeLine: sc?.type_line || face?.type_line || moxCard.type_line || '',
+                    oracleText: sc?.oracle_text || face?.oracle_text || moxCard.oracle_text || '',
+                    power: sc?.power || face?.power || moxCard.power || '',
+                    toughness: sc?.toughness || face?.toughness || moxCard.toughness || '',
+                    colors: sc?.colors || face?.colors || moxCard.colors || [],
+                    colorIdentity: sc?.color_identity || moxCard.color_identity || [],
+                    producedMana: sc?.produced_mana || [],
+                    layout: sc?.layout || moxCard.layout || 'token',
+                });
             }
         }
 
