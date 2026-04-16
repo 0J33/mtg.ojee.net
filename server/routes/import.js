@@ -311,12 +311,17 @@ router.post('/moxfield', async (req, res) => {
                 if (tfRes.ok) {
                     const tfJson = await tfRes.json();
                     for (const c of (tfJson.data || [])) {
-                        // Heuristic: textless flag is the strongest signal, but some
-                        // printings are effectively textless too (art series, tokens).
+                        // Heuristic: Scryfall's textless flag is the strongest signal.
+                        // Also flag:
+                        //  - art_series layout (art cards with no rules text)
+                        //  - tokens without oracle_text
+                        //  - Secret Lair Drop (sld) cards — stylized art often makes
+                        //    the text hard to read at small sizes even when present
                         // Users can manually toggle via context menu for misses.
                         const isTextless = !!c.textless
                             || c.layout === 'art_series'
-                            || (c.layout === 'token' && !c.oracle_text);
+                            || (c.layout === 'token' && !c.oracle_text)
+                            || c.set === 'sld';
                         cardFlags.set(c.id, {
                             textless: isTextless,
                             nonEnglish: c.lang && c.lang !== 'en',
