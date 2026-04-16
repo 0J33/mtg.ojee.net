@@ -33,6 +33,7 @@ function scryfallCardToEntry(card) {
         colorIdentity: card.color_identity || [],
         producedMana: card.produced_mana || face?.produced_mana || [],
         layout: card.layout || 'normal',
+        textless: !!card.textless || !!card.full_art,
     };
 }
 
@@ -293,11 +294,36 @@ router.post('/moxfield', async (req, res) => {
             }
         }
 
+        // Batch-fetch textless flag from Scryfall for all cards. Moxfield
+        // doesn't include this. We use /cards/collection (75 per call).
+        const allCards = [...result.commanders, ...result.companions, ...result.mainboard, ...result.sideboard];
+        const uniqueIds = [...new Set(allCards.filter(c => c.scryfallId).map(c => c.scryfallId))];
+        const textlessSet = new Set();
+        for (let i = 0; i < uniqueIds.length; i += 75) {
+            const batch = uniqueIds.slice(i, i + 75);
+            try {
+                const tfRes = await fetch(`${SCRYFALL_BASE}/cards/collection`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifiers: batch.map(id => ({ id })) }),
+                });
+                if (tfRes.ok) {
+                    const tfJson = await tfRes.json();
+                    for (const c of (tfJson.data || [])) {
+                        if (c.textless || c.full_art) textlessSet.add(c.id);
+                    }
+                }
+            } catch (err) {
+                console.error('[moxfield import] textless fetch failed:', err.message);
+            }
+        }
+        for (const c of allCards) {
+            c.textless = textlessSet.has(c.scryfallId) || false;
+        }
+
         const total = result.commanders.length + result.companions.length
             + result.mainboard.length + result.sideboard.length;
         if (total === 0) {
-            // Diagnostic — if we somehow got a response but parsed 0 cards,
-            // log the top-level keys so we can see what shape we're missing.
             console.warn('[moxfield import] parsed 0 cards from response. Top keys:', Object.keys(data || {}).join(','));
         }
 

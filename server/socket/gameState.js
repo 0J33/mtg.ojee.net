@@ -66,6 +66,7 @@ function createCardInstance(cardData, overrides = {}) {
         rotated180: false,
         skinUrl: cardData.skinUrl || null, // custom art override — visible to everyone
         foil: cardData.foil || null,      // 'foil' | 'etched' | null — visible to everyone
+        textless: !!cardData.textless,    // card image has no rules text (full art / textless)
         ...overrides,
     };
 }

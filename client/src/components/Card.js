@@ -91,10 +91,9 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     // hasEffects drives the "!" badge on the card thumbnail (real effects).
     // Keywords alone don't trigger the badge — almost every card has them.
     const hasEffects = hasCounters || hasNotes || hasAttachInfo;
-    // Show oracle text only when nothing else would fill the panel (textless
-    // full-art cards, basic lands, vanilla creatures). Cards with keywords or
-    // effects already have a useful panel; normal cards have readable text.
-    const showOracleFallback = !!card.oracleText && !hasKeywords && !hasEffects;
+    // Show oracle text for textless/full-art cards where the image has no
+    // readable rules text. Requires re-import for the flag to be set.
+    const showOracleFallback = !!card.textless && !!card.oracleText;
     const showSidePanel = hasEffects || hasKeywords || showOracleFallback;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 

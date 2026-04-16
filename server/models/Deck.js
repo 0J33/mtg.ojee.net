@@ -29,6 +29,7 @@ const cardEntrySchema = new mongoose.Schema({
     customCardAuthorUsername: { type: String },
     skinUrl: { type: String, default: null },
     foil: { type: String, default: null }, // 'foil' | 'etched' | null
+    textless: { type: Boolean, default: false },
 }, { _id: false });
 
 const deckSchema = new mongoose.Schema({
