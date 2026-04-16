@@ -801,15 +801,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     z-index: 2;
     background: linear-gradient(
         115deg,
-        rgba(255, 200, 230, 0.22) 0%,
-        rgba(255, 240, 200, 0.22) 20%,
-        rgba(200, 255, 220, 0.22) 40%,
-        rgba(200, 220, 255, 0.22) 60%,
-        rgba(230, 200, 255, 0.22) 80%,
-        rgba(255, 200, 230, 0.22) 100%
+        rgba(255, 150, 200, 0.35) 0%,
+        rgba(255, 230, 150, 0.35) 20%,
+        rgba(150, 255, 200, 0.35) 40%,
+        rgba(150, 200, 255, 0.35) 60%,
+        rgba(210, 150, 255, 0.35) 80%,
+        rgba(255, 150, 200, 0.35) 100%
     );
     background-size: 200% 200%;
-    mix-blend-mode: soft-light;
+    mix-blend-mode: overlay;
     animation: foilShimmer 8s ease-in-out infinite alternate;
 }
 .card.foil::after, .card-zoom.foil::after, .card-max-image-wrap.foil::after {
@@ -817,11 +817,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     background: linear-gradient(
         70deg,
         rgba(255, 255, 255, 0.0) 0%,
-        rgba(255, 255, 255, 0.18) 50%,
+        rgba(255, 255, 255, 0.2) 50%,
         rgba(255, 255, 255, 0.0) 100%
     );
     background-size: 200% 100%;
-    mix-blend-mode: soft-light;
+    mix-blend-mode: overlay;
     animation: foilStreak 5s ease-in-out infinite alternate;
 }
 @keyframes foilShimmer {
