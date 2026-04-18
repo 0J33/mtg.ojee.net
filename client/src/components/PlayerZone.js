@@ -64,7 +64,7 @@ function fmtTimer(ms) {
 
 const COMMANDER_FORMATS = new Set(['commander', 'brawl', 'oathbreaker']);
 
-export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer, touchInteractMode, format }) {
+export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer, touchInteractMode, format, piles }) {
     const hasCommanderZone = COMMANDER_FORMATS.has(format || 'commander');
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
@@ -481,11 +481,13 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             ...stackPushItems,
             ...adventureItems,
             ...bfRowItems,
-            // Foil works in any zone — mark it before casting, while in hand, etc.
-            { label: 'Make foil', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'foil' }), disabled: card.foil === 'foil' },
-            { label: 'Make etched', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'etched' }), disabled: card.foil === 'etched' },
-            ...(card.foil ? [{ label: 'Remove effect', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: null }) }] : []),
-            { label: card.textless ? 'Hide oracle on hover' : 'Show oracle on hover', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'textless', value: !card.textless }) },
+            // Foil / textless are cosmetic — only the card's owner can change them.
+            ...(isOwner ? [
+                { label: 'Make foil', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'foil' }), disabled: card.foil === 'foil' },
+                { label: 'Make etched', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: 'etched' }), disabled: card.foil === 'etched' },
+                ...(card.foil ? [{ label: 'Remove effect', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: null }) }] : []),
+                { label: card.textless ? 'Hide oracle on hover' : 'Show oracle on hover', onClick: () => socket.emit('setCardField', { instanceId: card.instanceId, field: 'textless', value: !card.textless }) },
+            ] : []),
             ...stateActionItems,
             ...combatItems,
             ...castFromZoneItems,
@@ -498,6 +500,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 { label: 'To top of library', onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: 'library', libraryPosition: 'top' }) },
                 { label: 'To bottom of library', onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: 'library' }) },
             ] : []),
+            // Move to any shared pile. Each pile is a top-level menu item.
+            ...((piles || []).map(p => ({
+                label: `Move to pile: ${p.name}`,
+                onClick: () => socket.emit('moveCard', { instanceId: card.instanceId, fromZone: zone, toZone: `pile:${p.id}` }),
+            }))),
             { divider: true },
             // Single unified "Flip" action. DFC cards swap sides; one-sided
             // cards toggle face-down. One button for everything.
@@ -725,7 +732,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
                 {/* Commander damage next to HP (commander formats only) */}
                 {hasCommanderZone && cmdDmgEntries.length > 0 && (
-                    <div className="commander-damage-inline">
+                    <div
+                        className="commander-damage-inline"
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    >
                         {cmdDmgEntries.filter(([, v]) => v > 0).map(([fromId, dmg]) => {
                             const from = allPlayers.find(p => p.userId === fromId);
                             return (
@@ -739,19 +750,23 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
                 {/* Infect / poison next to HP */}
                 {totalInfect > 0 && (
-                    <div className="infect-inline">
+                    <div
+                        className="infect-inline"
+                        onClick={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    >
                         <span className={`infect-total ${lethalInfect ? 'lethal' : ''}`} title="Poison counters">
                             ☣ {fmtNum(totalInfect)}/10
                         </span>
                     </div>
                 )}
 
-                <div className="player-counters">
+                <div className="player-counters" onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
                     {Object.entries(player.counters || {}).filter(([, v]) => v > 0).map(([name, val]) => (
                         <span key={name} className="player-counter-badge" title={`${name} · click +1 · right-click -1 · middle-click remove`}
-                            onClick={spectating ? undefined : () => socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : val + 1 })}
-                            onContextMenu={spectating ? (e) => e.preventDefault() : (e) => { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : Math.max(0, val - 1) }); }}
-                            onMouseDown={spectating ? undefined : (e) => { if (e.button === 1) { e.preventDefault(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: 0 }); } }}>
+                            onClick={spectating ? undefined : (e) => { e.stopPropagation(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : val + 1 }); }}
+                            onContextMenu={spectating ? (e) => { e.preventDefault(); e.stopPropagation(); } : (e) => { e.preventDefault(); e.stopPropagation(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : Math.max(0, val - 1) }); }}
+                            onMouseDown={spectating ? undefined : (e) => { if (e.button === 1) { e.preventDefault(); e.stopPropagation(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: 0 }); } }}>
                             {name}: {fmtNum(val)}
                         </span>
                     ))}
@@ -979,8 +994,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             {counterModal && (
                 <CounterModal
                     card={counterModal.card}
-                    onApply={(name, val, mode) => {
-                        socket.emit('setCardCounter', { instanceId: counterModal.instanceId, counter: name, value: val, mode });
+                    onApply={(name, val, mode, endOfTurn) => {
+                        socket.emit('setCardCounter', { instanceId: counterModal.instanceId, counter: name, value: val, mode, endOfTurn });
                         setCounterModal(null);
                     }}
                     onClose={() => setCounterModal(null)}

@@ -781,6 +781,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .effect-card-thumb { width: 36px; height: 50px; object-fit: cover; border-radius: 3px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
 
 /* Keyword tooltips — shown in hover panel and maximized view */
+/* End-of-turn counter tag */
+.eot-tag { color: var(--accent); font-style: italic; font-size: 0.85em; font-family: 'Cinzel', serif; letter-spacing: 1px; margin-left: 4px; }
+.counter-eot-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 0.85em; color: var(--text-mid, #aaa); cursor: pointer; user-select: none; }
+.counter-eot-row input { cursor: pointer; }
+
 /* Oracle text in hover panel */
 .hover-oracle-group { font-size: 0.88em; }
 .hover-type-line { color: var(--accent); font-family: 'Cinzel', serif; font-size: 0.75em; letter-spacing: 1px; margin-bottom: 4px; }
@@ -3166,4 +3171,125 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 @media (max-width: 700px) {
     .bracket-container { flex-direction: column; align-items: stretch; }
     .bracket-round { min-width: auto; }
+}
+
+/* ─── PILES ─────────────────────────────────────────────── */
+/* Floating toggle button — left edge, below the drawing pen (top: 50%, -30px offset) */
+.piles-toggle {
+    position: fixed;
+    top: calc(50% + 64px);
+    left: 0;
+    transform: translateY(-50%);
+    z-index: 205;
+    padding: 10px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 4px 4px 0;
+    border-left: none;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    cursor: pointer;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.5);
+}
+.piles-toggle:hover { color: var(--accent); }
+.piles-toggle.open { color: var(--accent); border-color: var(--accent); }
+.piles-toggle:active { transform: translateY(-50%); }
+.piles-toggle-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: var(--accent);
+    color: var(--bg-deep);
+    border-radius: 50%;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 0.7em;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Sliding panel */
+.piles-panel {
+    position: fixed;
+    top: 60px;
+    left: 40px;
+    bottom: 40px;
+    width: 340px;
+    max-width: 90vw;
+    z-index: 220;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.7);
+    overflow: hidden;
+}
+.piles-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-soft, #333);
+    background: var(--bg-deep);
+}
+.piles-panel-header h3 { margin: 0; font-size: 0.9em; letter-spacing: 2px; text-transform: uppercase; font-family: 'Cinzel', serif; }
+.piles-panel-header .muted { font-size: 0.75em; margin-left: 6px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.piles-panel-actions { display: flex; gap: 6px; align-items: center; }
+
+.pile-create-row { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border-soft, #333); }
+.pile-create-row input { flex: 1; }
+
+.piles-list { flex: 1; overflow-y: auto; padding: 6px; }
+
+.pile-item { border: 1px solid var(--border-soft, #333); border-radius: 4px; margin-bottom: 6px; background: var(--bg-deep); transition: border-color 0.15s; }
+.pile-item:last-child { margin-bottom: 0; }
+.pile-item:hover { border-color: var(--accent-dim, #556); }
+
+.pile-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.85em;
+}
+.pile-chevron { color: var(--text-faint); font-size: 0.7em; width: 10px; }
+.pile-name { flex: 1; color: var(--text); font-weight: 500; }
+.pile-header input[type="text"] { flex: 1; font-size: 0.9em; padding: 2px 6px; }
+.pile-count { color: var(--accent); font-weight: 600; font-size: 0.85em; min-width: 20px; text-align: right; }
+.pile-actions { display: flex; gap: 2px; }
+.pile-actions .icon-btn { width: 22px; height: 22px; font-size: 0.85em; }
+
+.pile-cards { padding: 6px 10px 10px; border-top: 1px solid var(--border-soft, #222); display: flex; flex-direction: column; gap: 6px; }
+.pile-cards .muted { font-size: 0.75em; padding: 8px 0; }
+.pile-card {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 4px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 3px;
+    cursor: grab;
+}
+.pile-card:active { cursor: grabbing; }
+.pile-card img { width: 40px; height: 56px; object-fit: cover; border-radius: 3px; cursor: zoom-in; flex-shrink: 0; background: #000; }
+.pile-card-name { font-size: 0.75em; flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pile-card-actions { display: flex; gap: 3px; flex-wrap: wrap; }
+.pile-card-actions .small-btn { padding: 3px 6px; font-size: 0.65em; }
+
+/* Drop target highlight when dragging into a pile */
+.pile-item[data-drop-zone] { position: relative; }
+.pile-item.touch-drop-highlight,
+.pile-item[data-drop-zone]:has(.pile-header:hover) { border-color: var(--accent); }
+
+@media (max-width: 700px) {
+    .piles-panel { left: 0; right: 0; top: 50px; bottom: 0; width: auto; max-width: none; border-radius: 0; border: none; }
+    .piles-toggle { top: auto; bottom: 200px; }
 }

@@ -25,11 +25,21 @@ function isPlayerEliminated(p) {
 // control changes, and clears combat markers. Called from nextTurn.
 function endOfTurnCleanup(room, endingPlayer, io) {
     if (!endingPlayer) return;
-    // 1) Damage clears at end of turn for ALL creatures
+    // 1) Damage clears at end of turn for ALL creatures, and any counters
+    //    marked as "until end of turn" are removed from every permanent.
     for (const p of room.players) {
         for (const card of (p.zones.battlefield || [])) {
             if (typeof card.damage === 'number' && card.damage > 0) card.damage = 0;
             if (card.attackingPlayerId) card.attackingPlayerId = null;
+            // Clear any end-of-turn counters. Stored on card.endOfTurnCounters
+            // as a Set-like {counterName: true}; when present, the counter
+            // value is also removed from card.counters.
+            if (card.endOfTurnCounters && Object.keys(card.endOfTurnCounters).length > 0) {
+                for (const counterName of Object.keys(card.endOfTurnCounters)) {
+                    if (card.counters) delete card.counters[counterName];
+                }
+                card.endOfTurnCounters = {};
+            }
         }
     }
     // 2) Return any cards under temp control to their original owner. We
@@ -133,6 +143,7 @@ const SNAPSHOT_EVENTS = new Set([
     'updateRoomSettings', 'concede',
     'mulliganBottom', 'takeControl',
     'setHandSizeEnforce', 'setSharedTeamLife',
+    'createPile', 'deletePile', 'renamePile', 'shufflePile',
 ]);
 
 // Auto-save interval
@@ -823,33 +834,59 @@ module.exports = function registerSocketHandlers(io) {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
 
-            // Find source player and card
+            // Helpers: fromZone/toZone can be a regular zone name, or
+            // `pile:${pileId}` referencing a shared room pile.
+            const isPileZone = (z) => typeof z === 'string' && z.startsWith('pile:');
+            const pileIdOf = (z) => z.slice(5);
+
+            // Find source player + card, or source pile + card
             let sourcePlayer = null;
+            let sourcePile = null;
             let card = null;
             let cardIndex = -1;
 
-            for (const p of room.players) {
-                const zone = p.zones[fromZone];
-                if (!zone) continue;
-                const idx = zone.findIndex(c => c.instanceId === instanceId);
-                if (idx !== -1) {
-                    sourcePlayer = p;
-                    card = zone[idx];
-                    cardIndex = idx;
-                    break;
+            if (isPileZone(fromZone)) {
+                const pile = (room.piles || []).find(p => p.id === pileIdOf(fromZone));
+                if (pile) {
+                    const idx = pile.cards.findIndex(c => c.instanceId === instanceId);
+                    if (idx !== -1) {
+                        sourcePile = pile;
+                        card = pile.cards[idx];
+                        cardIndex = idx;
+                    }
+                }
+            } else {
+                for (const p of room.players) {
+                    const zone = p.zones[fromZone];
+                    if (!zone) continue;
+                    const idx = zone.findIndex(c => c.instanceId === instanceId);
+                    if (idx !== -1) {
+                        sourcePlayer = p;
+                        card = zone[idx];
+                        cardIndex = idx;
+                        break;
+                    }
                 }
             }
 
             if (!card) return callback?.({ error: 'Card not found' });
 
             // Remove from source
-            sourcePlayer.zones[fromZone].splice(cardIndex, 1);
+            if (sourcePile) {
+                sourcePile.cards.splice(cardIndex, 1);
+            } else {
+                sourcePlayer.zones[fromZone].splice(cardIndex, 1);
+            }
 
-            // Determine target player
+            // Determine target player (unused if toZone is a pile)
             const targetPlayer = targetPlayerId
                 ? getPlayerInRoom(room, targetPlayerId)
-                : sourcePlayer;
-            if (!targetPlayer) return callback?.({ error: 'Target player not found' });
+                : (sourcePlayer || room.players[0]);
+            const targetPile = isPileZone(toZone)
+                ? (room.piles || []).find(p => p.id === pileIdOf(toZone))
+                : null;
+            if (!targetPlayer && !targetPile) return callback?.({ error: 'Target not found' });
+            if (isPileZone(toZone) && !targetPile) return callback?.({ error: 'Target pile not found' });
 
             // If a card leaves the battlefield, clean up attachments so
             // equipment/auras don't point at ghosts.
@@ -858,12 +895,12 @@ module.exports = function registerSocketHandlers(io) {
             }
 
             // Tokens cease to exist when they leave the battlefield (MTG rule
-            // 111.8). Don't push them into graveyard/exile/hand — just drop.
+            // 111.8). Don't push them into graveyard/exile/hand/pile — just drop.
             if (card.isToken && fromZone === 'battlefield' && toZone !== 'battlefield') {
                 addAndBroadcastAction(io, room, currentUserId, 'moveCard', {
                     cardName: card.name, fromZone, toZone: '(destroyed — token)',
-                    fromPlayer: sourcePlayer.username,
-                    toPlayer: (targetPlayerId ? getPlayerInRoom(room, targetPlayerId)?.username : sourcePlayer.username) || '',
+                    fromPlayer: sourcePlayer?.username || (sourcePile ? `pile "${sourcePile.name}"` : ''),
+                    toPlayer: targetPile ? `pile "${targetPile.name}"` : ((targetPlayerId ? getPlayerInRoom(room, targetPlayerId)?.username : sourcePlayer?.username) || ''),
                 });
                 broadcastRoomState(io, room);
                 return callback?.({ success: true });
@@ -875,23 +912,23 @@ module.exports = function registerSocketHandlers(io) {
             if (toZone !== 'battlefield') { card.x = 0; card.y = 0; }
             if (faceDown !== undefined) card.faceDown = faceDown;
             if (toZone === 'hand' || toZone === 'library') card.tapped = false;
-            if (toZone === 'commandZone' && fromZone === 'graveyard') {
+            if (toZone === 'commandZone' && fromZone === 'graveyard' && targetPlayer) {
                 // Commander died and returned to command zone
                 targetPlayer.commanderDeaths++;
             }
 
-            // Add to target zone. Library supports explicit top/bottom placement.
-            if (toZone === 'library' && libraryPosition === 'top') {
+            // Add to target — pile, or a player zone (with top/bottom for library).
+            if (targetPile) {
+                targetPile.cards.push(card);
+            } else if (toZone === 'library' && libraryPosition === 'top') {
                 targetPlayer.zones[toZone].unshift(card);
             } else {
                 targetPlayer.zones[toZone].push(card);
             }
 
             // Satisfy "did you play a land?" nudge when a land enters the
-            // battlefield from the owner's hand. We only count it for the
-            // card's owning player (the one who dragged it there), and only
-            // from hand — not from other zones like graveyard.
-            if (toZone === 'battlefield' && fromZone === 'hand' && sourcePlayer === targetPlayer) {
+            // battlefield from the owner's hand.
+            if (toZone === 'battlefield' && fromZone === 'hand' && sourcePlayer && sourcePlayer === targetPlayer) {
                 const typeLine = (card.typeLine || '').toLowerCase();
                 if (typeLine.includes('land')) {
                     targetPlayer.landsPlayedThisTurn = (targetPlayer.landsPlayedThisTurn || 0) + 1;
@@ -899,9 +936,11 @@ module.exports = function registerSocketHandlers(io) {
             }
 
             addAndBroadcastAction(io, room, currentUserId, 'moveCard', {
-                cardName: card.name, fromZone, toZone,
-                fromPlayer: sourcePlayer.username,
-                toPlayer: targetPlayer.username,
+                cardName: card.name,
+                fromZone: sourcePile ? `pile:${sourcePile.name}` : fromZone,
+                toZone: targetPile ? `pile:${targetPile.name}` : toZone,
+                fromPlayer: sourcePlayer?.username || '',
+                toPlayer: targetPile ? '' : targetPlayer.username,
             });
             broadcastRoomState(io, room);
             callback?.({ success: true });
@@ -953,7 +992,33 @@ module.exports = function registerSocketHandlers(io) {
             const targetPlayer = targetPlayerId
                 ? getPlayerInRoom(room, targetPlayerId)
                 : null;
+            const isPileTarget = typeof toZone === 'string' && toZone.startsWith('pile:');
+            const targetPile = isPileTarget
+                ? (room.piles || []).find(p => p.id === toZone.slice(5))
+                : null;
+            if (isPileTarget && !targetPile) return callback?.({ error: 'Target pile not found' });
 
+            // Helper to add a card to the destination (pile or player zone)
+            const pushDest = (card, sourcePlayer) => {
+                if (targetPile) {
+                    targetPile.cards.push(card);
+                    return;
+                }
+                const dest = targetPlayer || sourcePlayer;
+                if (toZone === 'library' && libraryPosition === 'top') {
+                    dest.zones[toZone].unshift(card);
+                } else {
+                    dest.zones[toZone].push(card);
+                }
+                if (toZone === 'battlefield' && sourcePlayer && dest === sourcePlayer) {
+                    const typeLine = (card.typeLine || '').toLowerCase();
+                    if (typeLine.includes('land')) {
+                        sourcePlayer.landsPlayedThisTurn = (sourcePlayer.landsPlayedThisTurn || 0) + 1;
+                    }
+                }
+            };
+
+            // Remove from player zones
             for (const player of room.players) {
                 for (const zoneName of Object.keys(player.zones)) {
                     const zone = player.zones[zoneName];
@@ -963,32 +1028,30 @@ module.exports = function registerSocketHandlers(io) {
                             if (zoneName === 'battlefield' && toZone !== 'battlefield') {
                                 cleanupAttachments(room, card);
                             }
-                            // Tokens cease to exist when leaving the battlefield
                             if (card.isToken && zoneName === 'battlefield' && toZone !== 'battlefield') {
                                 moved++;
-                                continue; // don't push to destination zone
+                                continue;
                             }
                             if (toZone !== 'battlefield') { card.x = 0; card.y = 0; card.tapped = false; }
-                            const dest = targetPlayer || player;
-                            if (toZone === 'library' && libraryPosition === 'top') {
-                                dest.zones[toZone].unshift(card);
-                            } else {
-                                dest.zones[toZone].push(card);
-                            }
+                            pushDest(card, player);
                             moved++;
-                            // Count lands being played this turn if this bulk
-                            // move is hand → battlefield for the card's own
-                            // player. Same rule as moveCard.
-                            if (toZone === 'battlefield' && zoneName === 'hand' && dest === player) {
-                                const typeLine = (card.typeLine || '').toLowerCase();
-                                if (typeLine.includes('land')) {
-                                    player.landsPlayedThisTurn = (player.landsPlayedThisTurn || 0) + 1;
-                                }
-                            }
                         }
                     }
                 }
             }
+
+            // Remove from piles
+            for (const pile of (room.piles || [])) {
+                for (let i = pile.cards.length - 1; i >= 0; i--) {
+                    if (ids.has(pile.cards[i].instanceId)) {
+                        const [card] = pile.cards.splice(i, 1);
+                        if (toZone !== 'battlefield') { card.x = 0; card.y = 0; card.tapped = false; }
+                        pushDest(card, null);
+                        moved++;
+                    }
+                }
+            }
+
             if (moved > 0) {
                 addAndBroadcastAction(io, room, currentUserId, 'bulkMove', { count: moved, toZone });
                 broadcastRoomState(io, room);
@@ -1005,6 +1068,11 @@ module.exports = function registerSocketHandlers(io) {
                     const card = zone.find(c => c.instanceId === instanceId);
                     if (card) return card;
                 }
+            }
+            // Also search shared piles
+            for (const pile of (room.piles || [])) {
+                const card = (pile.cards || []).find(c => c.instanceId === instanceId);
+                if (card) return card;
             }
             return null;
         };
@@ -1558,13 +1626,14 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
-        socket.on('setCardCounter', ({ instanceId, counter, value, mode }, callback) => {
+        socket.on('setCardCounter', ({ instanceId, counter, value, mode, endOfTurn }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
 
             const card = findCardAnywhere(room, instanceId);
             if (!card) return callback?.({ error: 'Card not found' });
             if (typeof card.counters !== 'object') card.counters = {};
+            if (typeof card.endOfTurnCounters !== 'object') card.endOfTurnCounters = {};
             // mode: 'set' (default) replaces, 'add' adds delta to current value
             let newValue = value;
             if (mode === 'add') {
@@ -1574,10 +1643,16 @@ module.exports = function registerSocketHandlers(io) {
             const clamped = clampGameValue(newValue);
             if (clamped === 0) {
                 delete card.counters[counter];
+                delete card.endOfTurnCounters[counter];
             } else {
                 card.counters[counter] = clamped;
+                if (endOfTurn) card.endOfTurnCounters[counter] = true;
+                else delete card.endOfTurnCounters[counter];
             }
-            addAndBroadcastAction(io, room, currentUserId, 'setCardCounter', { cardName: card.name, counter, value: clamped });
+            addAndBroadcastAction(io, room, currentUserId, 'setCardCounter', {
+                cardName: card.name, counter, value: clamped,
+                endOfTurn: !!endOfTurn,
+            });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -2315,6 +2390,27 @@ module.exports = function registerSocketHandlers(io) {
             const card = findCardAnywhere(room, instanceId);
             if (!card) return callback?.({ error: 'Card not found' });
 
+            // Foil / textless / skin are cosmetic choices that belong to the
+            // card's owner. Find who owns the card (by which player's zone
+            // it's currently in). Cards in shared piles have no owner, so
+            // anyone can edit those.
+            if (field === 'foil' || field === 'textless') {
+                let owner = null;
+                for (const p of room.players) {
+                    for (const zoneName of Object.keys(p.zones || {})) {
+                        const zone = p.zones[zoneName];
+                        if (Array.isArray(zone) && zone.some(c => c.instanceId === instanceId)) {
+                            owner = p;
+                            break;
+                        }
+                    }
+                    if (owner) break;
+                }
+                if (owner && owner.userId !== currentUserId) {
+                    return callback?.({ error: 'Only the card owner can change foil/textless' });
+                }
+            }
+
             if (field === 'damage' || field === 'suspendCounters') {
                 card[field] = clampGameValue(value, { allowNegative: false });
             } else if (field === 'phasedOut' || field === 'goaded' || field === 'rotated180' || field === 'textless') {
@@ -2832,6 +2928,22 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
             const card = findCardAnywhere(room, instanceId);
             if (!card) return callback?.({ error: 'Card not found' });
+            // Only the card's owner can change its art (cards in shared piles
+            // can be edited by anyone).
+            let owner = null;
+            for (const p of room.players) {
+                for (const zoneName of Object.keys(p.zones || {})) {
+                    const zone = p.zones[zoneName];
+                    if (Array.isArray(zone) && zone.some(c => c.instanceId === instanceId)) {
+                        owner = p;
+                        break;
+                    }
+                }
+                if (owner) break;
+            }
+            if (owner && owner.userId !== currentUserId) {
+                return callback?.({ error: 'Only the card owner can change art' });
+            }
             card.skinUrl = skinUrl || null;
             broadcastRoomState(io, room);
             callback?.({ success: true });
@@ -3190,6 +3302,81 @@ module.exports = function registerSocketHandlers(io) {
             }
 
             broadcastRoomState(io, room);
+        });
+
+        // ─── SHARED PILES ────────────────────────────────────────────────
+        // Any player can create a pile, name it, put cards in it, pull cards
+        // out. Deleting a pile sends its cards to the creator's hand (or the
+        // first player's hand if creator isn't present).
+
+        socket.on('createPile', ({ name }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            if (!room.piles) room.piles = [];
+            const player = getPlayerInRoom(room, currentUserId);
+            const id = `pile_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+            const pileName = (typeof name === 'string' && name.trim()) ? name.trim() : `Pile ${room.piles.length + 1}`;
+            const pile = {
+                id,
+                name: pileName,
+                cards: [],
+                createdBy: currentUserId,
+                createdByName: player?.username || null,
+            };
+            room.piles.push(pile);
+            addAndBroadcastAction(io, room, currentUserId, 'createPile', { name: pileName });
+            broadcastRoomState(io, room);
+            callback?.({ success: true, pileId: id });
+        });
+
+        socket.on('deletePile', ({ pileId, returnTo }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room?.piles) return callback?.({ error: 'Not in a room' });
+            const idx = room.piles.findIndex(p => p.id === pileId);
+            if (idx === -1) return callback?.({ error: 'Pile not found' });
+            const pile = room.piles[idx];
+            // Return cards to a player's hand. Default: pile creator, fall back
+            // to the caller, fall back to the first player.
+            const ownerId = returnTo || pile.createdBy || currentUserId;
+            const owner = getPlayerInRoom(room, ownerId) || room.players[0];
+            if (owner && pile.cards.length > 0) {
+                if (!owner.zones.hand) owner.zones.hand = [];
+                owner.zones.hand.push(...pile.cards);
+            }
+            room.piles.splice(idx, 1);
+            addAndBroadcastAction(io, room, currentUserId, 'deletePile', {
+                name: pile.name,
+                cardCount: pile.cards.length,
+                returnedTo: owner?.username || null,
+            });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        socket.on('renamePile', ({ pileId, name }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room?.piles) return callback?.({ error: 'Not in a room' });
+            const pile = room.piles.find(p => p.id === pileId);
+            if (!pile) return callback?.({ error: 'Pile not found' });
+            const newName = (typeof name === 'string' && name.trim()) ? name.trim() : pile.name;
+            const oldName = pile.name;
+            pile.name = newName;
+            if (oldName !== newName) {
+                addAndBroadcastAction(io, room, currentUserId, 'renamePile', { oldName, newName });
+            }
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        socket.on('shufflePile', ({ pileId }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room?.piles) return callback?.({ error: 'Not in a room' });
+            const pile = room.piles.find(p => p.id === pileId);
+            if (!pile) return callback?.({ error: 'Pile not found' });
+            shuffleArray(pile.cards);
+            addAndBroadcastAction(io, room, currentUserId, 'shufflePile', { name: pile.name });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
         });
 
         // ─── DISCONNECT ─────────────────────────────────────────────────

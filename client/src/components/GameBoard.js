@@ -20,6 +20,7 @@ import DeckImport from './DeckImport';
 import DeckBuilder from './DeckBuilder';
 import DeckViewer from './DeckViewer';
 import DraftSetup from './DraftSetup';
+import PilesPanel from './PilesPanel';
 import DraftPick from './DraftPick';
 import SealedBuilder from './SealedBuilder';
 import TournamentBracket from './TournamentBracket';
@@ -421,6 +422,11 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     if (found) return { card: found, zone: zoneName, player };
                 }
             }
+        }
+        // Also search shared piles
+        for (const pile of (gameState.piles || [])) {
+            const found = (pile.cards || []).find(c => c?.instanceId === instanceId);
+            if (found) return { card: found, zone: `pile:${pile.id}`, player: null };
         }
         return null;
     };
@@ -1195,6 +1201,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                                     optimisticUpdatePlayer={optimisticUpdatePlayer}
                                     touchInteractMode={touchInteractMode}
                                     format={gameState.settings?.format || 'commander'}
+                                    piles={gameState.piles || []}
                                 />
                             </div>
                         );
@@ -1313,6 +1320,15 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         color: newColor,
                     });
                 }}
+            />
+
+            {/* Shared piles — floating toggle + slide-in panel */}
+            <PilesPanel
+                piles={gameState.piles || []}
+                players={gameState.players}
+                userId={user.id}
+                spectating={isSpectator}
+                onMaximizeCard={setMaximizedCard}
             />
 
             {/* Chat — always rendered, collapsible */}
@@ -1484,6 +1500,9 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         userId={user.id}
                         currentZone={liveMaximizedInfo?.zone}
                         readOnly={isSpectator}
+                        // Owner = card is in the viewer's own zones (not a pile,
+                        // not another player's zones). Cosmetics are owner-only.
+                        isOwner={!!liveMaximizedInfo?.player && liveMaximizedInfo.player.userId === user.id}
                         attachedToName={maxAttachedToName}
                         attachments={maxAttachments.length > 0 ? maxAttachments : null}
                         loadedDeckId={loadedDeckId}
@@ -1596,14 +1615,14 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                 <CounterModal
                     card={counterModalCard}
                     multiCount={selectedIds.size > 1 ? selectedIds.size : 1}
-                    onApply={(name, val, mode) => {
+                    onApply={(name, val, mode, endOfTurn) => {
                         // Apply to all selected cards if multi-selected,
                         // otherwise just the one card.
                         const targets = selectedIds.size > 1
                             ? Array.from(selectedIds)
                             : [counterModalCard.instanceId];
                         for (const id of targets) {
-                            socket.emit('setCardCounter', { instanceId: id, counter: name, value: val, mode });
+                            socket.emit('setCardCounter', { instanceId: id, counter: name, value: val, mode, endOfTurn });
                         }
                         setCounterModalCard(null);
                     }}

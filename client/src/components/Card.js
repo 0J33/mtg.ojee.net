@@ -156,12 +156,15 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                             {hasCounters && (
                                 <div className="effect-group">
                                     <div className="effect-group-label">Counters</div>
-                                    {counterEntries.map(([name, val]) => (
-                                        <div key={name} className="effect-line counter-effect">
-                                            <span className="effect-icon counter-icon">+</span>
-                                            <span><strong>{name}</strong> × {val}</span>
-                                        </div>
-                                    ))}
+                                    {counterEntries.map(([name, val]) => {
+                                        const eot = !!(card.endOfTurnCounters && card.endOfTurnCounters[name]);
+                                        return (
+                                            <div key={name} className="effect-line counter-effect">
+                                                <span className="effect-icon counter-icon">+</span>
+                                                <span><strong>{name}</strong> × {val}{eot ? <em className="eot-tag"> (EOT)</em> : null}</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                             {hasNotes && (

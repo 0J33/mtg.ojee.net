@@ -4,6 +4,20 @@
 
 export const CHANGELOG = [
     {
+        version: '2.5',
+        date: '2026-04-19',
+        changes: [
+            'Shared piles — click the piles icon on the left edge to open. Any player can create, name, rename, shuffle, delete piles, and drag cards in/out',
+            'Piles are visible to everyone; drag cards into a pile from any zone, drag them back out, or use the context menu "Move to pile: <name>"',
+            'Counter modal: new "Until end of turn" checkbox — counter clears automatically at end of turn cleanup',
+            'Foil / alternate art / textless flag are now OWNER-ONLY edits (others can see the effect but not change it)',
+            'CardMaximized now shows the owner\u2019s chosen alternate art (was only shown on the battlefield thumbnail)',
+            'If rotated 180° on the board, CardMaximized also rotates',
+            'Fix counter modal: Add/Set buttons work from right-click menu; raised above CardMaximized so "Add counter" from maximize view is visible',
+            'Fix player header right-click: counters and cmd damage badges no longer pop the browser\u2019s right-click menu or bubble to the player menu',
+        ],
+    },
+    {
         version: '2.3',
         date: '2026-04-15',
         changes: [

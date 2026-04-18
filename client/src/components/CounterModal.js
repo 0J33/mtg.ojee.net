@@ -19,7 +19,7 @@ export function saveCustomCounters(arr) {
 
 // Props:
 //   card: the card being edited (or first selected card for multi-select)
-//   onApply(name, value, mode): mode is 'add' (delta) or 'set' (absolute).
+//   onApply(name, value, mode, endOfTurn): mode is 'add' | 'set'.
 //     The caller decides how to apply it (single card or all selected).
 //   multiCount: number of cards this will apply to (for UI label).
 export default function CounterModal({ card, onApply, onClose, multiCount }) {
@@ -27,6 +27,7 @@ export default function CounterModal({ card, onApply, onClose, multiCount }) {
     const [name, setName] = useState('+1/+1');
     const [value, setValue] = useState(1);
     const [customs, setCustoms] = useState([]);
+    const [endOfTurn, setEndOfTurn] = useState(false);
 
     useEffect(() => { setCustoms(loadCustomCounters()); }, []);
 
@@ -55,7 +56,7 @@ export default function CounterModal({ card, onApply, onClose, multiCount }) {
             setCustoms(next);
             saveCustomCounters(next);
         }
-        onApply(trimmed, value, mode);
+        onApply(trimmed, value, mode, endOfTurn);
     };
 
     return createPortal(
@@ -91,6 +92,10 @@ export default function CounterModal({ card, onApply, onClose, multiCount }) {
                         onKeyDown={e => e.key === 'Enter' && doApply('add')}
                     />
                 </div>
+                <label className="counter-eot-row" title="Temporary counter: cleared automatically at end of turn">
+                    <input type="checkbox" checked={endOfTurn} onChange={e => setEndOfTurn(e.target.checked)} />
+                    <span>Until end of turn</span>
+                </label>
                 <div className="counter-actions">
                     <button onClick={saveAsPreset} className="small-btn" title="Save name as a preset without applying">Save preset</button>
                     <button onClick={() => doApply('set')} className="small-btn" title="Replace current counter value with this">Set</button>

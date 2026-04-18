@@ -8,7 +8,7 @@ import { detectKeywords } from '../keywords';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
-export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly, attachedToName, attachments, loadedDeckId }) {
+export default function CardMaximized({ card, onClose, onClickCard, onAddNote, onAddCounter, allPlayers, userId, currentZone, readOnly, isOwner, attachedToName, attachments, loadedDeckId }) {
     useEscapeKey(onClose);
     const [hoverThumb, setHoverThumb] = useState(null); // { url, x, y }
     const [showRevealMenu, setShowRevealMenu] = useState(false);
@@ -74,11 +74,15 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     // The local preview toggle lets the user peek at whichever side ISN'T
     // currently shown, without mutating game state.
     const showBack = viewingBack ? !gameShowsBack : gameShowsBack;
+    // skinUrl is the alternate art the owner picked — shown to all players.
+    // Only applies to the front side; DFC back uses its own image.
+    const skin = card.skinUrl;
+    const frontImage = skin || card.imageUri || card.customImageUrl || CARD_BACK;
     const imageUrl = isFaceDown
         ? CARD_BACK
         : showBack
             ? card.backImageUri
-            : (card.imageUri || card.customImageUrl || CARD_BACK);
+            : frontImage;
 
     const largeUrl = imageUrl.replace('/normal/', '/large/').replace('/small/', '/large/');
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
@@ -255,23 +259,29 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                 {onAddNote && (
                                     <button className="small-btn" onClick={() => onAddNote(card.instanceId)}>+ Note</button>
                                 )}
-                                <button
-                                    className={`small-btn ${card.foil ? 'foil-active' : ''}`}
-                                    onClick={() => {
-                                        const next = !card.foil ? 'foil' : card.foil === 'foil' ? 'etched' : null;
-                                        socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: next });
-                                    }}
-                                    title={!card.foil ? 'Make foil' : card.foil === 'foil' ? 'Switch to etched' : 'Remove effect'}
-                                >
-                                    {!card.foil ? '\u2727 Foil' : card.foil === 'foil' ? '\u2726 Foil' : '\u2726 Etched'}
-                                </button>
-                                <button
-                                    className={`small-btn ${card.textless ? 'active' : ''}`}
-                                    onClick={() => socket.emit('setCardField', { instanceId: card.instanceId, field: 'textless', value: !card.textless })}
-                                    title={card.textless ? 'Hide oracle text on hover (card has visible rules text)' : 'Show oracle text on hover (textless / no visible rules)'}
-                                >
-                                    {card.textless ? '\u2713 Show text' : 'Show text'}
-                                </button>
+                                {/* Cosmetic toggles — owner only. Cards in shared piles
+                                    or on opponents' sides show read-only visuals. */}
+                                {isOwner && (
+                                    <>
+                                        <button
+                                            className={`small-btn ${card.foil ? 'foil-active' : ''}`}
+                                            onClick={() => {
+                                                const next = !card.foil ? 'foil' : card.foil === 'foil' ? 'etched' : null;
+                                                socket.emit('setCardField', { instanceId: card.instanceId, field: 'foil', value: next });
+                                            }}
+                                            title={!card.foil ? 'Make foil' : card.foil === 'foil' ? 'Switch to etched' : 'Remove effect'}
+                                        >
+                                            {!card.foil ? '\u2727 Foil' : card.foil === 'foil' ? '\u2726 Foil' : '\u2726 Etched'}
+                                        </button>
+                                        <button
+                                            className={`small-btn ${card.textless ? 'active' : ''}`}
+                                            onClick={() => socket.emit('setCardField', { instanceId: card.instanceId, field: 'textless', value: !card.textless })}
+                                            title={card.textless ? 'Hide oracle text on hover (card has visible rules text)' : 'Show oracle text on hover (textless / no visible rules)'}
+                                        >
+                                            {card.textless ? '\u2713 Show text' : 'Show text'}
+                                        </button>
+                                    </>
+                                )}
                             </div>
 
                             {/* Move card to a different zone */}
@@ -309,8 +319,8 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                     )}
 
                     {/* Custom skin — change art from Scryfall printings or a custom URL.
-                        Visible to all players. */}
-                    {card.instanceId && (
+                        Visible to all players but only editable by the card's owner. */}
+                    {card.instanceId && isOwner && (
                         <div className="card-skin-section">
                             <div className="card-skin-header">
                                 <strong>Card art</strong>

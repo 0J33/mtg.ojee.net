@@ -40,6 +40,9 @@ function createCardInstance(cardData, overrides = {}) {
         flipped: false,
         faceDown: false,
         counters: {},
+        // Counters flagged as "until end of turn" — map of counterName -> true.
+        // Cleared in endOfTurnCleanup, same time damage clears.
+        endOfTurnCounters: {},
         attachedTo: null,
         zIndex: 0,
         isToken: false,
@@ -195,6 +198,9 @@ function createRoom(hostId, hostUsername, settings = {}) {
         // nextTurn fires, if the queue is non-empty, the next turn goes to
         // the head of the queue instead of advancing turnIndex.
         extraTurns: [],
+        // Shared piles — any player can create, delete, or put cards into them.
+        // Each pile is { id, name, cards: [] }. Visible to everyone.
+        piles: [],
         settings: {
             startingLife: settings.startingLife || 40,
             useCommanderDamage: settings.useCommanderDamage !== false,
@@ -312,6 +318,14 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
             ownerId: t.ownerId,
             ownerName: t.ownerName,
             source: t.source,
+        })),
+        piles: (room.piles || []).map(pile => ({
+            id: pile.id,
+            name: pile.name,
+            cards: pile.cards || [],
+            count: (pile.cards || []).length,
+            createdBy: pile.createdBy || null,
+            createdByName: pile.createdByName || null,
         })),
         started: room.started,
         gameStartedAt: room.gameStartedAt || null,
@@ -431,6 +445,7 @@ function snapshotState(room) {
         teams: room.teams,
         stack: room.stack || [],
         extraTurns: room.extraTurns || [],
+        piles: JSON.parse(JSON.stringify(room.piles || [])),
         sharedTeamLife: !!room.sharedTeamLife,
     }));
 }
@@ -460,6 +475,7 @@ function restoreSnapshot(room, snapshot) {
     if (snapshot.teams) room.teams = snapshot.teams;
     if (snapshot.stack !== undefined) room.stack = snapshot.stack;
     if (snapshot.extraTurns !== undefined) room.extraTurns = snapshot.extraTurns;
+    if (snapshot.piles !== undefined) room.piles = snapshot.piles;
     if (snapshot.sharedTeamLife !== undefined) room.sharedTeamLife = snapshot.sharedTeamLife;
 }
 
