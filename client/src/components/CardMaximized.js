@@ -100,7 +100,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
         <div className="modal-overlay card-max-overlay">
             <div className="card-maximized">
                 <div className="card-max-image-col">
-                    <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? card.foil : ''}`}>
+                    <div className={`card-max-image-wrap ${card.foil && !isFaceDown ? card.foil : ''} ${card.rotated180 && !isFaceDown ? 'rotated-180' : ''}`}>
                         <img src={largeUrl} alt={card.name} />
                     </div>
                     {hasDFC && !isFaceDown && (

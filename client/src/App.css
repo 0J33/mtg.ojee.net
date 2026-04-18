@@ -2287,6 +2287,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-temp-control-badge { bottom: 2px; right: 2px; background: #2980b9; }
 
 .card.rotated-180 img { transform: rotate(180deg); }
+.card-max-image-wrap.rotated-180 > img { transform: rotate(180deg); }
 .card.phased-out img { opacity: 0.35; filter: grayscale(0.6); }
 .card.attacking { box-shadow: 0 0 0 2px #e74c3c, 0 0 12px rgba(231, 76, 60, 0.5); }
 .card.temp-controlled { box-shadow: 0 0 0 2px #2980b9; }
