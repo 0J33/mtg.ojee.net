@@ -1,6 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
+
+const POS_KEY = 'mtg_piles_panel_pos';
+const PANEL_W = 340;
+const PANEL_H_DEFAULT = () => Math.min(window.innerHeight - 80, 600);
+
+function loadPos() {
+    try {
+        const raw = localStorage.getItem(POS_KEY);
+        if (!raw) return null;
+        const p = JSON.parse(raw);
+        if (typeof p?.left === 'number' && typeof p?.top === 'number') return p;
+    } catch (_) {}
+    return null;
+}
+function savePos(p) {
+    try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch (_) {}
+}
+function clampPos(p) {
+    const w = Math.min(PANEL_W, window.innerWidth - 10);
+    const h = PANEL_H_DEFAULT();
+    return {
+        left: Math.max(4, Math.min(p.left, window.innerWidth - w - 4)),
+        top: Math.max(4, Math.min(p.top, window.innerHeight - Math.min(h, 120) - 4)),
+    };
+}
 
 /**
  * Shared piles panel. Collapsible from a floating toggle button so it
@@ -16,6 +41,57 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
     const [newName, setNewName] = useState('');
     const [creating, setCreating] = useState(false);
     const [createName, setCreateName] = useState('');
+    const [pos, setPos] = useState(() => loadPos());
+    const dragRef = useRef(null); // { startX, startY, origLeft, origTop, pointerId }
+
+    // Clamp on window resize so the panel can't get stuck off-screen.
+    useEffect(() => {
+        if (!pos) return;
+        const onResize = () => setPos(p => (p ? clampPos(p) : p));
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, [pos]);
+
+    const onHeaderPointerDown = (e) => {
+        // Ignore clicks on buttons/inputs inside the header
+        if (e.target.closest('button, input')) return;
+        const panel = e.currentTarget.parentElement;
+        if (!panel) return;
+        const rect = panel.getBoundingClientRect();
+        dragRef.current = {
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
+            startX: e.clientX,
+            startY: e.clientY,
+            pointerId: e.pointerId,
+            moved: false,
+        };
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+    const onHeaderPointerMove = (e) => {
+        const d = dragRef.current;
+        if (!d || d.pointerId !== e.pointerId) return;
+        if (!d.moved) {
+            if (Math.abs(e.clientX - d.startX) <= 2 && Math.abs(e.clientY - d.startY) <= 2) return;
+            d.moved = true;
+            e.preventDefault();
+        }
+        setPos(clampPos({
+            left: e.clientX - d.offsetX,
+            top: e.clientY - d.offsetY,
+        }));
+    };
+    const onHeaderPointerUp = (e) => {
+        const d = dragRef.current;
+        if (!d || d.pointerId !== e.pointerId) return;
+        dragRef.current = null;
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+        if (d.moved && pos) savePos(pos);
+    };
+    const resetPos = () => {
+        setPos(null);
+        try { localStorage.removeItem(POS_KEY); } catch (_) {}
+    };
 
     const totalCards = (piles || []).reduce((n, p) => n + (p.count || 0), 0);
 
@@ -93,12 +169,34 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
             </button>
 
             {open && createPortal(
-                <div className="piles-panel">
-                    <div className="piles-panel-header">
+                <div
+                    className={`piles-panel ${pos ? 'piles-panel-floating' : ''}`}
+                    style={pos ? { left: pos.left, top: pos.top, right: 'auto', bottom: 'auto' } : undefined}
+                >
+                    <div
+                        className="piles-panel-header"
+                        onPointerDown={onHeaderPointerDown}
+                        onPointerMove={onHeaderPointerMove}
+                        onPointerUp={onHeaderPointerUp}
+                        onPointerCancel={onHeaderPointerUp}
+                        title="Drag to move"
+                    >
+                        <span className="piles-drag-grip" aria-hidden="true" title="Drag to move">
+                            <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
+                                <circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/>
+                                <circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/>
+                                <circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/>
+                            </svg>
+                        </span>
                         <h3>Piles {totalCards > 0 && <span className="muted">({totalCards} cards)</span>}</h3>
                         <div className="piles-panel-actions">
                             {!spectating && (
                                 <button className="small-btn primary-btn" onClick={() => setCreating(true)} type="button">+ New pile</button>
+                            )}
+                            {pos && (
+                                <button className="icon-btn" onClick={resetPos} title="Reset position" type="button">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg>
+                                </button>
                             )}
                             <button className="icon-btn" onClick={() => setOpen(false)} title="Close">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -160,14 +258,24 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                             <div className="pile-actions" onClick={e => e.stopPropagation()}>
                                                 {isRenaming ? (
                                                     <>
-                                                        <button className="icon-btn" onClick={renamePile} title="Save">\u2713</button>
-                                                        <button className="icon-btn" onClick={() => { setRenameFor(null); setNewName(''); }} title="Cancel">\u2715</button>
+                                                        <button className="icon-btn" onClick={renamePile} title="Save">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                                        </button>
+                                                        <button className="icon-btn" onClick={() => { setRenameFor(null); setNewName(''); }} title="Cancel">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </button>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <button className="icon-btn" onClick={() => { setRenameFor(pile.id); setNewName(pile.name); }} title="Rename">\u270E</button>
-                                                        <button className="icon-btn" onClick={() => shufflePile(pile.id)} title="Shuffle">\u21BB</button>
-                                                        <button className="icon-btn" onClick={() => deletePile(pile.id)} title="Delete pile">\u2715</button>
+                                                        <button className="icon-btn" onClick={() => { setRenameFor(pile.id); setNewName(pile.name); }} title="Rename">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                                        </button>
+                                                        <button className="icon-btn" onClick={() => shufflePile(pile.id)} title="Shuffle">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                                                        </button>
+                                                        <button className="icon-btn" onClick={() => deletePile(pile.id)} title="Delete pile">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                        </button>
                                                     </>
                                                 )}
                                             </div>
@@ -203,8 +311,8 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                                     <span className="pile-card-name">{card.faceDown ? 'Face down' : card.name}</span>
                                                     {!spectating && (
                                                         <div className="pile-card-actions">
-                                                            <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'hand')} title="Move to your hand">\u2192 Hand</button>
-                                                            <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'battlefield')} title="Play to your battlefield">\u2192 BF</button>
+                                                            <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'hand')} title="Move to your hand">{'\u2192'} Hand</button>
+                                                            <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'battlefield')} title="Play to your battlefield">{'\u2192'} BF</button>
                                                             <button className="small-btn" onClick={() => toggleFaceDown(card)} title="Flip face up/down">Flip</button>
                                                         </div>
                                                     )}

@@ -4,7 +4,17 @@
 
 export const CHANGELOG = [
     {
-        version: '2.5',
+        version: '2.6',
+        date: '2026-04-19',
+        changes: [
+            'Piles panel is draggable — grab the header (grip icon on the left) to move it anywhere on screen; works on desktop and mobile',
+            'Position persists per browser; a reset button appears in the header once moved',
+            'On mobile, dragging turns the panel into a floating window instead of full-screen so you can reach zones underneath',
+            'Fix broken pile action icons (rename / shuffle / delete were showing literal escape text); replaced with proper SVG icons',
+        ],
+    },
+    {
+        version: '2.4 – 2.5',
         date: '2026-04-19',
         changes: [
             'Shared piles — click the piles icon on the left edge to open. Any player can create, name, rename, shuffle, delete piles, and drag cards in/out',
