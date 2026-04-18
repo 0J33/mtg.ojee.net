@@ -1038,7 +1038,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .quick-counts button { min-width: 40px; }
 
 /* ─── COUNTER MODAL ───────────────────────────────────────── */
-.counter-modal { max-width: 460px; z-index: 3100; }
+.counter-modal { max-width: 460px; }
+/* Keep counter modal above CardMaximized (3000) so "Add counter" from
+   the maximize view opens on top, not behind it. */
+.counter-modal-overlay { z-index: 3200; }
 .counter-presets { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0; }
 .counter-presets button.active { background: var(--accent); color: #000; border-color: var(--accent); }
 .counter-preset-custom { display: inline-flex; align-items: stretch; }

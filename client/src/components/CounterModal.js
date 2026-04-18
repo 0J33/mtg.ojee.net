@@ -59,7 +59,7 @@ export default function CounterModal({ card, onApply, onClose, multiCount }) {
     };
 
     return createPortal(
-        <div className="modal-overlay">
+        <div className="modal-overlay counter-modal-overlay">
             <div className="modal counter-modal">
                 <div className="modal-header">
                     <h3>Counters{multiCount > 1 ? ` · ${multiCount} cards` : ` · ${card?.name || 'card'}`}</h3>

@@ -979,8 +979,8 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             {counterModal && (
                 <CounterModal
                     card={counterModal.card}
-                    onAdd={(name, val) => {
-                        socket.emit('setCardCounter', { instanceId: counterModal.instanceId, counter: name, value: val });
+                    onApply={(name, val, mode) => {
+                        socket.emit('setCardCounter', { instanceId: counterModal.instanceId, counter: name, value: val, mode });
                         setCounterModal(null);
                     }}
                     onClose={() => setCounterModal(null)}
