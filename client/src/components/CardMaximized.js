@@ -18,52 +18,9 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const [showSkinInput, setShowSkinInput] = useState(false);
     const [altArts, setAltArts] = useState(null); // null = not loaded, [] = empty
     const [loadingArts, setLoadingArts] = useState(false);
-
-    const currentSkin = card?.skinUrl || null;
-
-    const loadAltArts = async () => {
-        if (altArts !== null || !card?.name) return;
-        setLoadingArts(true);
-        try {
-            // Strip DFC back-face name if present
-            const name = card.name.includes(' // ') ? card.name.split(' // ')[0] : card.name;
-            const res = await scryfall.prints(name);
-            const arts = (res?.data || [])
-                .filter(c => c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal)
-                .map(c => ({
-                    id: c.id,
-                    set: c.set_name,
-                    setCode: c.set?.toUpperCase(),
-                    cn: c.collector_number,
-                    imageUri: c.image_uris?.normal || c.card_faces?.[0]?.image_uris?.normal,
-                }));
-            setAltArts(arts);
-        } catch (_) {
-            setAltArts([]);
-        }
-        setLoadingArts(false);
-    };
-
-    const applySkin = (url, allCopies) => {
-        if (allCopies && card.scryfallId) {
-            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: url });
-            // Also save to deck so it persists across games
-            if (loadedDeckId) {
-                socket.emit('saveSkinToDeck', { deckId: loadedDeckId, scryfallId: card.scryfallId, skinUrl: url });
-            }
-        } else {
-            socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: url });
-        }
-    };
-
-    const saveSkinToDeck = () => {
-        if (!loadedDeckId || !card.scryfallId || !currentSkin) return;
-        socket.emit('saveSkinToDeck', { deckId: loadedDeckId, scryfallId: card.scryfallId, skinUrl: currentSkin }, (res) => {
-            if (res?.success) {
-                // brief visual feedback would be nice but keeping it simple
-            }
-        });
-    };
+    // Reload alt-art gallery when the user flips between front/back so the
+    // thumbnails reflect the side they're editing.
+    const [artsSide, setArtsSide] = useState('front');
     if (!card) return null;
 
     const hasDFC = !!card.backImageUri;
@@ -74,15 +31,94 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     // The local preview toggle lets the user peek at whichever side ISN'T
     // currently shown, without mutating game state.
     const showBack = viewingBack ? !gameShowsBack : gameShowsBack;
+    // The side being edited — all skin / alt-art actions target this side.
+    const editingSide = showBack ? 'back' : 'front';
     // skinUrl is the alternate art the owner picked — shown to all players.
-    // Only applies to the front side; DFC back uses its own image.
-    const skin = card.skinUrl;
-    const frontImage = skin || card.imageUri || card.customImageUrl || CARD_BACK;
+    // Front uses skinUrl; back (DFC) uses backSkinUrl.
+    const frontImage = (card.skinUrl || card.imageUri || card.customImageUrl || CARD_BACK);
+    const backImage = (card.backSkinUrl || card.backImageUri || CARD_BACK);
     const imageUrl = isFaceDown
         ? CARD_BACK
         : showBack
-            ? card.backImageUri
+            ? backImage
             : frontImage;
+    // Which skin value the UI is currently editing (shown as "active thumb"
+    // in the gallery, reset button targets this side, etc.).
+    const currentSkin = showBack ? (card.backSkinUrl || null) : (card.skinUrl || null);
+
+    const loadAltArts = async (side = editingSide) => {
+        if (!card?.name) return;
+        setLoadingArts(true);
+        try {
+            // Strip DFC back-face name if present
+            const name = card.name.includes(' // ') ? card.name.split(' // ')[0] : card.name;
+            const res = await scryfall.prints(name);
+            // For DFC cards, prints return the whole card; pull the matching
+            // face image (0 = front, 1 = back) when available.
+            const arts = (res?.data || [])
+                .map(c => {
+                    const faces = c.card_faces || [];
+                    const img = side === 'back'
+                        ? (faces[1]?.image_uris?.normal || null)
+                        : (c.image_uris?.normal || faces[0]?.image_uris?.normal || null);
+                    if (!img) return null;
+                    return {
+                        id: c.id,
+                        set: c.set_name,
+                        setCode: c.set?.toUpperCase(),
+                        cn: c.collector_number,
+                        imageUri: img,
+                    };
+                })
+                .filter(Boolean);
+            setAltArts(arts);
+            setArtsSide(side);
+        } catch (_) {
+            setAltArts([]);
+            setArtsSide(side);
+        }
+        setLoadingArts(false);
+    };
+
+    const applySkin = (url, allCopies) => {
+        const side = editingSide;
+        if (allCopies && card.scryfallId) {
+            socket.emit('setCardSkinAll', { scryfallId: card.scryfallId, skinUrl: url, side });
+            // Also save to deck so it persists across games
+            if (loadedDeckId) {
+                socket.emit('saveSkinToDeck', {
+                    deckId: loadedDeckId,
+                    scryfallId: card.scryfallId,
+                    [side === 'back' ? 'backSkinUrl' : 'skinUrl']: url,
+                });
+            }
+        } else {
+            socket.emit('setCardSkin', { instanceId: card.instanceId, skinUrl: url, side });
+        }
+    };
+
+    const saveSkinToDeck = () => {
+        if (!loadedDeckId || !card.scryfallId) return;
+        socket.emit('saveSkinToDeck', {
+            deckId: loadedDeckId,
+            scryfallId: card.scryfallId,
+            [editingSide === 'back' ? 'backSkinUrl' : 'skinUrl']: currentSkin,
+        });
+    };
+
+    // Save every cosmetic setting (both sides' skins, foil, textless) to
+    // the deck so the next game loads them all automatically.
+    const saveAllSettingsToDeck = () => {
+        if (!loadedDeckId || !card.scryfallId) return;
+        socket.emit('saveSkinToDeck', {
+            deckId: loadedDeckId,
+            scryfallId: card.scryfallId,
+            skinUrl: card.skinUrl || null,
+            backSkinUrl: card.backSkinUrl || null,
+            foil: card.foil || null,
+            textless: !!card.textless,
+        });
+    };
 
     const largeUrl = imageUrl.replace('/normal/', '/large/').replace('/small/', '/large/');
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
@@ -319,28 +355,44 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                     )}
 
                     {/* Custom skin — change art from Scryfall printings or a custom URL.
-                        Visible to all players but only editable by the card's owner. */}
+                        Visible to all players but only editable by the card's owner.
+                        DFC cards let you edit front and back independently — actions
+                        target whichever side is currently showing in the preview. */}
                     {card.instanceId && isOwner && (
                         <div className="card-skin-section">
                             <div className="card-skin-header">
-                                <strong>Card art</strong>
+                                <strong>Card art{hasDFC ? ` — ${editingSide} face` : ''}</strong>
+                                {hasDFC && (
+                                    <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>
+                                        Use "{showBack ? '↩ Front' : '↪ Other side'}" to edit the {showBack ? 'front' : 'back'}.
+                                    </span>
+                                )}
                             </div>
                             {currentSkin && (
                                 <div className="card-skin-actions">
-                                    <button className="small-btn" onClick={() => applySkin(null, false)}>Reset this card</button>
+                                    <button className="small-btn" onClick={() => applySkin(null, false)}>Reset {hasDFC ? editingSide : 'this card'}</button>
                                     {card.scryfallId && (
                                         <button className="small-btn" onClick={() => applySkin(null, true)}>Reset all copies</button>
                                     )}
                                     {loadedDeckId && card.scryfallId && (
-                                        <button className="small-btn primary-btn" onClick={saveSkinToDeck}>Save to deck</button>
+                                        <button className="small-btn primary-btn" onClick={saveSkinToDeck} title="Save this side's art to the deck">Save {hasDFC ? editingSide : ''} to deck</button>
                                     )}
                                 </div>
                             )}
+                            {loadedDeckId && card.scryfallId && (
+                                <div className="card-skin-actions">
+                                    <button
+                                        className="small-btn"
+                                        onClick={saveAllSettingsToDeck}
+                                        title="Save both sides' art, foil, and textless flag to the deck"
+                                    >Save all settings to deck</button>
+                                </div>
+                            )}
 
-                            {/* Alternate printings from Scryfall */}
-                            {altArts === null ? (
-                                <button className="small-btn" onClick={loadAltArts} disabled={loadingArts}>
-                                    {loadingArts ? 'Loading...' : 'Browse alternate art'}
+                            {/* Alternate printings from Scryfall — gallery reflects the side being edited. */}
+                            {altArts === null || artsSide !== editingSide ? (
+                                <button className="small-btn" onClick={() => loadAltArts(editingSide)} disabled={loadingArts}>
+                                    {loadingArts ? 'Loading...' : `Browse alternate art${hasDFC ? ` (${editingSide})` : ''}`}
                                 </button>
                             ) : altArts.length > 0 ? (
                                 <div className="card-skin-gallery">

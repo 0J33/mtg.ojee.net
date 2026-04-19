@@ -67,7 +67,8 @@ function createCardInstance(cardData, overrides = {}) {
         // zone (foretell pile, exile from blink). Used to return it.
         returnZone: null,
         rotated180: false,
-        skinUrl: cardData.skinUrl || null, // custom art override — visible to everyone
+        skinUrl: cardData.skinUrl || null,     // custom art override for the front — visible to everyone
+        backSkinUrl: cardData.backSkinUrl || null, // custom art override for the back face of a DFC
         foil: cardData.foil || null,      // 'foil' | 'etched' | null — visible to everyone
         textless: !!cardData.textless,    // card image has no rules text (full art / textless)
         nonEnglish: !!cardData.nonEnglish, // card image text is not in English

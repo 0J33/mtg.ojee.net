@@ -805,7 +805,7 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         // ─── CARD ACTIONS ───────────────────────────────────────────────
-        socket.on('drawCards', ({ count }, callback) => {
+        socket.on('drawCards', ({ count, faceDown }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             const player = getPlayerInRoom(room, currentUserId);
@@ -816,6 +816,11 @@ module.exports = function registerSocketHandlers(io) {
             for (let i = 0; i < num; i++) {
                 const card = player.zones.library.shift();
                 if (card) {
+                    // faceDown lets you draw cards without revealing their
+                    // identity to yourself — useful for "manifest", "top of
+                    // library clues", "cards in hand the opponent hid", etc.
+                    // The card stays in hand and you can flip it up later.
+                    if (faceDown) card.faceDown = true;
                     player.zones.hand.push(card);
                     drawn.push(card);
                 }
@@ -825,7 +830,7 @@ module.exports = function registerSocketHandlers(io) {
             // turn-start draw specifically.
             if (num > 0) player.drewThisTurn = true;
 
-            addAndBroadcastAction(io, room, currentUserId, 'drawCards', { count: num });
+            addAndBroadcastAction(io, room, currentUserId, 'drawCards', { count: num, faceDown: !!faceDown });
             broadcastRoomState(io, room);
             callback?.({ success: true, drawn });
         });
@@ -918,7 +923,13 @@ module.exports = function registerSocketHandlers(io) {
             if (y !== undefined) card.y = y;
             if (toZone !== 'battlefield') { card.x = 0; card.y = 0; }
             if (faceDown !== undefined) card.faceDown = faceDown;
-            if (toZone === 'hand' || toZone === 'library') card.tapped = false;
+            // Any non-battlefield zone implies the card isn't "in play" so
+            // it shouldn't be tapped. The command zone in particular has
+            // historically confused players because commanders carry their
+            // tapped state when they're sent back (e.g. from a battlefield
+            // bounce), and there's no gameplay reason for a command-zone
+            // commander to be tapped.
+            if (toZone !== 'battlefield') card.tapped = false;
             if (toZone === 'commandZone' && fromZone === 'graveyard' && targetPlayer) {
                 // Commander died and returned to command zone
                 targetPlayer.commanderDeaths++;
@@ -3053,7 +3064,10 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         // Set a custom skin on a single card instance (visible to everyone).
-        socket.on('setCardSkin', ({ instanceId, skinUrl }, callback) => {
+        // `side` can be 'front' (default) or 'back' — the back side applies
+        // only to DFC cards. We don't fail if there is no back; it just
+        // stores a value that isn't rendered anywhere.
+        socket.on('setCardSkin', ({ instanceId, skinUrl, side }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             const card = findCardAnywhere(room, instanceId);
@@ -3074,14 +3088,15 @@ module.exports = function registerSocketHandlers(io) {
             if (owner && owner.userId !== currentUserId) {
                 return callback?.({ error: 'Only the card owner can change art' });
             }
-            card.skinUrl = skinUrl || null;
+            if (side === 'back') card.backSkinUrl = skinUrl || null;
+            else card.skinUrl = skinUrl || null;
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
 
         // Set a custom skin on ALL cards with the same scryfallId across all
         // zones of the requesting player. Used for "apply to all copies".
-        socket.on('setCardSkinAll', ({ scryfallId, skinUrl }, callback) => {
+        socket.on('setCardSkinAll', ({ scryfallId, skinUrl, side }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             const player = getPlayerInRoom(room, currentUserId);
@@ -3092,7 +3107,8 @@ module.exports = function registerSocketHandlers(io) {
                 if (!Array.isArray(zone)) continue;
                 for (const card of zone) {
                     if (card.scryfallId === scryfallId) {
-                        card.skinUrl = skinUrl || null;
+                        if (side === 'back') card.backSkinUrl = skinUrl || null;
+                        else card.skinUrl = skinUrl || null;
                         count++;
                     }
                 }
@@ -3101,9 +3117,14 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true, count });
         });
 
-        // Save a skin to the deck so it loads automatically next time.
-        // Updates every card entry with the matching scryfallId.
-        socket.on('saveSkinToDeck', async ({ deckId, scryfallId, skinUrl }, callback) => {
+        // Save cosmetic settings (skin, foil, textless) to the deck so
+        // they load automatically next time. Updates every card entry
+        // with the matching scryfallId across commanders / companions /
+        // mainboard / sideboard. Each field is only overwritten when a
+        // value for it is present in the payload (undefined = leave as-is),
+        // so the in-game "Save skin only" button keeps working while a
+        // broader "Save all settings" button can hit everything at once.
+        socket.on('saveSkinToDeck', async ({ deckId, scryfallId, skinUrl, backSkinUrl, foil, textless }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             try {
@@ -3113,10 +3134,12 @@ module.exports = function registerSocketHandlers(io) {
                 let updated = 0;
                 for (const section of ['commanders', 'companions', 'mainboard', 'sideboard']) {
                     for (const entry of (deck[section] || [])) {
-                        if (entry.scryfallId === scryfallId) {
-                            entry.skinUrl = skinUrl || null;
-                            updated++;
-                        }
+                        if (entry.scryfallId !== scryfallId) continue;
+                        if (skinUrl !== undefined) entry.skinUrl = skinUrl || null;
+                        if (backSkinUrl !== undefined) entry.backSkinUrl = backSkinUrl || null;
+                        if (foil !== undefined) entry.foil = foil || null;
+                        if (textless !== undefined) entry.textless = !!textless;
+                        updated++;
                     }
                 }
                 if (updated > 0) {

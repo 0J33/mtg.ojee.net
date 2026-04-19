@@ -43,7 +43,7 @@ function formatEntry(entry, playerNameById) {
         case 'mill':
             return `${actorName} milled ${d.count || 1}`;
         case 'drawCards':
-            return `${actorName} drew ${d.count || 1}`;
+            return `${actorName} drew ${d.count || 1}${d.faceDown ? ' face-down' : ''}`;
         case 'tutor':
             return `${actorName} tutored ${d.cardName || 'a card'} to ${d.toZone || '?'}${d.shuffled ? ' (shuffled)' : ''}`;
         case 'revealCard':

@@ -28,6 +28,7 @@ const cardEntrySchema = new mongoose.Schema({
     // effectively immutable in this app, so it doesn't matter).
     customCardAuthorUsername: { type: String },
     skinUrl: { type: String, default: null },
+    backSkinUrl: { type: String, default: null }, // DFC back-face custom art
     foil: { type: String, default: null }, // 'foil' | 'etched' | null
     textless: { type: Boolean, default: false },
     nonEnglish: { type: Boolean, default: false },

@@ -22,13 +22,15 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const hasBack = !!card.backImageUri;
     const isFlipped = card.flipped && hasBack;
     // Server-side skin (visible to everyone) takes priority, then localStorage
-    // fallback for any previously-set client-only skins.
+    // fallback for any previously-set client-only skins. DFC cards have a
+    // separate backSkinUrl for the back face (owner-picked).
     const skin = card.skinUrl || getSkin(card.scryfallId);
     const frontImage = skin || card.imageUri || card.customImageUrl || CARD_BACK;
+    const backImage = card.backSkinUrl || card.backImageUri;
     const imageUrl = isFaceDown
         ? CARD_BACK
         : isFlipped
-            ? card.backImageUri
+            ? backImage
             : frontImage;
 
     useEffect(() => { setImgError(false); }, [imageUrl]);

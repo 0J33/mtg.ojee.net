@@ -4,6 +4,18 @@
 
 export const CHANGELOG = [
     {
+        version: '2.9',
+        date: '2026-04-19',
+        changes: [
+            'DFC back-face art — "Other side" in maximize view now lets you browse alt prints, paste a custom URL, and save the back face\'s art independently (new backSkinUrl field on cards and decks)',
+            'Save to deck: new "Save all settings to deck" button that bundles front art, back art, foil, and textless in one click; the server endpoint now accepts any subset so partial saves also work',
+            'Player header now has a semi-opaque backdrop + text-shadow, so life / name / counter / commander damage badges stay readable over any custom player background',
+            'Battlefield cells — removed the content-proportional flex grow that made one zone hog space. All cells now share the row equally; each still respects its min text width, and if they can\'t all fit the row scrolls horizontally',
+            'Cards moved into any non-battlefield zone (including command zone) are now auto-untapped — fixes commanders appearing tapped when they bounce back from the battlefield',
+            'Draw face-down — new "Draw ↓" button in library actions (also: shift-click or right-click the regular Draw button). Useful for manifest, foretelling, hidden top-of-library tricks, etc. Flip face up later via context menu or CardMaximized',
+        ],
+    },
+    {
         version: '2.8',
         date: '2026-04-19',
         changes: [

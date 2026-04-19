@@ -824,8 +824,6 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     );
                 });
 
-                const dynamicGrow = (cards) => Math.max(1, Math.min(cards.length, 12));
-
                 const renderRow = (key, label, cards, extraClass = '') => {
                     const isCollapsed = collapsedRows.has(key);
                     return (
@@ -839,7 +837,6 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                             renderCards={renderCards}
                             onDragOver={handleDragOver}
                             onDrop={(e) => handleDrop(e, 'battlefield')}
-                            grow={dynamicGrow(cards)}
                             playerId={player.userId}
                         />
                     );
@@ -862,7 +859,6 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                     renderCards={renderCards}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, 'commandZone')}
-                                    grow={dynamicGrow(player.zones.commandZone || [])}
                                     isCollapsed={collapsedRows.has('commandZone')}
                                     onToggle={() => toggleRow('commandZone')}
                                     playerId={player.userId}
@@ -971,8 +967,20 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                             <button
                                 onClick={() => socket.emit('drawCards', { count: 1 })}
                                 className={needsDraw ? 'turn-nudge' : ''}
-                                title={needsDraw ? "You haven't drawn this turn" : 'Draw a card'}
+                                title={needsDraw ? "You haven't drawn this turn" : 'Draw a card (shift-click or right-click to draw face-down)'}
+                                onContextMenu={(e) => { e.preventDefault(); socket.emit('drawCards', { count: 1, faceDown: true }); }}
+                                onMouseDown={(e) => {
+                                    if (e.shiftKey && e.button === 0) {
+                                        e.preventDefault();
+                                        socket.emit('drawCards', { count: 1, faceDown: true });
+                                    }
+                                }}
                             >Draw</button>
+                            <button
+                                onClick={() => socket.emit('drawCards', { count: 1, faceDown: true })}
+                                title="Draw one card face-down (flip it up later when ready)"
+                                data-sfx="draw"
+                            >Draw ↓</button>
                             <button onClick={() => socket.emit('shuffleLibrary')}>Shuffle</button>
                             <button onClick={() => socket.emit('mill', { count: 1 })}>Mill 1</button>
                             <button onClick={() => onScry?.()}>Scry</button>
@@ -1005,14 +1013,19 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     );
 }
 
-function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, renderCards, onDragOver, onDrop, grow, playerId }) {
+function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, renderCards, onDragOver, onDrop, playerId }) {
     const ref = useHorizontalWheel();
+    // All cells share the row equally (flex: 1 1 0) with the min-width in
+    // CSS acting as the floor. This avoids the old proportional-to-count
+    // grow making one cell hog space while others stay cramped. If content
+    // exceeds the cell's height it scrolls vertically (already set on
+    // .battlefield-cards).
     return (
         <div className={`zone battlefield bf-cell ${extraClass} ${isCollapsed ? 'collapsed' : ''}`}
             data-drop-zone="battlefield" data-drop-player={playerId}
             onDragOver={onDragOver}
             onDrop={onDrop}
-            style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
+            style={{ flex: isCollapsed ? '0 0 auto' : '1 1 0' }}>
             <div className="bf-row-label">
                 <span className="bf-row-toggle" onClick={onToggle}>
                     <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -1028,14 +1041,14 @@ function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, rende
     );
 }
 
-function CommandZoneCell({ player, renderCards, onDragOver, onDrop, grow, isCollapsed, onToggle, playerId }) {
+function CommandZoneCell({ player, renderCards, onDragOver, onDrop, isCollapsed, onToggle, playerId }) {
     const ref = useHorizontalWheel();
     return (
         <div className={`zone command-zone bf-cell ${isCollapsed ? 'collapsed' : ''}`}
             data-drop-zone="commandZone" data-drop-player={playerId}
             onDragOver={onDragOver}
             onDrop={onDrop}
-            style={{ flexGrow: isCollapsed ? 0 : grow, flexBasis: isCollapsed ? 'auto' : 0 }}>
+            style={{ flex: isCollapsed ? '0 0 auto' : '1 1 0' }}>
             <div className="bf-row-label">
                 <span className="bf-row-toggle" onClick={onToggle}>
                     <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
