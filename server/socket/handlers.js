@@ -143,7 +143,7 @@ const SNAPSHOT_EVENTS = new Set([
     'updateRoomSettings', 'concede',
     'mulliganBottom', 'takeControl',
     'setHandSizeEnforce', 'setSharedTeamLife',
-    'createPile', 'deletePile', 'renamePile', 'shufflePile',
+    'createPile', 'deletePile', 'renamePile', 'shufflePile', 'setPilePrivate',
 ]);
 
 // Auto-save interval
@@ -848,6 +848,10 @@ module.exports = function registerSocketHandlers(io) {
             if (isPileZone(fromZone)) {
                 const pile = (room.piles || []).find(p => p.id === pileIdOf(fromZone));
                 if (pile) {
+                    // Private pile: only the creator can pull cards out.
+                    if (pile.private && pile.createdBy !== currentUserId) {
+                        return callback?.({ error: 'Only the pile owner can take cards from a private pile' });
+                    }
                     const idx = pile.cards.findIndex(c => c.instanceId === instanceId);
                     if (idx !== -1) {
                         sourcePile = pile;
@@ -887,6 +891,9 @@ module.exports = function registerSocketHandlers(io) {
                 : null;
             if (!targetPlayer && !targetPile) return callback?.({ error: 'Target not found' });
             if (isPileZone(toZone) && !targetPile) return callback?.({ error: 'Target pile not found' });
+            if (targetPile && targetPile.private && targetPile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can drop cards into a private pile' });
+            }
 
             // If a card leaves the battlefield, clean up attachments so
             // equipment/auras don't point at ghosts.
@@ -997,6 +1004,9 @@ module.exports = function registerSocketHandlers(io) {
                 ? (room.piles || []).find(p => p.id === toZone.slice(5))
                 : null;
             if (isPileTarget && !targetPile) return callback?.({ error: 'Target pile not found' });
+            if (targetPile && targetPile.private && targetPile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can drop cards into a private pile' });
+            }
 
             // Helper to add a card to the destination (pile or player zone)
             const pushDest = (card, sourcePlayer) => {
@@ -1040,8 +1050,9 @@ module.exports = function registerSocketHandlers(io) {
                 }
             }
 
-            // Remove from piles
+            // Remove from piles (skip private piles the caller doesn't own)
             for (const pile of (room.piles || [])) {
+                if (pile.private && pile.createdBy !== currentUserId) continue;
                 for (let i = pile.cards.length - 1; i >= 0; i--) {
                     if (ids.has(pile.cards[i].instanceId)) {
                         const [card] = pile.cards.splice(i, 1);
@@ -1145,40 +1156,50 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ error: 'Card not found on battlefield' });
         });
 
+        // Locate a card by instanceId across all player zones AND shared piles.
+        // Returns { card, pile } — pile is null if the card is in a player zone.
+        // Mutations hit the live state.
+        const findCardForFlip = (room, instanceId) => {
+            for (const player of room.players) {
+                for (const zone of Object.values(player.zones)) {
+                    if (!Array.isArray(zone)) continue;
+                    const card = zone.find(c => c.instanceId === instanceId);
+                    if (card) return { card, pile: null };
+                }
+            }
+            for (const pile of (room.piles || [])) {
+                const card = (pile.cards || []).find(c => c.instanceId === instanceId);
+                if (card) return { card, pile };
+            }
+            return { card: null, pile: null };
+        };
+
         socket.on('flipCard', ({ instanceId }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
-
-            for (const player of room.players) {
-                for (const zone of Object.values(player.zones)) {
-                    const card = zone.find(c => c.instanceId === instanceId);
-                    if (card) {
-                        card.flipped = !card.flipped;
-                        addAndBroadcastAction(io, room, currentUserId, 'flipCard', { cardName: card.name });
-                        broadcastRoomState(io, room);
-                        return callback?.({ success: true });
-                    }
-                }
+            const { card, pile } = findCardForFlip(room, instanceId);
+            if (!card) return callback?.({ error: 'Card not found' });
+            if (pile && pile.private && pile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can flip cards in a private pile' });
             }
-            callback?.({ error: 'Card not found' });
+            card.flipped = !card.flipped;
+            addAndBroadcastAction(io, room, currentUserId, 'flipCard', { cardName: card.name });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
         });
 
         socket.on('toggleFaceDown', ({ instanceId }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
-
-            for (const player of room.players) {
-                for (const zone of Object.values(player.zones)) {
-                    const card = zone.find(c => c.instanceId === instanceId);
-                    if (card) {
-                        card.faceDown = !card.faceDown;
-                        addAndBroadcastAction(io, room, currentUserId, 'toggleFaceDown', { cardName: card.faceDown ? '(face-down card)' : card.name });
-                        broadcastRoomState(io, room);
-                        return callback?.({ success: true });
-                    }
-                }
+            const { card, pile } = findCardForFlip(room, instanceId);
+            if (!card) return callback?.({ error: 'Card not found' });
+            if (pile && pile.private && pile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can flip cards in a private pile' });
             }
-            callback?.({ error: 'Card not found' });
+            card.faceDown = !card.faceDown;
+            addAndBroadcastAction(io, room, currentUserId, 'toggleFaceDown', { cardName: card.faceDown ? '(face-down card)' : card.name });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
         });
 
         socket.on('updateCardPosition', ({ instanceId, x, y, zIndex }) => {
@@ -3309,7 +3330,7 @@ module.exports = function registerSocketHandlers(io) {
         // out. Deleting a pile sends its cards to the creator's hand (or the
         // first player's hand if creator isn't present).
 
-        socket.on('createPile', ({ name }, callback) => {
+        socket.on('createPile', ({ name, private: isPrivate }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
             if (!room.piles) room.piles = [];
@@ -3322,11 +3343,27 @@ module.exports = function registerSocketHandlers(io) {
                 cards: [],
                 createdBy: currentUserId,
                 createdByName: player?.username || null,
+                private: !!isPrivate,
             };
             room.piles.push(pile);
-            addAndBroadcastAction(io, room, currentUserId, 'createPile', { name: pileName });
+            addAndBroadcastAction(io, room, currentUserId, 'createPile', { name: pileName, private: pile.private });
             broadcastRoomState(io, room);
             callback?.({ success: true, pileId: id });
+        });
+
+        // Toggle pile privacy. Only the pile creator can change this.
+        socket.on('setPilePrivate', ({ pileId, private: isPrivate }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room?.piles) return callback?.({ error: 'Not in a room' });
+            const pile = room.piles.find(p => p.id === pileId);
+            if (!pile) return callback?.({ error: 'Pile not found' });
+            if (pile.createdBy && pile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile creator can change privacy' });
+            }
+            pile.private = !!isPrivate;
+            addAndBroadcastAction(io, room, currentUserId, 'setPilePrivate', { name: pile.name, private: pile.private });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
         });
 
         socket.on('deletePile', ({ pileId, returnTo }, callback) => {
@@ -3335,6 +3372,9 @@ module.exports = function registerSocketHandlers(io) {
             const idx = room.piles.findIndex(p => p.id === pileId);
             if (idx === -1) return callback?.({ error: 'Pile not found' });
             const pile = room.piles[idx];
+            if (pile.private && pile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can delete a private pile' });
+            }
             // Return cards to a player's hand. Default: pile creator, fall back
             // to the caller, fall back to the first player.
             const ownerId = returnTo || pile.createdBy || currentUserId;
@@ -3358,6 +3398,9 @@ module.exports = function registerSocketHandlers(io) {
             if (!room?.piles) return callback?.({ error: 'Not in a room' });
             const pile = room.piles.find(p => p.id === pileId);
             if (!pile) return callback?.({ error: 'Pile not found' });
+            if (pile.private && pile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can rename a private pile' });
+            }
             const newName = (typeof name === 'string' && name.trim()) ? name.trim() : pile.name;
             const oldName = pile.name;
             pile.name = newName;
@@ -3373,6 +3416,9 @@ module.exports = function registerSocketHandlers(io) {
             if (!room?.piles) return callback?.({ error: 'Not in a room' });
             const pile = room.piles.find(p => p.id === pileId);
             if (!pile) return callback?.({ error: 'Pile not found' });
+            if (pile.private && pile.createdBy !== currentUserId) {
+                return callback?.({ error: 'Only the pile owner can shuffle a private pile' });
+            }
             shuffleArray(pile.cards);
             addAndBroadcastAction(io, room, currentUserId, 'shufflePile', { name: pile.name });
             broadcastRoomState(io, room);

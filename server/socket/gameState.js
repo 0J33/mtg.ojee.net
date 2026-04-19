@@ -319,14 +319,24 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
             ownerName: t.ownerName,
             source: t.source,
         })),
-        piles: (room.piles || []).map(pile => ({
-            id: pile.id,
-            name: pile.name,
-            cards: pile.cards || [],
-            count: (pile.cards || []).length,
-            createdBy: pile.createdBy || null,
-            createdByName: pile.createdByName || null,
-        })),
+        // Private piles are filtered out entirely for non-owners (and for
+        // spectators with no perspective over the owner). Public piles ship
+        // their cards to everyone.
+        piles: (room.piles || [])
+            .filter(pile => {
+                if (!pile.private) return true;
+                const viewerId = handViewerId;
+                return viewerId && pile.createdBy === viewerId;
+            })
+            .map(pile => ({
+                id: pile.id,
+                name: pile.name,
+                cards: pile.cards || [],
+                count: (pile.cards || []).length,
+                createdBy: pile.createdBy || null,
+                createdByName: pile.createdByName || null,
+                private: !!pile.private,
+            })),
         started: room.started,
         gameStartedAt: room.gameStartedAt || null,
         turnStartedAt: room.turnStartedAt || null,

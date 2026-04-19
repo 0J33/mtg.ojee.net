@@ -4,6 +4,18 @@
 
 export const CHANGELOG = [
     {
+        version: '2.7',
+        date: '2026-04-19',
+        changes: [
+            'Fix Flip button — previously silently failed for cards in piles (server only searched player zones); now works everywhere',
+            'Piles: new "Private" option — only the creator sees the cards; others see nothing. Toggle from the create row or the pile header (lock icon)',
+            'Private piles are fully hidden from other players; only the owner can add/remove cards, rename, shuffle, or delete',
+            'Piles: face-down cards now show the actual card back (was rendering a broken image)',
+            'Piles: pile name / rename inputs now use proper dark-on-light styling (were unreadable white-on-white)',
+            'Delete pile now uses a styled confirm modal instead of the browser alert, with proper z-index above the panel',
+        ],
+    },
+    {
         version: '2.6',
         date: '2026-04-19',
         changes: [

@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
+import { useDialog } from './Dialog';
+
+const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
 const POS_KEY = 'mtg_piles_panel_pos';
 const PANEL_W = 340;
@@ -35,12 +38,14 @@ function clampPos(p) {
  * Cards in piles are fully visible to everyone (like graveyard / exile).
  */
 export default function PilesPanel({ piles, players, userId, onMaximizeCard, spectating }) {
+    const dialog = useDialog();
     const [open, setOpen] = useState(false);
     const [expanded, setExpanded] = useState(new Set()); // expanded pile ids
     const [renameFor, setRenameFor] = useState(null);    // pileId
     const [newName, setNewName] = useState('');
     const [creating, setCreating] = useState(false);
     const [createName, setCreateName] = useState('');
+    const [createPrivate, setCreatePrivate] = useState(false);
     const [pos, setPos] = useState(() => loadPos());
     const dragRef = useRef(null); // { startX, startY, origLeft, origTop, pointerId }
 
@@ -103,14 +108,21 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
 
     const createPile = () => {
         const name = createName.trim();
-        socket.emit('createPile', { name });
+        socket.emit('createPile', { name, private: createPrivate });
         setCreateName('');
+        setCreatePrivate(false);
         setCreating(false);
     };
 
-    const deletePile = (pileId) => {
-        if (!window.confirm('Delete this pile? Cards will return to the creator\u2019s hand.')) return;
-        socket.emit('deletePile', { pileId });
+    const deletePile = async (pile) => {
+        const ok = await dialog.confirm(
+            pile.private
+                ? `Delete private pile "${pile.name}"? Cards will go back to your hand.`
+                : `Delete pile "${pile.name}"? Cards will return to the creator's hand.`,
+            { title: 'Delete pile', danger: true, confirmLabel: 'Delete' },
+        );
+        if (!ok) return;
+        socket.emit('deletePile', { pileId: pile.id });
     };
 
     const renamePile = () => {
@@ -121,9 +133,16 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
     };
 
     const shufflePile = (pileId) => socket.emit('shufflePile', { pileId });
+    const togglePilePrivate = (pile) => {
+        socket.emit('setPilePrivate', { pileId: pile.id, private: !pile.private });
+    };
 
-    const toggleFaceDown = (card) => {
-        socket.emit('setCardField', { instanceId: card.instanceId, field: 'faceDown', value: !card.faceDown });
+    // Flip a card in a pile. DFC cards swap sides; one-sided cards toggle face-down.
+    const flipPileCard = (card) => {
+        socket.emit(
+            card.backImageUri ? 'flipCard' : 'toggleFaceDown',
+            { instanceId: card.instanceId },
+        );
     };
 
     // Drag-drop support: move a card from anywhere into a pile by dropping on its header
@@ -206,16 +225,24 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
 
                     {creating && (
                         <div className="pile-create-row">
-                            <input
-                                type="text"
-                                placeholder="Pile name (optional)"
-                                value={createName}
-                                onChange={e => setCreateName(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') createPile(); if (e.key === 'Escape') { setCreating(false); setCreateName(''); } }}
-                                autoFocus
-                            />
-                            <button className="small-btn" onClick={createPile}>Create</button>
-                            <button className="small-btn" onClick={() => { setCreating(false); setCreateName(''); }}>Cancel</button>
+                            <div className="pile-create-name">
+                                <input
+                                    type="text"
+                                    placeholder="Pile name (optional)"
+                                    value={createName}
+                                    onChange={e => setCreateName(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') createPile(); if (e.key === 'Escape') { setCreating(false); setCreateName(''); setCreatePrivate(false); } }}
+                                    autoFocus
+                                />
+                                <label className="pile-private-toggle" title="Private piles are only visible to you">
+                                    <input type="checkbox" checked={createPrivate} onChange={e => setCreatePrivate(e.target.checked)} />
+                                    <span>Private</span>
+                                </label>
+                            </div>
+                            <div className="pile-create-actions">
+                                <button className="small-btn primary-btn" onClick={createPile}>Create</button>
+                                <button className="small-btn" onClick={() => { setCreating(false); setCreateName(''); setCreatePrivate(false); }}>Cancel</button>
+                            </div>
                         </div>
                     )}
 
@@ -226,10 +253,13 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                         {(piles || []).map(pile => {
                             const isExpanded = expanded.has(pile.id);
                             const isRenaming = renameFor === pile.id;
+                            // On a private pile, mutating actions are gated to the creator.
+                            const isOwner = !pile.createdBy || pile.createdBy === userId;
+                            const canMutate = !spectating && (!pile.private || isOwner);
                             return (
                                 <div
                                     key={pile.id}
-                                    className="pile-item"
+                                    className={`pile-item ${pile.private ? 'pile-private' : ''}`}
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, pile.id)}
                                     data-drop-zone={`pile:${pile.id}`}
@@ -237,6 +267,11 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                 >
                                     <div className="pile-header" onClick={() => togglePile(pile.id)}>
                                         <span className="pile-chevron">{isExpanded ? '\u25BC' : '\u25B6'}</span>
+                                        {pile.private && (
+                                            <span className="pile-private-badge" title={isOwner ? 'Private — only you can see these cards' : 'Private pile'}>
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                            </span>
+                                        )}
                                         {isRenaming ? (
                                             <input
                                                 type="text"
@@ -254,7 +289,7 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                             <span className="pile-name">{pile.name}</span>
                                         )}
                                         <span className="pile-count">{pile.count}</span>
-                                        {!spectating && (
+                                        {canMutate && (
                                             <div className="pile-actions" onClick={e => e.stopPropagation()}>
                                                 {isRenaming ? (
                                                     <>
@@ -267,13 +302,26 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                                     </>
                                                 ) : (
                                                     <>
+                                                        {isOwner && (
+                                                            <button
+                                                                className="icon-btn"
+                                                                onClick={() => togglePilePrivate(pile)}
+                                                                title={pile.private ? 'Make public' : 'Make private'}
+                                                            >
+                                                                {pile.private ? (
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                                                                ) : (
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                                                )}
+                                                            </button>
+                                                        )}
                                                         <button className="icon-btn" onClick={() => { setRenameFor(pile.id); setNewName(pile.name); }} title="Rename">
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                                         </button>
                                                         <button className="icon-btn" onClick={() => shufflePile(pile.id)} title="Shuffle">
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
                                                         </button>
-                                                        <button className="icon-btn" onClick={() => deletePile(pile.id)} title="Delete pile">
+                                                        <button className="icon-btn" onClick={() => deletePile(pile)} title="Delete pile">
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                                         </button>
                                                     </>
@@ -285,39 +333,42 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                     {isExpanded && (
                                         <div className="pile-cards">
                                             {pile.cards.length === 0 && <div className="muted">Empty. Drag a card here or right-click a card to add.</div>}
-                                            {pile.cards.map(card => (
-                                                <div
-                                                    key={card.instanceId}
-                                                    className="pile-card"
-                                                    title={card.name}
-                                                    draggable={!spectating}
-                                                    onDragStart={(e) => {
-                                                        e.dataTransfer.setData('application/json', JSON.stringify({
-                                                            instanceId: card.instanceId,
-                                                            fromZone: `pile:${pile.id}`,
-                                                            fromPlayerId: userId,
-                                                        }));
-                                                        e.dataTransfer.effectAllowed = 'move';
-                                                    }}
-                                                >
-                                                    {card.imageUri && (
+                                            {pile.cards.map(card => {
+                                                const displayedImage = card.faceDown
+                                                    ? CARD_BACK
+                                                    : (card.flipped && card.backImageUri ? card.backImageUri : (card.skinUrl || card.imageUri));
+                                                return (
+                                                    <div
+                                                        key={card.instanceId}
+                                                        className="pile-card"
+                                                        title={card.name}
+                                                        draggable={canMutate}
+                                                        onDragStart={(e) => {
+                                                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                                                instanceId: card.instanceId,
+                                                                fromZone: `pile:${pile.id}`,
+                                                                fromPlayerId: userId,
+                                                            }));
+                                                            e.dataTransfer.effectAllowed = 'move';
+                                                        }}
+                                                    >
                                                         <img
-                                                            src={card.faceDown ? '' : card.imageUri}
-                                                            alt={card.name}
+                                                            src={displayedImage}
+                                                            alt={card.faceDown ? 'Face-down card' : card.name}
                                                             onClick={() => onMaximizeCard?.(card)}
                                                             draggable={false}
                                                         />
-                                                    )}
-                                                    <span className="pile-card-name">{card.faceDown ? 'Face down' : card.name}</span>
-                                                    {!spectating && (
-                                                        <div className="pile-card-actions">
-                                                            <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'hand')} title="Move to your hand">{'\u2192'} Hand</button>
-                                                            <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'battlefield')} title="Play to your battlefield">{'\u2192'} BF</button>
-                                                            <button className="small-btn" onClick={() => toggleFaceDown(card)} title="Flip face up/down">Flip</button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+                                                        <span className="pile-card-name">{card.faceDown ? 'Face down' : card.name}</span>
+                                                        {canMutate && (
+                                                            <div className="pile-card-actions">
+                                                                <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'hand')} title="Move to your hand">{'\u2192'} Hand</button>
+                                                                <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'battlefield')} title="Play to your battlefield">{'\u2192'} BF</button>
+                                                                <button className="small-btn" onClick={() => flipPileCard(card)} title={card.backImageUri ? 'Flip (swap sides)' : 'Flip face up/down'}>Flip</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>

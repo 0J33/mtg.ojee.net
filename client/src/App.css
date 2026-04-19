@@ -3265,10 +3265,34 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .piles-panel-header:hover .piles-drag-grip { opacity: 1; color: var(--accent); }
 
-.pile-create-row input { flex: 1; min-width: 0; }
-
-.pile-create-row { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border-soft, #333); }
-.pile-create-row input { flex: 1; }
+.pile-create-row { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border-soft, #333); }
+.pile-create-name { display: flex; gap: 8px; align-items: center; }
+.pile-create-row input[type="text"],
+.pile-header input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    background: var(--bg-deep);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: 'EB Garamond', serif;
+    font-size: 0.9em;
+}
+.pile-create-row input[type="text"]:focus,
+.pile-header input[type="text"]:focus { outline: none; border-color: var(--accent-dim); }
+.pile-create-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.pile-private-toggle { display: flex; align-items: center; gap: 4px; font-size: 0.8em; color: var(--text-mid); cursor: pointer; white-space: nowrap; }
+.pile-private-toggle input { cursor: pointer; }
+.pile-private-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-right: 2px;
+}
+.pile-item.pile-private { border-left: 2px solid var(--accent); }
 
 .piles-list { flex: 1; overflow-y: auto; padding: 6px; }
 
@@ -3287,7 +3311,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .pile-chevron { color: var(--text-faint); font-size: 0.7em; width: 10px; }
 .pile-name { flex: 1; color: var(--text); font-weight: 500; }
-.pile-header input[type="text"] { flex: 1; font-size: 0.9em; padding: 2px 6px; }
 .pile-count { color: var(--accent); font-weight: 600; font-size: 0.85em; min-width: 20px; text-align: right; }
 .pile-actions { display: flex; gap: 2px; }
 .pile-actions .icon-btn { width: 22px; height: 22px; font-size: 0.85em; }
