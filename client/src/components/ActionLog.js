@@ -16,6 +16,8 @@ function formatEntry(entry, playerNameById) {
     switch (entry.type) {
         case 'startGame':
             return `Game started (${d.firstPlayer || '?'} goes first)`;
+        case 'restartGame':
+            return `${actorName} restarted the game`;
         case 'initialDraw':
             return `${d.player || '?'} drew opening hand of ${d.count ?? 7}`;
         case 'turnStart':

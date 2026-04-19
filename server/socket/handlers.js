@@ -131,7 +131,7 @@ const SNAPSHOT_EVENTS = new Set([
     'setInfect', 'setDesignation', 'createToken', 'createCustomCard',
     'setTeam', 'setTeamLife', 'nextTurn', 'setTurnIndex',
     'untapAll', 'tapAll', 'mulligan', 'putBackFromHand',
-    'setBackground', 'tutorCard', 'tutorCardWithOptions', 'setBfRow', 'loadDeck', 'startGame',
+    'setBackground', 'tutorCard', 'tutorCardWithOptions', 'setBfRow', 'loadDeck', 'startGame', 'restartGame',
     'addCardNote', 'removeCardNote', 'clearCardNotes', 'kickPlayer',
     'batchToLibrary', 'peekResolve',
     // Big-batch additions:
@@ -2327,6 +2327,115 @@ module.exports = function registerSocketHandlers(io) {
             broadcastToRoom(io, room, 'notification', {
                 type: 'mulligan-phase',
                 message: 'Mulligan phase — everyone click Ready when done',
+            });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Restart an in-progress game. Drops the room back to the pre-start
+        // state: every card from every main zone goes back into that
+        // player's library (sideboard/companions stay where they are, for
+        // the same reason startGame leaves them), per-card and per-player
+        // runtime state is reset, piles are cleared, started=false. The
+        // host then either clicks Start Game with the same decks, or each
+        // player can Load Deck first to swap before starting. Host-only.
+        socket.on('restartGame', (callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            if (room.hostId !== currentUserId) return callback?.({ error: 'Only host can restart' });
+            if (!room.started) return callback?.({ error: 'No game to restart' });
+
+            // Helper: wipe per-card runtime state so returning cards look
+            // fresh (no lingering tapped/counters/damage/attach links).
+            const resetCard = (card) => {
+                card.tapped = false;
+                card.flipped = false;
+                card.faceDown = false;
+                card.x = 0;
+                card.y = 0;
+                card.counters = {};
+                card.endOfTurnCounters = {};
+                card.notes = [];
+                card.damage = 0;
+                card.phasedOut = false;
+                card.suspendCounters = 0;
+                card.goaded = false;
+                card.attackingPlayerId = null;
+                card.controllerOriginal = null;
+                card.attachedTo = null;
+                card.rotated180 = false;
+                card.tappedFor = null;
+                card.returnZone = null;
+                card.bfRow = null;
+                return card;
+            };
+
+            // Pile cards have no owner metadata. Return them to the pile
+            // creator's library if we can find that player; otherwise drop
+            // them on player 0 so they aren't lost.
+            for (const pile of (room.piles || [])) {
+                const creator = getPlayerInRoom(room, pile.createdBy) || room.players[0];
+                if (creator && Array.isArray(pile.cards)) {
+                    for (const card of pile.cards) {
+                        if (card.isToken) continue;
+                        creator.zones.library.push(resetCard(card));
+                    }
+                }
+            }
+            room.piles = [];
+
+            // Sweep every main zone back into the player's library so the
+            // deck is whole and ready either for Start Game (same deck) or
+            // Load Deck (replace it). Sideboard/companions stay put.
+            const MAIN_ZONES = ['hand', 'battlefield', 'graveyard', 'exile', 'commandZone', 'foretell', 'emblems'];
+            for (const player of room.players) {
+                if (!player.zones) continue;
+                for (const zoneName of MAIN_ZONES) {
+                    const zone = player.zones[zoneName] || [];
+                    for (const card of zone) {
+                        if (card.isToken) continue;
+                        player.zones.library.push(resetCard(card));
+                    }
+                    player.zones[zoneName] = [];
+                }
+
+                player.life = room.settings.startingLife;
+                player.counters = { poison: 0, energy: 0, experience: 0 };
+                player.commanderDeaths = 0;
+                player.commanderDamageFrom = {};
+                player.infect = 0;
+                player.commanderTax = 0;
+                player.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+                player.designations = { monarch: false, initiative: false, dayNight: null, citysBlessing: false };
+                player.mulliganCount = 0;
+                player.mulliganBottomPending = 0;
+                player.mulliganReady = false;
+                player.firstPlayerRoll = null;
+                player.drewThisTurn = false;
+                player.landsPlayedThisTurn = 0;
+                player.conceded = false;
+            }
+
+            // Room-level resets — back to the pre-start "lobby in room"
+            // state. started=false re-exposes Load Deck / Start Game in
+            // the client UI, so the host can swap decks or just restart.
+            room.stack = [];
+            room.extraTurns = [];
+            room.winnerUserId = null;
+            room.turnIndex = -1;
+            room.gameStartedAt = null;
+            room.turnStartedAt = null;
+            room.cumulativeTurnTime = {};
+            room.mulliganPhase = false;
+            room.started = false;
+            // Wipe the undo stack — old snapshots reference zone contents
+            // that no longer exist after the restart.
+            room.undoStack = [];
+
+            addAndBroadcastAction(io, room, currentUserId, 'restartGame', { players: room.players.length });
+            broadcastToRoom(io, room, 'notification', {
+                type: 'restart',
+                message: 'Game restarted — host, click Start Game when everyone is ready (or Load Deck to swap first)',
             });
             broadcastRoomState(io, room);
             callback?.({ success: true });

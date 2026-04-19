@@ -27,6 +27,7 @@ import TournamentBracket from './TournamentBracket';
 import { useDialog } from './Dialog';
 import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
 import { VERSION } from '../version';
+import * as sfx from '../sfx';
 
 // Format milliseconds as M:SS or H:MM:SS
 function fmtTimer(ms) {
@@ -203,6 +204,47 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
         return () => socket.off('rollResult', handler);
     }, []);
 
+    // Map server action-log entries to SFX. We listen to the dedicated
+    // `actionEntry` socket event (append-only, fired exactly once per new
+    // action) so we don't re-sound on reconnects / state replays / undo.
+    useEffect(() => {
+        const pickSound = (entry) => {
+            const t = entry?.type;
+            const d = entry?.data || {};
+            if (t === 'tapCard')       return 'tap';
+            if (t === 'flipCard' || t === 'toggleFaceDown') return 'flip';
+            if (t === 'moveCard' || t === 'bulkMove') return 'move';
+            if (t === 'drawCards' || t === 'initialDraw') return 'draw';
+            if (t === 'shuffleLibrary' || t === 'shufflePile') return 'shuffle';
+            if (t === 'mill') return 'draw';
+            if (t === 'adjustLife') {
+                return (typeof d.amount === 'number' && d.amount < 0) ? 'life_down' : 'life_up';
+            }
+            if (t === 'setLife') {
+                if (typeof d.from === 'number' && typeof d.to === 'number') {
+                    return d.to < d.from ? 'life_down' : 'life_up';
+                }
+                return 'life_up';
+            }
+            if (t === 'setPlayerCounter' || t === 'setCardCounter') return 'counter';
+            if (t === 'nextTurn' || t === 'turnStart') return 'turn';
+            if (t === 'createToken') return 'token';
+            if (t === 'createPile' || t === 'deletePile' || t === 'renamePile') return 'pile';
+            if (t === 'revealCard') return 'reveal';
+            if (t === 'concede') return 'error';
+            if (t === 'startGame' || t === 'restartGame' || t === 'mulliganPhaseStart') return 'notify';
+            if (t === 'mulligan' || t === 'mulliganBottom') return 'draw';
+            return null;
+        };
+        const handler = (entry) => {
+            const name = pickSound(entry);
+            if (name) sfx.play(name);
+        };
+        socket.on('actionEntry', handler);
+        return () => socket.off('actionEntry', handler);
+    }, []);
+
+
     // Listen for notification broadcasts (turn changes, mulligans, game start, etc.)
     useEffect(() => {
         const handler = (note) => {
@@ -211,6 +253,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
             setTimeout(() => {
                 setNotifications(prev => prev.filter(n => n.id !== id));
             }, 3500);
+            sfx.play('notify');
         };
         socket.on('notification', handler);
         return () => socket.off('notification', handler);
@@ -220,6 +263,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
     useEffect(() => {
         const handler = (payload) => {
             setVictoryAnim(payload);
+            sfx.play('win');
             setTimeout(() => setVictoryAnim(null), 6500);
         };
         socket.on('victory', handler);
@@ -1118,6 +1162,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         </div>
                     )}
                     <div className="topbar-group topbar-utils">
+                        <SoundToggleButton />
                         <button onClick={() => setSettingsModalOpen(true)} className="topbar-icon-btn" title="Game settings">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1694,6 +1739,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     sharedTeamLife={!!gameState.sharedTeamLife}
                     teams={gameState.teams || []}
                     me={me}
+                    gameStarted={!!gameState.started}
                     onClose={() => setSettingsModalOpen(false)}
                 />
             )}
@@ -2132,7 +2178,8 @@ function BackgroundModal({ onClose }) {
 // existing modal-overlay/modal class pattern so they pick up the existing
 // theme automatically — no new top-level layout. ─────────────────────────
 
-function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose }) {
+function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarted, onClose }) {
+    const dialog = useDialog();
     useEscapeKey(onClose);
     const [draft, setDraft] = useState({
         startingLife: settings?.startingLife ?? 40,
@@ -2292,12 +2339,107 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, onClose })
                     </div>
                 </div>
 
+                <SoundSettingsSection />
+
+                {isHost && gameStarted && (
+                    <div className="settings-section">
+                        <strong>Danger zone</strong>
+                        <p className="muted" style={{ margin: '4px 0 8px' }}>
+                            Restart sweeps every card back into libraries, resets life / counters / mana / piles, and drops the room back to pre-game — so you can either click Start Game again or Load Deck to swap decks first.
+                        </p>
+                        <button
+                            className="small-btn danger"
+                            data-sfx="error"
+                            onClick={async () => {
+                                const ok = await dialog.confirm(
+                                    'Restart the game? All board state will be wiped and the room will return to pre-game. You can load a different deck before starting again.',
+                                    { title: 'Restart game', danger: true, confirmLabel: 'Restart' },
+                                );
+                                if (!ok) return;
+                                socket.emit('restartGame', (resp) => {
+                                    if (resp?.error) dialog.alert(resp.error, { title: 'Restart failed' });
+                                    else onClose();
+                                });
+                            }}
+                        >Restart game</button>
+                    </div>
+                )}
+
                 <div className="modal-actions">
                     <button onClick={onClose}>Cancel</button>
                     <button onClick={save} className="primary-btn">Save</button>
                 </div>
             </div>
         </div>
+    );
+}
+
+// Compact sound controls: mute toggle + volume slider. Used inside the
+// settings modal; writes straight to the sfx module (localStorage-backed).
+function SoundSettingsSection() {
+    const [vol, setVol] = useState(sfx.getVolume());
+    const [muted, setMutedState] = useState(sfx.isMuted());
+    useEffect(() => sfx.subscribe(() => {
+        setVol(sfx.getVolume());
+        setMutedState(sfx.isMuted());
+    }), []);
+    return (
+        <div className="settings-section">
+            <strong>Sound</strong>
+            <label className="settings-checkbox-row">
+                <input type="checkbox" checked={muted} onChange={e => sfx.setMuted(e.target.checked)} />
+                <span>Mute</span>
+            </label>
+            <label className="sfx-volume-row">
+                <span>Volume</span>
+                <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={vol}
+                    disabled={muted}
+                    onChange={e => sfx.setVolume(parseFloat(e.target.value))}
+                />
+                <span className="sfx-volume-pct">{Math.round(vol * 100)}%</span>
+                <button
+                    type="button"
+                    className="small-btn"
+                    data-sfx="none"
+                    onClick={() => sfx.play('click')}
+                    title="Play a sample click"
+                >Test</button>
+            </label>
+        </div>
+    );
+}
+
+// Topbar quick mute toggle. Clicking cycles muted on/off. While muted,
+// the icon renders with a slash overlay so it reads as "off".
+function SoundToggleButton() {
+    const [muted, setMutedState] = useState(sfx.isMuted());
+    useEffect(() => sfx.subscribe(() => setMutedState(sfx.isMuted())), []);
+    return (
+        <button
+            className={`topbar-icon-btn ${muted ? 'muted' : ''}`}
+            data-sfx="none"
+            title={muted ? 'Unmute sounds' : 'Mute sounds'}
+            onClick={() => sfx.toggleMuted()}
+        >
+            {muted ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <line x1="23" y1="9" x2="17" y2="15"/>
+                    <line x1="17" y1="9" x2="23" y2="15"/>
+                </svg>
+            ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                </svg>
+            )}
+        </button>
     );
 }
 

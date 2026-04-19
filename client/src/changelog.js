@@ -4,6 +4,16 @@
 
 export const CHANGELOG = [
     {
+        version: '2.8',
+        date: '2026-04-19',
+        changes: [
+            'Restart game — host-only button in Settings (Danger zone). Sweeps every card back into libraries, resets life/counters/mana/piles, and drops the room back to pre-game so you can Start Game again or Load Deck to swap first',
+            'Sound effects — synthesized in-browser for button clicks, tap/untap, flip, move, draw, shuffle, life up/down, turn start, counters, token/pile ops, chat, reveal, notifications, victory',
+            'Volume slider + mute toggle in Settings → Sound; quick mute button in the topbar. Preferences persist per browser',
+            'Buttons play a subtle UI click by default; action-specific buttons (Flip, Shuffle, etc.) use their own sound via the server action log so every player hears the same events',
+        ],
+    },
+    {
         version: '2.7',
         date: '2026-04-19',
         changes: [

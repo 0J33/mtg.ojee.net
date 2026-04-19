@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import socket from '../socket';
+import * as sfx from '../sfx';
 
 /*
  * Chat sidebar — slides in from the right edge of the screen, hideable via a
@@ -38,6 +39,7 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
                 if (prev.some(m => m.id === msg.id)) return prev;
                 return [...prev, msg];
             });
+            if (msg.userId !== currentUserId) sfx.play('chat');
             if (!open && msg.userId !== currentUserId) {
                 setUnread(u => u + 1);
             }

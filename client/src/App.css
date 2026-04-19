@@ -468,6 +468,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .topbar-icon-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
 .topbar-icon-btn svg { display: block; }
+.topbar-icon-btn.muted { color: var(--danger); }
+.topbar-icon-btn.muted:hover { color: var(--danger); border-color: var(--danger); }
+
+/* Sound controls inside the settings modal */
+.sfx-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+.sfx-volume-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.sfx-volume-row input[type="range"]:disabled { opacity: 0.4; }
+.sfx-volume-pct { font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; color: var(--text-mid); font-size: 0.85em; }
 
 /* ─── PLAYER ZONES LAYOUT ─────────────────────────────────── */
 .player-zones { flex: 1; display: grid; gap: 4px; overflow: hidden; padding: 4px; --card-w: 70px; --card-h: 98px; }
