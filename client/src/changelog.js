@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.5',
+        date: '2026-04-19',
+        changes: [
+            'Keyword reminder text now surfaces card-specific "defined terms" like "Prepared" (Emeritus of Ideation) that don\'t appear in Scryfall\'s keywords list. The scanner looks for words used after state-cue verbs (enters / becomes / is / gains / has) that are mentioned 2+ times in the oracle text and aren\'t common English or MTG vocabulary — it grabs every sentence mentioning that word as the reminder',
+        ],
+    },
+    {
         version: '3.4',
         date: '2026-04-19',
         changes: [

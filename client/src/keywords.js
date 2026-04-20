@@ -149,6 +149,37 @@ export const KEYWORDS = {
     // Static short words (can collide with common English — handled via word-boundary regex)
 };
 
+// Words that look like "defined terms" when they appear after cue words
+// like "enters" / "becomes" but are actually just common English or
+// general MTG vocabulary. Used by the defined-term scanner below so we
+// don't flag "enters the battlefield" as a keyword called "the".
+const COMMON_DEFINED_TERM_STOP = new Set([
+    'the', 'a', 'an', 'this', 'that', 'these', 'those', 'it', 'its', 'you', 'your',
+    'and', 'or', 'but', 'not', 'no', 'yes', 'if', 'then', 'else', 'for', 'to', 'from',
+    'of', 'on', 'in', 'at', 'as', 'by', 'with', 'under', 'over', 'up', 'down',
+    'any', 'all', 'each', 'every', 'one', 'two', 'three', 'four', 'five', 'six',
+    'seven', 'eight', 'nine', 'ten', 'zero',
+    // Common MTG vocabulary that appears repeatedly but isn't a keyword.
+    'creature', 'creatures', 'player', 'players', 'spell', 'spells', 'card', 'cards',
+    'ability', 'abilities', 'permanent', 'permanents', 'land', 'lands', 'artifact',
+    'artifacts', 'enchantment', 'enchantments', 'planeswalker', 'planeswalkers',
+    'token', 'tokens', 'turn', 'turns', 'battlefield', 'graveyard', 'library',
+    'hand', 'exile', 'stack', 'deck', 'damage', 'life', 'mana', 'counter', 'counters',
+    'attack', 'attacks', 'attacking', 'block', 'blocks', 'blocked', 'blocking',
+    'cast', 'casts', 'casting', 'tap', 'taps', 'tapped', 'untap', 'untaps', 'untapped',
+    'draw', 'draws', 'drawn', 'control', 'controls', 'controlled', 'controller',
+    'opponent', 'opponents', 'owner', 'power', 'toughness', 'target', 'targets',
+    'color', 'colors', 'colored', 'colorless', 'type', 'types', 'basic', 'legendary',
+    'white', 'blue', 'black', 'red', 'green',
+    'source', 'sources', 'copy', 'copies', 'end', 'beginning', 'upkeep',
+    'whenever', 'when', 'where', 'while', 'until', 'unless', 'may', 'would', 'could',
+    'same', 'different', 'another', 'other', 'also', 'instead', 'only', 'just',
+    'become', 'becomes', 'becoming', 'enter', 'enters', 'entered', 'entering',
+    'leave', 'leaves', 'leaving', 'gain', 'gains', 'gained',
+    'have', 'has', 'had', 'be', 'is', 'are', 'was', 'were', 'being', 'been',
+    'put', 'puts', 'return', 'returns', 'pay', 'pays', 'paid',
+]);
+
 // Pull reminder text for a single keyword from the card's own oracle
 // text. Handles two common forms:
 //   1. Parenthetical reminder: "Flying (Can't be blocked except by...)".
@@ -232,6 +263,44 @@ export function detectKeywords(card) {
             if (pattern.test(text)) {
                 push(key, KEYWORDS[key]);
             }
+        }
+    }
+
+    // 3. Scan for card-specific DEFINED TERMS — words the card defines
+    // inline that aren't on any Scryfall / evergreen list. Pattern:
+    // any word used after a state-cue verb ("enters X", "becomes X",
+    // "is X", "gains X") AND mentioned in the oracle text 2+ times,
+    // filtered against common English + MTG vocabulary. Catches cards
+    // like Emeritus of Ideation // Ancestral Recall where "prepared" is
+    // a card-local state that Scryfall doesn't flag as a keyword.
+    if (oracle) {
+        const typeLineWords = new Set(
+            (card.typeLine || '').toLowerCase().split(/[^a-z]+/).filter(Boolean)
+        );
+        const cueRe = /\b(?:enters?|becomes?|is|gains?|loses?|has|turned)\s+(?:an?\s+|the\s+)?([a-z][a-z-]{2,})\b/gi;
+        const candidates = new Map(); // lowerWord -> count-in-oracle
+        let m;
+        while ((m = cueRe.exec(oracle)) !== null) {
+            const word = m[1].toLowerCase();
+            if (!candidates.has(word)) candidates.set(word, 0);
+        }
+        // Count each candidate's total oracle occurrences.
+        for (const word of candidates.keys()) {
+            const re = new RegExp(`\\b${word.replace(/[-]/g, '\\-')}\\b`, 'gi');
+            const count = (oracle.match(re) || []).length;
+            candidates.set(word, count);
+        }
+        for (const [word, count] of candidates) {
+            if (count < 2) continue;
+            if (COMMON_DEFINED_TERM_STOP.has(word)) continue;
+            if (KEYWORDS[word]) continue;          // already handled
+            if (found.has(word)) continue;          // already surfaced
+            if (typeLineWords.has(word)) continue;  // part of type line
+            const reminder = reminderFromOracle(oracle, word);
+            if (!reminder) continue;
+            // Capitalize for display.
+            const display = word.charAt(0).toUpperCase() + word.slice(1);
+            push(display, reminder);
         }
     }
     return results;
