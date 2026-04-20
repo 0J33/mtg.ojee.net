@@ -1151,39 +1151,36 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .card.etched::before, .card-zoom.etched::before, .card-max-image-wrap.etched::before {
     z-index: 2;
-    /* Metallic border sheen — subtle enough to read as "shiny frame"
-       without overpowering the art. Only the outer ring of the ellipse
-       tints; the inner 60% leaves the art untouched. */
+    /* Whisper-thin metallic border sheen. Only the outermost ~20% of
+       the ellipse tints anything; the rest of the card is untouched. */
     background: radial-gradient(
         ellipse at 50% 50%,
-        transparent 60%,
-        rgba(235, 220, 180, 0.28) 78%,
-        rgba(255, 240, 200, 0.32) 90%,
-        rgba(190, 175, 140, 0.26) 100%
+        transparent 72%,
+        rgba(235, 220, 180, 0.13) 88%,
+        rgba(255, 240, 200, 0.16) 96%,
+        rgba(190, 175, 140, 0.12) 100%
     );
     background-size: 220% 220%;
     mix-blend-mode: screen;
-    animation: etchedShimmer 6s ease-in-out infinite alternate;
+    animation: etchedShimmer 7s ease-in-out infinite alternate;
 }
 .card.etched::after, .card-zoom.etched::after, .card-max-image-wrap.etched::after {
     z-index: 3;
-    /* Very thin diagonal glint — reads as a passing reflection off a
-       polished frame, nothing more. */
+    /* Passing reflection off the frame — barely there. */
     background: linear-gradient(
         115deg,
-        transparent 44%,
-        rgba(255, 250, 230, 0.22) 50%,
-        transparent 56%
+        transparent 46%,
+        rgba(255, 250, 230, 0.10) 50%,
+        transparent 54%
     );
     background-size: 300% 300%;
     mix-blend-mode: screen;
     animation: etchedGlint 4s ease-in-out infinite alternate;
 }
-/* Thin gold inner frame so the effect is visible even on dark art,
-   without colouring the whole card. */
-.card.etched { box-shadow: inset 0 0 0 1px rgba(235, 220, 180, 0.3); }
-.card-zoom.etched { box-shadow: inset 0 0 0 1.5px rgba(235, 220, 180, 0.35), 0 0 8px rgba(235, 220, 180, 0.15); }
-.card-max-image-wrap.etched { box-shadow: inset 0 0 0 1.5px rgba(235, 220, 180, 0.35), 0 0 10px rgba(235, 220, 180, 0.15); }
+/* Hairline gold inset so the effect is still legible on dark art. */
+.card.etched { box-shadow: inset 0 0 0 1px rgba(235, 220, 180, 0.18); }
+.card-zoom.etched { box-shadow: inset 0 0 0 1px rgba(235, 220, 180, 0.2); }
+.card-max-image-wrap.etched { box-shadow: inset 0 0 0 1px rgba(235, 220, 180, 0.2); }
 @keyframes etchedShimmer {
     0% { background-position: 0% 0%; }
     100% { background-position: 100% 100%; }

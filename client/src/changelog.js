@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.14',
+        date: '2026-04-19',
+        changes: [
+            'Etched foil dialed down further — radial sheen opacity halved (0.12–0.16), glint halved (0.10), inset frame hairlined (0.18–0.2), and the sheen is now confined to the outermost ~20% of the card so the art reads clean',
+        ],
+    },
+    {
         version: '3.13',
         date: '2026-04-19',
         changes: [
