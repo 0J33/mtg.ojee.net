@@ -30,6 +30,40 @@ function consumeShareCode() {
     return code;
 }
 
+// Global retrofit: clicking on the backdrop of any .modal-overlay fires
+// an Escape keydown, which every modal already listens for via the
+// useEscapeKey hook. Drags that *start* inside a modal and release on
+// the backdrop are ignored — otherwise sliding a range input or
+// select-text-drag would accidentally close the modal. This way we get
+// "click outside to close" for every modal in the app without patching
+// each one.
+function installOutsideClickClose() {
+    if (typeof document === 'undefined') return;
+    if (installOutsideClickClose._installed) return;
+    installOutsideClickClose._installed = true;
+    let downInside = false;
+    document.addEventListener('mousedown', (e) => {
+        const overlay = e.target.closest?.('.modal-overlay');
+        if (!overlay) { downInside = false; return; }
+        // If mousedown landed inside a modal (not on the overlay itself),
+        // remember that so the subsequent mouseup on the overlay doesn't
+        // count as an "outside click".
+        downInside = e.target !== overlay;
+    }, true);
+    document.addEventListener('click', (e) => {
+        const overlay = e.target.closest?.('.modal-overlay');
+        if (!overlay) return;
+        if (e.target !== overlay) return;
+        if (downInside) { downInside = false; return; }
+        // Dispatch a synthetic Escape so the topmost modal's useEscapeKey
+        // handler fires. We use the native event path because modals
+        // register their Escape listeners directly on document.
+        const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        document.dispatchEvent(esc);
+    }, true);
+}
+installOutsideClickClose();
+
 export default function App() {
     const dialog = useDialog();
     const [user, setUser] = useState(null);

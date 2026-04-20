@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { OracleText } from './ManaCost';
+import ManaCost, { OracleText } from './ManaCost';
 import { detectKeywords } from '../keywords';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
@@ -96,7 +96,15 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     // Show oracle text for textless/full-art cards or non-English printings
     // where the image has no readable English rules text.
     const showOracleFallback = (!!card.textless || !!card.nonEnglish) && !!card.oracleText;
-    const showSidePanel = hasEffects || hasKeywords || showOracleFallback;
+    // Multi-face cards where both halves share one image (adventures, splits,
+    // flips, aftermaths) — hasMultipleFaces is true and backImageUri is
+    // empty, so there's no "flip to other side" to see the second half. We
+    // render both faces in the side panel so the player can read the spell
+    // text. For DFCs the back side has its own image, so the user can flip
+    // to see it; we still show the faces list for non-English DFCs.
+    const multiFaces = Array.isArray(card.faces) && card.faces.length >= 2 ? card.faces : null;
+    const showFaces = !!multiFaces && (!card.backImageUri || !!card.nonEnglish || !!card.textless);
+    const showSidePanel = hasEffects || hasKeywords || showOracleFallback || showFaces;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 
     return (
@@ -137,11 +145,26 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                     </div>
                     {showSidePanel && (
                         <div className="card-effects-panel">
-                            {showOracleFallback && (
+                            {showOracleFallback && !showFaces && (
                                 <div className="effect-group hover-oracle-group">
                                     {card.typeLine && <div className="hover-type-line">{card.typeLine}</div>}
                                     <div className="hover-oracle"><OracleText text={card.oracleText} /></div>
                                     {(card.power || card.toughness) && <div className="hover-pt">{card.power}/{card.toughness}</div>}
+                                </div>
+                            )}
+                            {showFaces && (
+                                <div className="effect-group hover-faces-group">
+                                    {multiFaces.map((f, i) => (
+                                        <div key={i} className="hover-face">
+                                            <div className="hover-face-head">
+                                                <strong>{f.name || `Face ${i + 1}`}</strong>
+                                                {f.manaCost && <span className="hover-face-cost"><ManaCost cost={f.manaCost} /></span>}
+                                            </div>
+                                            {f.typeLine && <div className="hover-type-line">{f.typeLine}</div>}
+                                            {f.oracleText && <div className="hover-oracle"><OracleText text={f.oracleText} /></div>}
+                                            {(f.power || f.toughness) && <div className="hover-pt">{f.power}/{f.toughness}</div>}
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                             {hasKeywords && (

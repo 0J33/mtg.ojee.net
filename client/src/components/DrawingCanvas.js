@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import socket from '../socket';
-import { useEscapeKey } from '../utils';
+import { useEscapeKey, useVerticalDragPos } from '../utils';
 
 export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle, penStateRef, onPenColorChange, hidden, onToggleHidden }) {
     useEscapeKey(() => { if (enabled) onToggle(); });
+    const toggleDrag = useVerticalDragPos('mtg_drawing_toggle_top');
     const canvasRef = useRef(null);
     const isDrawingRef = useRef(false);
     const currentStrokeRef = useRef([]);
@@ -492,7 +493,13 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                 </div>
             )}
             {!hideToggle && (
-                <button className={`drawing-toggle ${enabled ? 'active' : ''}`} onClick={onToggle} title="Toggle drawing">
+                <button
+                    className={`drawing-toggle ${enabled ? 'active' : ''}`}
+                    onClick={onToggle}
+                    title="Toggle drawing (drag vertically to move)"
+                    style={toggleDrag.topStyle}
+                    {...toggleDrag.dragHandlers}
+                >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 19l7-7 3 3-7 7-3-3z" />
                         <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />

@@ -261,6 +261,46 @@ const PAGES = [
             </>
         ),
     },
+    {
+        title: 'Layout tips',
+        body: (
+            <>
+                <p>Most panels stay out of your way until you want them:</p>
+                <ul>
+                    <li><strong>Drag the side toggles vertically</strong> — chat, action log, piles, drawing. Grab and slide; position persists per browser.</li>
+                    <li><strong>Piles panel</strong> — drag the header to move the whole panel anywhere. Reset button restores the default spot.</li>
+                    <li><strong>Command zone</strong> sits to the LEFT of your hand. Click its chevron to collapse it down to a vertical label — it takes almost no width when you're not using it.</li>
+                    <li><strong>Lands</strong> are on their own horizontal-scroll row below creatures/artifacts, shaped like the hand.</li>
+                    <li><strong>Compact mode</strong> (topbar toggle) flattens every opponent into one horizontal scrolling strip, ideal for 3–6 player games.</li>
+                    <li><strong>Hide an opponent</strong> you want to ignore: right-click their header → <em>Hide this player</em>. Same menu toggles their background image if it's too busy.</li>
+                </ul>
+            </>
+        ),
+    },
+    {
+        title: 'Teams, commander damage & more',
+        body: (
+            <>
+                <p><strong>Teams share a turn</strong> — when everyone on one team clicks Next Turn, the turn passes to the other team. Teammates also land on the same side of the table automatically.</p>
+                <p><strong>Commander damage</strong> (right-click a player → <em>Commander damage...</em>) now opens one picker listing every source — including yourself (for partner commanders and token copies). Each row has −1 / +1 / Add... / Set... / Clear.</p>
+                <p><strong>Infect badge</strong> responds to L-click (+1), R-click (−1), middle-click (clear), Shift-click (set exact).</p>
+                <p><strong>Draw face-down</strong> via the <em>Draw ↓</em> button in library actions. Useful for manifest / foretell / hidden top-of-library plays.</p>
+                <p><strong>Restart game</strong> (Settings → Danger zone, host only) sweeps every card back to its owner's library and drops the room to pre-game so you can swap decks and re-start.</p>
+                <p><strong>Eliminated players</strong> can switch to <em>spectator</em> from their own right-click menu — frees up their slot without leaving the room.</p>
+                <p><strong>Tie-breakers</strong> only re-roll the players who actually tied; non-tied players are locked out of subsequent rolls.</p>
+            </>
+        ),
+    },
+    {
+        title: 'Sound & accessibility',
+        body: (
+            <>
+                <p>Turn sounds on or off in <strong>Settings → Sound</strong> — mute toggle + volume slider. There's also a quick mute icon in the topbar.</p>
+                <p>SFX map to server actions (tap, flip, move, draw, shuffle, life up/down, turn start, counters, token/pile ops, concede, chat, reveal, victory), so every player hears the same thing when someone acts.</p>
+                <p>Modals close on click outside (except if you started a drag inside — range sliders and text-select won't accidentally dismiss the modal).</p>
+            </>
+        ),
+    },
 ];
 
 export default function Guide({ onClose }) {

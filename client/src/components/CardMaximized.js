@@ -165,6 +165,30 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                     <p className="type-line">{card.typeLine}</p>
                     {card.oracleText && <p className="oracle-text"><OracleText text={card.oracleText} /></p>}
                     {(card.power || card.toughness) && <p className="pt">{card.power}/{card.toughness}</p>}
+                    {/* Per-face breakdown for multi-face cards. Shown for
+                        adventures / splits / flips / aftermaths (where both
+                        halves share one image so the individual face text
+                        isn't visible) AND for DFCs (useful for textless or
+                        non-English back prints where the back side's text
+                        isn't readable from the image alone). */}
+                    {Array.isArray(card.faces) && card.faces.length >= 2 && (
+                        <div className="card-faces-section">
+                            <div className="card-effects-section-head">
+                                <strong>{card.backImageUri ? 'Card faces' : 'Both halves'}</strong>
+                            </div>
+                            {card.faces.map((f, i) => (
+                                <div key={i} className="card-face-block">
+                                    <div className="card-face-head">
+                                        <strong>{f.name || `Face ${i + 1}`}</strong>
+                                        {f.manaCost && <span className="card-face-cost"><ManaCost cost={f.manaCost} /></span>}
+                                    </div>
+                                    {f.typeLine && <p className="card-face-type">{f.typeLine}</p>}
+                                    {f.oracleText && <p className="card-face-oracle"><OracleText text={f.oracleText} /></p>}
+                                    {(f.power || f.toughness) && <p className="card-face-pt">{f.power}/{f.toughness}</p>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     {detectedKeywords.length > 0 && (
                         <div className="card-effects-section">
                             <div className="card-effects-section-head"><strong>Keywords</strong></div>

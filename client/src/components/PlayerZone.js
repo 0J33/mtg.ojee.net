@@ -4,6 +4,7 @@ import Card from './Card';
 import ContextMenu from './ContextMenu';
 import NoteEditor from './NoteEditor';
 import CounterModal from './CounterModal';
+import { useDialog } from './Dialog';
 import { useEscapeKey, useHorizontalWheel, fmtNum, parseGameValue, isInfinite, INFINITE } from '../utils';
 
 // Color order used by the mana pool widget — matches the WUBRG convention
@@ -65,6 +66,7 @@ function fmtTimer(ms) {
 const COMMANDER_FORMATS = new Set(['commander', 'brawl', 'oathbreaker']);
 
 export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaximizeCard, onScry, onTutor, onPlayerContextMenu, onViewLibrary, selectedIds, onToggleSelect, onClearSelection, compact, isCurrentTurn, touchMode, spectating, gameStarted, onCloneCard, onShowCardFieldEditor, onTakeControl, onCastFromZone, onForetellCard, onCastForetold, cumulativeTurnTime, currentTurnElapsed, pendingAction, onStartPendingAction, onResolvePendingCard, onResolvePendingPlayer, optimisticUpdateCard, optimisticUpdatePlayer, touchInteractMode, format, piles }) {
+    const dialog = useDialog();
     const hasCommanderZone = COMMANDER_FORMATS.has(format || 'commander');
     // Turn-start nudges: on the self-zone only, once the game has started and
     // it's actually your turn, glow the draw button until you've drawn and
@@ -748,14 +750,44 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     </div>
                 )}
 
-                {/* Infect / poison next to HP */}
-                {totalInfect > 0 && (
+                {/* Infect / poison next to HP — owner always sees it (even at 0)
+                    so they can click to add. Others only see it when >0. Click
+                    behavior mirrors the other counter badges: left +1,
+                    right -1, middle clear, shift+click opens a set prompt. */}
+                {(totalInfect > 0 || isOwner) && (
                     <div
                         className="infect-inline"
                         onClick={(e) => e.stopPropagation()}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     >
-                        <span className={`infect-total ${lethalInfect ? 'lethal' : ''}`} title="Poison counters">
+                        <span
+                            className={`infect-total ${lethalInfect ? 'lethal' : ''}`}
+                            title={(spectating || !isOwner)
+                                ? `Poison counters (${totalInfect}/10)`
+                                : "Poison · L-click +1 · R-click −1 · middle-click clear · shift-click to set"}
+                            onClick={(spectating || !isOwner) ? undefined : (e) => {
+                                e.stopPropagation();
+                                if (e.shiftKey) {
+                                    dialog.prompt('Set poison counters:', String(totalInfect), {
+                                        title: 'Set poison', inputType: 'number',
+                                    }).then(v => {
+                                        if (v === null || v === '') return;
+                                        const n = parseInt(v, 10);
+                                        if (!isNaN(n)) socket.emit('setInfect', { toPlayerId: player.userId, amount: Math.max(0, n) });
+                                    });
+                                } else {
+                                    socket.emit('setInfect', { toPlayerId: player.userId, amount: totalInfect + 1 });
+                                }
+                            }}
+                            onContextMenu={(spectating || !isOwner) ? (e) => { e.preventDefault(); e.stopPropagation(); } : (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                socket.emit('setInfect', { toPlayerId: player.userId, amount: Math.max(0, totalInfect - 1) });
+                            }}
+                            onMouseDown={(spectating || !isOwner) ? undefined : (e) => {
+                                if (e.button === 1) { e.preventDefault(); e.stopPropagation(); socket.emit('setInfect', { toPlayerId: player.userId, amount: 0 }); }
+                            }}
+                        >
                             ☣ {fmtNum(totalInfect)}/10
                         </span>
                     </div>
@@ -843,16 +875,33 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 };
 
                 return (
-                    <div className="bf-grid">
-                        {/* Top row: creatures + artifacts (+ other if any) */}
-                        <div className="bf-mid-row">
-                            {renderRow('creatures', 'Creatures', groups.creatures, 'battlefield-creatures')}
-                            {renderRow('artifacts', 'Artifacts/Enchant.', groups.artifacts, 'battlefield-artifacts')}
-                            {groups.other.length > 0 && renderRow('other', 'Other', groups.other, 'battlefield-other')}
+                    <>
+                        <div className="bf-grid">
+                            {/* Top row: creatures + artifacts (+ other if any) */}
+                            <div className="bf-mid-row">
+                                {renderRow('creatures', 'Creatures', groups.creatures, 'battlefield-creatures')}
+                                {renderRow('artifacts', 'Artifacts/Enchant.', groups.artifacts, 'battlefield-artifacts')}
+                                {groups.other.length > 0 && renderRow('other', 'Other', groups.other, 'battlefield-other')}
+                            </div>
+
+                            {/* Lands — full-width, horizontal-scroll row (same shape as Hand) */}
+                            <LandsRow
+                                cards={groups.lands}
+                                renderCards={renderCards}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, 'battlefield')}
+                                isCollapsed={collapsedRows.has('lands')}
+                                onToggle={() => toggleRow('lands')}
+                                playerId={player.userId}
+                            />
                         </div>
 
-                        {/* Bottom row: command zone + lands */}
-                        <div className="bf-top-row">
+                        {/* Command zone + Hand — command zone sits to the LEFT of the hand
+                            so it reads as "my tracked pile beside the cards I'm holding".
+                            The command cell collapses to a slim vertical label that takes
+                            almost no horizontal space (useful when the user isn't actively
+                            interacting with their commander). */}
+                        <div className="hand-row">
                             {hasCommanderZone && (
                                 <CommandZoneCell
                                     player={player}
@@ -864,22 +913,19 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                     playerId={player.userId}
                                 />
                             )}
-                            {renderRow('lands', 'Lands', groups.lands, 'battlefield-lands')}
+                            <HandZone
+                                player={player}
+                                isOwner={isOwner}
+                                spectating={spectating}
+                                renderZoneCards={renderZoneCards}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, 'hand')}
+                                playerId={player.userId}
+                            />
                         </div>
-                    </div>
+                    </>
                 );
             })()}
-
-            {/* Hand */}
-            <HandZone
-                player={player}
-                isOwner={isOwner}
-                spectating={spectating}
-                renderZoneCards={renderZoneCards}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, 'hand')}
-                playerId={player.userId}
-            />
 
             {/* Side zones */}
             <div className="side-zones">
@@ -1043,25 +1089,56 @@ function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, rende
 
 function CommandZoneCell({ player, renderCards, onDragOver, onDrop, isCollapsed, onToggle, playerId }) {
     const ref = useHorizontalWheel();
+    // When collapsed the cell shrinks to just the vertical label so the
+    // hand can take the full remaining width. When expanded the cell
+    // sizes to fit about one card plus the label.
     return (
-        <div className={`zone command-zone bf-cell ${isCollapsed ? 'collapsed' : ''}`}
+        <div className={`zone command-zone cmd-beside-hand ${isCollapsed ? 'collapsed' : ''}`}
             data-drop-zone="commandZone" data-drop-player={playerId}
             onDragOver={onDragOver}
-            onDrop={onDrop}
-            style={{ flex: isCollapsed ? '0 0 auto' : '1 1 0' }}>
-            <div className="bf-row-label">
+            onDrop={onDrop}>
+            <div className={`bf-row-label cmd-zone-label ${isCollapsed ? 'cmd-zone-label-vertical' : ''}`}>
                 <span className="bf-row-toggle" onClick={onToggle}>
                     <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
                     Command ({player.zones.commandZone?.length || 0})
-                    {player.commanderDeaths > 0 && <span className="death-counter"> · Deaths: {player.commanderDeaths}</span>}
-                    {player.commanderTax > 0 && <span className="tax-counter"> · Tax: {player.commanderTax}</span>}
                 </span>
+                {!isCollapsed && (player.commanderDeaths > 0 || player.commanderTax > 0) && (
+                    <div className="cmd-zone-meta">
+                        {player.commanderDeaths > 0 && <span className="death-counter">Deaths: {player.commanderDeaths}</span>}
+                        {player.commanderTax > 0 && <span className="tax-counter">Tax: {player.commanderTax}</span>}
+                    </div>
+                )}
             </div>
             {!isCollapsed && (
-                <div ref={ref} className="zone-cards battlefield-cards">
+                <div ref={ref} className="zone-cards battlefield-cards cmd-cards-row">
                     {(player.zones.commandZone?.length || 0) === 0
                         ? <div className="zone-empty">—</div>
                         : renderCards(player.zones.commandZone, 'commandZone')}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Lands row — modeled after HandZone: fixed-height, full-width, scrolls
+// horizontally. Replaces the old grid cell so lands don't fight for
+// horizontal space with the command zone / artifacts row.
+function LandsRow({ cards, renderCards, onDragOver, onDrop, isCollapsed, onToggle, playerId }) {
+    const ref = useHorizontalWheel();
+    return (
+        <div className={`zone battlefield battlefield-lands lands-row ${isCollapsed ? 'collapsed' : ''}`}
+            data-drop-zone="battlefield" data-drop-player={playerId}
+            onDragOver={onDragOver}
+            onDrop={onDrop}>
+            <div className="bf-row-label">
+                <span className="bf-row-toggle" onClick={onToggle}>
+                    <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
+                    Lands ({cards.length})
+                </span>
+            </div>
+            {!isCollapsed && (
+                <div ref={ref} className="zone-cards lands-cards">
+                    {cards.length === 0 ? <div className="zone-empty">—</div> : renderCards(cards)}
                 </div>
             )}
         </div>

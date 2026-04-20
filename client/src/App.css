@@ -575,6 +575,25 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .player-counter-badge:hover { background: var(--bg-hover); }
 .cmd-dmg-badge, .infect-badge, .infect-total, .death-counter, .tax-counter { text-shadow: 0 1px 2px rgba(0,0,0,0.85); }
 .life-value { text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(212, 175, 111, 0.3) !important; }
+
+/* Multi-face card display — split / adventure / flip / aftermath / DFC */
+.card-faces-section { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft, #333); }
+.card-face-block { margin: 10px 0; padding: 8px 10px; background: rgba(0,0,0,0.25); border-left: 2px solid var(--accent-dim, #556); border-radius: 2px; }
+.card-face-block:last-child { margin-bottom: 0; }
+.card-face-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+.card-face-head strong { font-family: 'Cinzel', serif; letter-spacing: 1px; }
+.card-face-cost .mana-cost-img { width: 14px; height: 14px; }
+.card-face-type { font-size: 0.85em; color: var(--text-mid); margin: 2px 0; font-style: italic; }
+.card-face-oracle { font-size: 0.9em; line-height: 1.4; margin: 4px 0; }
+.card-face-pt { font-family: 'Cinzel', serif; font-weight: 700; text-align: right; margin: 2px 0; }
+
+/* Hover-panel variant — tighter */
+.hover-faces-group { }
+.hover-face { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.hover-face:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.hover-face-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 2px; }
+.hover-face-head strong { font-size: 0.88em; }
+.hover-face-cost { flex-shrink: 0; }
 .player-designations { display: flex; gap: 4px; }
 .designation-badge { padding: 3px 10px; border-radius: 2px; font-size: 0.65em; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-family: 'Cinzel', serif; }
 .designation-badge.monarch { background: #d4af6f; color: #000; }
@@ -583,6 +602,45 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .designation-badge.daynight { background: #5f7fa0; color: #fff; }
 
 .death-counter, .tax-counter { color: var(--accent); font-size: 0.8em; font-weight: 600; }
+.cmd-zone-label { flex-direction: column; align-items: flex-start; gap: 2px; }
+.cmd-zone-meta { display: flex; gap: 12px; font-size: 0.9em; margin-top: 2px; }
+
+/* Commander damage picker modal — single entry that replaces the old
+   "Cmdr Dmg from <name>" submenu explosion. */
+.cmd-dmg-picker-modal { max-width: 520px; }
+.cmd-dmg-source-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
+.cmd-dmg-source-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-soft); border-radius: 3px; }
+.cmd-dmg-source-row.lethal { border-color: var(--danger); background: rgba(176,68,68,0.15); }
+.cmd-dmg-source-name { flex: 1; font-family: 'Cinzel', serif; letter-spacing: 1px; }
+.cmd-dmg-source-value { font-family: 'Cinzel', serif; font-weight: 700; min-width: 52px; text-align: center; color: var(--accent); }
+.cmd-dmg-source-row.lethal .cmd-dmg-source-value { color: var(--danger); }
+.cmd-dmg-source-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* Hidden player placeholder — replaces the full zone when a viewer
+   hides an opponent from their own UI. Same wrapper element so the
+   CSS grid keeps its cell count; just collapses the contents to a
+   one-liner that still shows name / life and an Unhide button. */
+.player-zone-wrapper.player-zone-hidden {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+.player-zone-hidden-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    padding: 6px 12px;
+    margin: 4px auto;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85em;
+    max-width: 320px;
+    width: 100%;
+}
+.player-zone-hidden-name { flex: 1; color: var(--text-mid); }
+.player-zone-hidden-life { color: var(--accent); font-weight: 700; }
 .commander-damage-list { display: flex; gap: 4px; padding: 2px 4px; flex-wrap: wrap; }
 .commander-damage-inline { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .cmd-dmg-badge { padding: 2px 7px; background: rgba(176,68,68,0.2); border: 1px solid var(--danger); border-radius: 2px; font-size: 0.7em; color: var(--danger); font-family: 'Cinzel', serif; letter-spacing: 0.5px; }
@@ -596,7 +654,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .infect-total.lethal { background: #5fa050; color: #000; box-shadow: 0 0 10px rgba(96,180,80,0.6); }
 
 /* Current turn highlight */
-.player-zone.current-turn { box-shadow: 0 0 0 2px var(--accent), 0 0 16px rgba(212,175,111,0.3); }
+.player-zone.current-turn {
+    /* Strong inner ring + soft outer glow + subtle pulsing border tint
+       so it's obvious at a glance whose turn it is, even over busy card
+       art. Animation is short and fades out quickly so it doesn't
+       distract during hover / action. */
+    box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 2px var(--accent), 0 0 20px rgba(212,175,111,0.45);
+    border-color: var(--accent);
+    animation: currentTurnPulse 2.4s ease-in-out infinite;
+}
+@keyframes currentTurnPulse {
+    0%, 100% { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 2px var(--accent), 0 0 20px rgba(212,175,111,0.35); }
+    50%      { box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 2px var(--accent), 0 0 28px rgba(212,175,111,0.7); }
+}
 
 /* ─── MANA SYMBOLS ────────────────────────────────────────── */
 .mana-symbols { display: inline-flex; gap: 2px; align-items: center; flex-wrap: wrap; vertical-align: middle; }
@@ -733,8 +803,77 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .battlefield-other { background: linear-gradient(180deg, rgba(28,28,28,0.5), rgba(16,16,16,0.6)); border-color: rgba(120,120,120,0.3); }
 
 /* Hand — warm, sized to current card height */
-.hand-zone { flex-shrink: 0; overflow-x: auto; overflow-y: hidden; background: linear-gradient(180deg, rgba(40,24,16,0.5), rgba(24,14,8,0.6)); border-color: rgba(140,90,40,0.3); border: 1px solid rgba(140,90,40,0.3); border-radius: 3px; }
+.hand-zone { flex-shrink: 0; flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; background: linear-gradient(180deg, rgba(40,24,16,0.5), rgba(24,14,8,0.6)); border-color: rgba(140,90,40,0.3); border: 1px solid rgba(140,90,40,0.3); border-radius: 3px; }
 .hand-cards { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding: 4px; }
+
+/* Command zone + Hand side-by-side row. Command zone sits on the LEFT
+   and shrinks to a slim vertical label when collapsed so the hand takes
+   the full remaining width. */
+.hand-row {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    flex-shrink: 0;
+}
+.command-zone.cmd-beside-hand {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    /* Enough for one card + the label row. */
+    width: max(calc(var(--card-w, 70px) + 32px), 140px);
+    background: linear-gradient(180deg, rgba(60,40,20,0.5), rgba(32,20,10,0.6));
+    border: 1px solid rgba(160,110,50,0.3);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.command-zone.cmd-beside-hand.collapsed {
+    /* Collapsed = just the slim vertical-text label; no width reserved
+       for cards. */
+    width: 22px;
+}
+.command-zone.cmd-beside-hand.collapsed .cmd-zone-label-vertical {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    padding: 10px 2px;
+    justify-content: flex-start;
+    text-align: center;
+    gap: 6px;
+    height: 100%;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-direction: row;
+}
+.command-zone.cmd-beside-hand.collapsed .cmd-zone-label-vertical .bf-row-toggle {
+    flex-direction: row;
+    gap: 4px;
+    writing-mode: vertical-rl;
+}
+.command-zone.cmd-beside-hand .cmd-cards-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Lands row — fixed-height horizontal scroller (mirror of the hand). */
+.lands-row {
+    flex-shrink: 0;
+    min-height: calc(var(--card-h, 98px) * 0.6 + 22px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.lands-row.collapsed { min-height: 0; }
+.lands-row .lands-cards {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px;
+    flex: 1;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
 
 /* Side zones */
 /* Side zones fit their content (collapsed = just the label, expanded = cards)
@@ -1243,24 +1382,36 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .compact-mode .is-other .commander-damage-inline,
 .compact-mode .is-other .infect-inline { display: none; }
 
-/* Flatten the battlefield grid into a single horizontal strip of all cards.
-   bf-top-row + bf-mid-row become one row, each cell is just a strip of cards. */
+/* Flatten every opponent zone into a single horizontal strip that scrolls.
+   Each cell is just a strip of cards that sizes to its content; no
+   grid columns, no row wrapping, no wasted whitespace. All zones —
+   creatures, artifacts, lands, command zone — share one horizontal
+   scroller so you can see a whole opponent at a glance. */
 .compact-mode .is-other .bf-grid {
     flex-direction: row;
     gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
-.compact-mode .is-other .bf-top-row,
 .compact-mode .is-other .bf-mid-row {
     flex-direction: row;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     gap: 2px;
+    min-height: 0;
+    overflow: visible;
+}
+.compact-mode .is-other .lands-row {
+    flex: 0 0 auto;
     min-height: 0;
 }
 .compact-mode .is-other .bf-cell {
     min-height: 0;
-    flex: 1 1 0 !important;
+    /* Each zone sizes to its content — not equal-stretch. An empty zone
+       takes near-zero space, a full zone just fits its cards. */
+    flex: 0 0 auto !important;
+    min-width: 0;
 }
-.compact-mode .is-other .bf-cell:has(.zone-empty) { flex: 0 0 auto !important; }
 .compact-mode .is-other .bf-row-label {
     display: none;
 }
@@ -1270,13 +1421,23 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     border-bottom: none;
 }
 /* Force a single horizontal row, no wrap, horizontal overflow scrolls */
-.compact-mode .is-other .battlefield-cards {
+.compact-mode .is-other .battlefield-cards,
+.compact-mode .is-other .lands-cards,
+.compact-mode .is-other .cmd-cards-row {
     padding: 2px;
     flex-wrap: nowrap !important;
     overflow-x: auto;
     overflow-y: hidden;
+    min-width: 0;
 }
 .compact-mode .is-other .zone-empty { display: none; }
+/* Command zone in compact: collapse to bare cards, no label column */
+.compact-mode .is-other .command-zone.cmd-beside-hand {
+    width: auto;
+    min-width: 0;
+}
+/* In compact mode only the hand itself is hidden on opponents —
+   command zone stays so you can still see their commanders. */
 .compact-mode .is-other .hand-zone { display: none; }
 .compact-mode .is-other .side-zones { display: none; }
 .compact-mode .is-other .death-banner { font-size: 0.6em; padding: 1px 4px; letter-spacing: 1px; }
@@ -2791,6 +2952,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     letter-spacing: 2px;
     text-transform: uppercase;
     margin-bottom: 8px;
+    /* The surrounding .bg-saved-list is a flex row; without a full-width
+       flex-basis the label sits on the same row as the thumbnails. */
+    flex-basis: 100%;
+    width: 100%;
 }
 .bg-saved-list {
     display: flex;

@@ -16,14 +16,41 @@ function scryfallImageFromId(scryfallId, side = 'front') {
     return `https://cards.scryfall.io/normal/${side}/${a}/${b}/${scryfallId}.jpg`;
 }
 
+// Layouts that have a real second face with its own image. Adventure,
+// split, flip, aftermath, and prototype all pack two halves into one
+// image, so they should NEVER set backImageUri — otherwise the UI
+// (wrongly) renders a "flip to other side" button that reveals a blank
+// card.
+const DFC_LAYOUTS = new Set([
+    'transform', 'modal_dfc', 'double_faced_token', 'reversible_card', 'meld', 'battle',
+]);
+
+// Pull each card face's gameplay text into a normalized shape so the UI
+// can show both halves of adventures / splits / flips (and the back half
+// of DFCs, for reference) without re-parsing Scryfall payloads.
+function extractFaces(card) {
+    const faces = card?.card_faces;
+    if (!Array.isArray(faces) || faces.length < 2) return null;
+    return faces.map(f => ({
+        name: f.name || '',
+        manaCost: f.mana_cost || '',
+        typeLine: f.type_line || '',
+        oracleText: f.oracle_text || '',
+        power: f.power || '',
+        toughness: f.toughness || '',
+        colors: Array.isArray(f.colors) ? f.colors : [],
+    }));
+}
+
 function scryfallCardToEntry(card) {
     const face = card.card_faces?.[0];
+    const isDfc = DFC_LAYOUTS.has(card.layout);
     return {
         scryfallId: card.id,
         name: card.name,
         quantity: 1,
         imageUri: card.image_uris?.normal || face?.image_uris?.normal || '',
-        backImageUri: card.card_faces?.[1]?.image_uris?.normal || '',
+        backImageUri: isDfc ? (card.card_faces?.[1]?.image_uris?.normal || '') : '',
         manaCost: card.mana_cost || face?.mana_cost || '',
         typeLine: card.type_line || face?.type_line || '',
         oracleText: card.oracle_text || face?.oracle_text || '',
@@ -35,6 +62,7 @@ function scryfallCardToEntry(card) {
         layout: card.layout || 'normal',
         textless: !!card.textless,
         nonEnglish: !!(card.lang && card.lang !== 'en'),
+        faces: extractFaces(card),
     };
 }
 
@@ -192,7 +220,12 @@ router.post('/moxfield', async (req, res) => {
                 if (!card) continue;
                 const sid = card.scryfall_id || card.id;
                 const frontFromId = scryfallImageFromId(sid, 'front');
-                const backFromId = card.card_faces && card.card_faces.length > 1
+                // Only DFC layouts get a back fallback. Adventures, splits,
+                // flips, and aftermaths have card_faces.length > 1 too, but
+                // their back face has no separate image (both halves share
+                // one image), so inferring a back URL yields a broken image.
+                const isDfc = DFC_LAYOUTS.has(card.layout);
+                const backFromId = (isDfc && card.card_faces && card.card_faces.length > 1)
                     ? scryfallImageFromId(sid, 'back')
                     : '';
                 const face0 = card.card_faces?.[0];
@@ -208,7 +241,7 @@ router.post('/moxfield', async (req, res) => {
                     imageUri: card.image_uris?.normal
                         || face0?.image_uris?.normal
                         || frontFromId,
-                    backImageUri: face1?.image_uris?.normal || backFromId,
+                    backImageUri: isDfc ? (face1?.image_uris?.normal || backFromId) : '',
                     manaCost: card.mana_cost || face0?.mana_cost || '',
                     typeLine: card.type_line || card.type || face0?.type_line || '',
                     oracleText: card.oracle_text || face0?.oracle_text || '',
@@ -219,6 +252,7 @@ router.post('/moxfield', async (req, res) => {
                     producedMana: card.produced_mana || face0?.produced_mana || [],
                     layout: card.layout || 'normal',
                     foil: foilFinish,
+                    faces: extractFaces(card),
                 });
             }
         };
@@ -276,12 +310,13 @@ router.post('/moxfield', async (req, res) => {
             for (const { sid, moxCard } of tokenRefs) {
                 const sc = scryfallTokens.get(sid);
                 const face = sc?.card_faces?.[0];
+                const tokenIsDfc = DFC_LAYOUTS.has(sc?.layout);
                 result.tokens.push({
                     scryfallId: sc?.id || sid,
                     name: sc?.name || moxCard.name,
                     quantity: 1,
                     imageUri: sc?.image_uris?.normal || face?.image_uris?.normal || scryfallImageFromId(sid, 'front'),
-                    backImageUri: sc?.card_faces?.[1]?.image_uris?.normal || '',
+                    backImageUri: tokenIsDfc ? (sc?.card_faces?.[1]?.image_uris?.normal || '') : '',
                     manaCost: sc?.mana_cost || face?.mana_cost || moxCard.mana_cost || '',
                     typeLine: sc?.type_line || face?.type_line || moxCard.type_line || '',
                     oracleText: sc?.oracle_text || face?.oracle_text || moxCard.oracle_text || '',
@@ -291,6 +326,7 @@ router.post('/moxfield', async (req, res) => {
                     colorIdentity: sc?.color_identity || moxCard.color_identity || [],
                     producedMana: sc?.produced_mana || [],
                     layout: sc?.layout || moxCard.layout || 'token',
+                    faces: extractFaces(sc),
                 });
             }
         }

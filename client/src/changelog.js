@@ -4,6 +4,41 @@
 
 export const CHANGELOG = [
     {
+        version: '3.1',
+        date: '2026-04-19',
+        changes: [
+            'Team play — whole team shares one turn (next-turn skips teammates), and teammates are placed on the same side of the table (bottom row = your team, top = opponents)',
+            'Commander zone now sits to the LEFT of the hand; collapsing it rotates the label vertical and shrinks its width to ~22px so the hand takes the full remaining space',
+            'Lands moved out of the grid into their own horizontal-scrolling row below the main battlefield, same shape as the hand',
+            'Compact mode for opponents: every zone on a single horizontal strip; zones size to content (no wasted whitespace); horizontal scroll when it overflows',
+            'Commander damage right-click collapsed from N entries (one per player) to a single "Commander damage..." picker with −1 / +1 / Add / Set / Clear per source — includes self',
+            'Commander deaths and commander tax now render on a separate line from the zone title so they don\'t push the commander label off-screen',
+            'Infect badge — L-click +1, R-click −1, middle-click clear, Shift-click to set exact; now visible to its owner even at 0 so you can click to add',
+            'Add Clone to the multi-select bulk-action bar (clones every selected card)',
+            'Pile cards — left-click maximizes, right-click opens a context menu with Move-to-X, Flip, → other pile',
+            'Modals now close when you click the backdrop, but ignore drags that start inside the modal (range sliders, selecting text, etc.)',
+            'Chat / Action log / Drawing / Piles side toggles are now draggable vertically — grab and slide; position persists per browser',
+            'Hide opponents from your view (right-click header → Hide this player); hide their background image separately; both are per-viewer client-side',
+            'Eliminated / conceded players can switch to spectator from their own right-click menu so their dead zone stops taking up the table',
+            'Tie-breaker fix — only the actually-tied players re-roll. Previously non-tied players\' stale rolls could re-enter the comparison and trigger endless tie-breaks',
+            'Team add: typing the first character of a new team name no longer closes the input (draft-state bug)',
+            'Disable mulligan once the game has started past the roll phase (prevents accidental mid-game hand-shuffles)',
+            'Current-turn player zone now has a stronger ring + slow pulse so it\'s unambiguous whose turn it is',
+            'Saved-backgrounds label wraps to its own line instead of sitting inline with the thumbnails',
+            'Guide updated with the new layout, team, commander-damage, infect, and sound sections',
+        ],
+    },
+    {
+        version: '3.0',
+        date: '2026-04-19',
+        changes: [
+            'Adventure / split / flip / aftermath cards no longer show a bogus "Other side" button — these layouts pack both halves into one image, so there\'s no separate back to flip to. Restricted to real DFC layouts (transform, modal_dfc, battle, meld, reversible_card, double_faced_token)',
+            'Each face\'s name / mana cost / type / oracle text / power / toughness is now stored and shown in CardMaximized and the hover side panel — so you can read the adventure / spell half even when the image hides it (also helps with textless or non-English prints)',
+            'Click SFX broadened — anything clickable now makes a sound (buttons, links, labels, inputs, role=button, and anything styled with cursor: pointer or grab such as cards)',
+            'Fix: tap / flip / draw sounds weren\'t firing for actions taken by other players. AudioContext is now eagerly resumed on the first user gesture of the session so server-driven sounds work for everyone',
+        ],
+    },
+    {
         version: '2.9',
         date: '2026-04-19',
         changes: [

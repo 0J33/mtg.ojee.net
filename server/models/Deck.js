@@ -32,6 +32,10 @@ const cardEntrySchema = new mongoose.Schema({
     foil: { type: String, default: null }, // 'foil' | 'etched' | null
     textless: { type: Boolean, default: false },
     nonEnglish: { type: Boolean, default: false },
+    // Normalized per-face data for cards with >1 face (adventures, splits,
+    // flips, aftermaths, DFCs). Null for single-face cards. Each face has
+    // name/mana cost/type line/oracle text/power/toughness/colors.
+    faces: { type: Array, default: null },
 }, { _id: false });
 
 const deckSchema = new mongoose.Schema({

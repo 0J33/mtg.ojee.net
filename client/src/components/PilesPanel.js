@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
 import { useDialog } from './Dialog';
+import ContextMenu from './ContextMenu';
+import { useVerticalDragPos } from '../utils';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
@@ -48,6 +50,8 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
     const [createPrivate, setCreatePrivate] = useState(false);
     const [pos, setPos] = useState(() => loadPos());
     const dragRef = useRef(null); // { startX, startY, origLeft, origTop, pointerId }
+    const [cardMenu, setCardMenu] = useState(null); // { x, y, pile, card }
+    const toggleDrag = useVerticalDragPos('mtg_piles_toggle_top');
 
     // Clamp on window resize so the panel can't get stuck off-screen.
     useEffect(() => {
@@ -173,12 +177,14 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
 
     return (
         <>
-            {/* Floating toggle — left edge, below drawing toggle */}
+            {/* Floating toggle — left edge, below drawing toggle. Drag vertically to move. */}
             <button
                 className={`piles-toggle ${open ? 'open' : ''}`}
                 onClick={() => setOpen(o => !o)}
-                title={open ? 'Hide piles' : 'Show piles'}
+                title={open ? 'Hide piles (drag vertically to move)' : 'Show piles (drag vertically to move)'}
                 type="button"
+                style={toggleDrag.topStyle}
+                {...toggleDrag.dragHandlers}
             >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="5" width="14" height="10" rx="1" />
@@ -351,19 +357,30 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                                             }));
                                                             e.dataTransfer.effectAllowed = 'move';
                                                         }}
+                                                        onClick={(e) => {
+                                                            // Ignore clicks that originate on the per-card
+                                                            // action buttons — those have their own handlers.
+                                                            if (e.target.closest('button')) return;
+                                                            onMaximizeCard?.(card);
+                                                        }}
+                                                        onContextMenu={(e) => {
+                                                            if (!canMutate) return;
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setCardMenu({ x: e.clientX, y: e.clientY, pile, card });
+                                                        }}
                                                     >
                                                         <img
                                                             src={displayedImage}
                                                             alt={card.faceDown ? 'Face-down card' : card.name}
-                                                            onClick={() => onMaximizeCard?.(card)}
                                                             draggable={false}
                                                         />
                                                         <span className="pile-card-name">{card.faceDown ? 'Face down' : card.name}</span>
                                                         {canMutate && (
                                                             <div className="pile-card-actions">
-                                                                <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'hand')} title="Move to your hand">{'\u2192'} Hand</button>
-                                                                <button className="small-btn" onClick={() => moveOutOfPile(pile, card, 'battlefield')} title="Play to your battlefield">{'\u2192'} BF</button>
-                                                                <button className="small-btn" onClick={() => flipPileCard(card)} title={card.backImageUri ? 'Flip (swap sides)' : 'Flip face up/down'}>Flip</button>
+                                                                <button className="small-btn" onClick={(e) => { e.stopPropagation(); moveOutOfPile(pile, card, 'hand'); }} title="Move to your hand">{'\u2192'} Hand</button>
+                                                                <button className="small-btn" onClick={(e) => { e.stopPropagation(); moveOutOfPile(pile, card, 'battlefield'); }} title="Play to your battlefield">{'\u2192'} BF</button>
+                                                                <button className="small-btn" onClick={(e) => { e.stopPropagation(); flipPileCard(card); }} title={card.backImageUri ? 'Flip (swap sides)' : 'Flip face up/down'}>Flip</button>
                                                             </div>
                                                         )}
                                                     </div>
@@ -377,6 +394,39 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                     </div>
                 </div>,
                 document.body
+            )}
+            {cardMenu && (
+                <ContextMenu
+                    x={cardMenu.x}
+                    y={cardMenu.y}
+                    items={[
+                        { label: 'View', onClick: () => onMaximizeCard?.(cardMenu.card) },
+                        { divider: true },
+                        { label: '→ Hand', onClick: () => moveOutOfPile(cardMenu.pile, cardMenu.card, 'hand') },
+                        { label: '→ Battlefield', onClick: () => moveOutOfPile(cardMenu.pile, cardMenu.card, 'battlefield') },
+                        { label: '→ Graveyard', onClick: () => moveOutOfPile(cardMenu.pile, cardMenu.card, 'graveyard') },
+                        { label: '→ Exile', onClick: () => moveOutOfPile(cardMenu.pile, cardMenu.card, 'exile') },
+                        { label: '→ Library (top)', onClick: () => {
+                            socket.emit('moveCard', { instanceId: cardMenu.card.instanceId, fromZone: `pile:${cardMenu.pile.id}`, toZone: 'library', libraryPosition: 'top', targetPlayerId: userId });
+                        } },
+                        { label: '→ Library (bottom)', onClick: () => {
+                            socket.emit('moveCard', { instanceId: cardMenu.card.instanceId, fromZone: `pile:${cardMenu.pile.id}`, toZone: 'library', targetPlayerId: userId });
+                        } },
+                        { divider: true },
+                        { label: cardMenu.card.backImageUri ? 'Flip (swap sides)' : 'Flip face up/down', onClick: () => flipPileCard(cardMenu.card) },
+                        // Moving to another pile — listed last.
+                        ...(piles || []).filter(p => p.id !== cardMenu.pile.id).map(p => ({
+                            label: `→ Pile: ${p.name}`,
+                            onClick: () => socket.emit('moveCard', {
+                                instanceId: cardMenu.card.instanceId,
+                                fromZone: `pile:${cardMenu.pile.id}`,
+                                toZone: `pile:${p.id}`,
+                                targetPlayerId: userId,
+                            }),
+                        })),
+                    ]}
+                    onClose={() => setCardMenu(null)}
+                />
             )}
         </>
     );

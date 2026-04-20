@@ -37,13 +37,31 @@ async function scryfallSearchAll(query) {
     return cards;
 }
 
+const DFC_LAYOUTS = new Set([
+    'transform', 'modal_dfc', 'double_faced_token', 'reversible_card', 'meld', 'battle',
+]);
+function extractFaces(card) {
+    const faces = card?.card_faces;
+    if (!Array.isArray(faces) || faces.length < 2) return null;
+    return faces.map(f => ({
+        name: f.name || '',
+        manaCost: f.mana_cost || '',
+        typeLine: f.type_line || '',
+        oracleText: f.oracle_text || '',
+        power: f.power || '',
+        toughness: f.toughness || '',
+        colors: Array.isArray(f.colors) ? f.colors : [],
+    }));
+}
+
 function cardToEntry(card) {
     const face = card.card_faces?.[0];
+    const isDfc = DFC_LAYOUTS.has(card.layout);
     return {
         scryfallId: card.id,
         name: card.name,
         imageUri: card.image_uris?.normal || face?.image_uris?.normal || '',
-        backImageUri: card.card_faces?.[1]?.image_uris?.normal || '',
+        backImageUri: isDfc ? (card.card_faces?.[1]?.image_uris?.normal || '') : '',
         manaCost: card.mana_cost || face?.mana_cost || '',
         typeLine: card.type_line || face?.type_line || '',
         oracleText: card.oracle_text || face?.oracle_text || '',
@@ -54,6 +72,7 @@ function cardToEntry(card) {
         producedMana: card.produced_mana || [],
         layout: card.layout || 'normal',
         rarity: card.rarity,
+        faces: extractFaces(card),
     };
 }
 

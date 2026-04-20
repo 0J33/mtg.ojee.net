@@ -72,6 +72,12 @@ function createCardInstance(cardData, overrides = {}) {
         foil: cardData.foil || null,      // 'foil' | 'etched' | null — visible to everyone
         textless: !!cardData.textless,    // card image has no rules text (full art / textless)
         nonEnglish: !!cardData.nonEnglish, // card image text is not in English
+        // Per-face data for multi-face cards (adventures, splits, flips,
+        // aftermaths, DFCs). Null if the card has a single face. The UI
+        // uses this to render a "secondary face" panel for cards whose
+        // second half isn't visible in the main image, and for showing
+        // the back face's text under the CardMaximized flip preview.
+        faces: Array.isArray(cardData.faces) ? cardData.faces : null,
         ...overrides,
     };
 }

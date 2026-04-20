@@ -1907,13 +1907,22 @@ module.exports = function registerSocketHandlers(io) {
             if (nextPlayerIdx === -1) {
                 // Advance through eliminated players automatically. Safety cap
                 // equal to player count so we can't infinite-loop if everyone is
-                // somehow dead.
+                // somehow dead. Teammates also get skipped — a whole team
+                // takes ONE combined turn, so we land on the next player who
+                // is NOT on the current team (or a dead/eliminated player).
                 const total = room.players.length;
+                const currentTeam = room.players[room.turnIndex]?.teamId || null;
                 let advanced = 0;
                 do {
                     room.turnIndex = (room.turnIndex + 1) % total;
                     advanced++;
-                } while (isPlayerEliminated(room.players[room.turnIndex]) && advanced < total);
+                    const p = room.players[room.turnIndex];
+                    if (isPlayerEliminated(p)) continue;
+                    // Skip teammates — same team keeps "the turn" until we
+                    // reach a player whose team differs (or no team at all).
+                    if (currentTeam && p.teamId && p.teamId === currentTeam) continue;
+                    break;
+                } while (advanced < total);
             } else {
                 room.turnIndex = nextPlayerIdx;
             }
@@ -1980,6 +1989,16 @@ module.exports = function registerSocketHandlers(io) {
             if (!room.mulliganPhase) return callback?.({ error: 'Not in mulligan phase' });
             const player = getPlayerInRoom(room, currentUserId);
             if (!player) return callback?.({ error: 'Not in room' });
+            // Track which players are still competing for first. Initially
+            // everyone; after a tie-break this narrows to just the tied
+            // players, so non-tied players' stale roll values can't re-enter
+            // the winner calculation on the next round.
+            if (!Array.isArray(room.rollEligibleIds)) {
+                room.rollEligibleIds = room.players.map(p => p.userId);
+            }
+            if (!room.rollEligibleIds.includes(currentUserId)) {
+                return callback?.({ error: 'You are not in this tie-break' });
+            }
             // Re-rolls during tiebreaks clear firstPlayerRoll back to null,
             // so a player who already has a roll is locked out until the
             // tiebreak resets them.
@@ -2005,12 +2024,16 @@ module.exports = function registerSocketHandlers(io) {
                 label: 'First player roll',
             });
 
-            // Has everyone rolled?
-            if (room.players.length > 0 && room.players.every(p => typeof p.firstPlayerRoll === 'number')) {
-                // Find the highest roll + anyone tied for it.
+            // Has everyone still in the running rolled?
+            const eligibleIds = room.rollEligibleIds;
+            const eligiblePlayers = room.players.filter(p => eligibleIds.includes(p.userId));
+            if (eligiblePlayers.length > 0 && eligiblePlayers.every(p => typeof p.firstPlayerRoll === 'number')) {
+                // Find the highest roll + anyone tied for it — ONLY among
+                // players still in this tie-break. Previous rounds' rolls
+                // on eliminated non-tied players are ignored entirely.
                 let max = -Infinity;
-                for (const p of room.players) if (p.firstPlayerRoll > max) max = p.firstPlayerRoll;
-                const tied = room.players.filter(p => p.firstPlayerRoll === max);
+                for (const p of eligiblePlayers) if (p.firstPlayerRoll > max) max = p.firstPlayerRoll;
+                const tied = eligiblePlayers.filter(p => p.firstPlayerRoll === max);
 
                 if (tied.length === 1) {
                     // We have a winner.
@@ -2020,7 +2043,7 @@ module.exports = function registerSocketHandlers(io) {
                     room.turnIndex = winnerIdx;
                     room.turnStartedAt = Date.now(); // first turn begins now
                     addAndBroadcastAction(io, room, currentUserId, 'firstPlayerRoll', {
-                        rolls: room.players.map(p => `${p.username}:${p.firstPlayerRoll}`).join(', '),
+                        rolls: eligiblePlayers.map(p => `${p.username}:${p.firstPlayerRoll}`).join(', '),
                         winner: winner.username,
                         winningRoll: winner.firstPlayerRoll,
                     });
@@ -2034,13 +2057,19 @@ module.exports = function registerSocketHandlers(io) {
                     // next game (winners + losers). Keep mulliganReady so
                     // the UI knows the phase is done.
                     for (const p of room.players) p.firstPlayerRoll = null;
+                    room.rollEligibleIds = null;
                 } else {
-                    // Multiple players tied at the top. Clear ONLY their rolls
-                    // so they re-roll — anyone not tied keeps their number
-                    // (doesn't matter, they're locked out of winning anyway).
-                    const tiedIds = new Set(tied.map(p => p.userId));
+                    // Multiple players tied at the top. Narrow the eligible
+                    // set to ONLY those still tied, and clear just their
+                    // rolls so they re-roll. Non-tied players drop out of
+                    // the tie-break entirely — they won't contribute to the
+                    // next round's max or "everyone rolled" check.
+                    const tiedIds = tied.map(p => p.userId);
+                    room.rollEligibleIds = tiedIds;
+                    const tiedSet = new Set(tiedIds);
                     for (const p of room.players) {
-                        if (tiedIds.has(p.userId)) p.firstPlayerRoll = null;
+                        if (tiedSet.has(p.userId)) p.firstPlayerRoll = null;
+                        else p.firstPlayerRoll = null; // clear stale values on losers so the UI doesn't show them
                     }
                     addAndBroadcastAction(io, room, currentUserId, 'firstPlayerTiebreak', {
                         tied: tied.map(p => p.username).join(', '),
@@ -2126,6 +2155,14 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
             const player = getPlayerInRoom(room, currentUserId);
             if (!player) return callback?.({ error: 'Not in room' });
+
+            // Mulligans are only allowed during the mulligan phase (before
+            // the d20 roll resolves and turnIndex advances past -1). Once the
+            // game has moved past the roll phase a "mulligan" would scramble
+            // the current turn's hand, which is never intentional.
+            if (!room.mulliganPhase || (typeof room.turnIndex === 'number' && room.turnIndex >= 0)) {
+                return callback?.({ error: 'Mulliganing is only available during the mulligan phase' });
+            }
 
             const rules = room.settings?.mulliganRules || 'vancouver';
 
@@ -2323,6 +2360,9 @@ module.exports = function registerSocketHandlers(io) {
             // d20 for each and the highest roll takes turn 1.
             room.mulliganPhase = true;
             room.turnIndex = -1; // no active turn during mulligan phase
+            // Reset the tie-break eligibility so a fresh game starts with
+            // every player able to win the first-player roll.
+            room.rollEligibleIds = null;
             for (const p of room.players) {
                 p.mulliganReady = false;
                 p.firstPlayerRoll = null;
@@ -2883,6 +2923,46 @@ module.exports = function registerSocketHandlers(io) {
             broadcastToRoom(io, room, 'notification', {
                 type: 'concede',
                 message: `${player.username} conceded`,
+            });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Dead / eliminated players can switch to spectator mode so their
+        // zone stops taking up space on the table. Their cards stay on
+        // record under their userId (so we can compute victory correctly)
+        // but they join room.spectators and the UI treats them as a
+        // watching observer from that point on. Rejected if the player is
+        // still alive — living players should leave the room instead of
+        // downgrading.
+        socket.on('becomeSpectator', (callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const player = getPlayerInRoom(room, currentUserId);
+            if (!player) return callback?.({ error: 'Not in room' });
+            if (!isPlayerEliminated(player)) {
+                return callback?.({ error: 'Only eliminated players can become a spectator' });
+            }
+            // Move them into the spectator list so they receive game
+            // broadcasts via the spectator path. Keep the player record
+            // in room.players (with conceded=true) so victory logic still
+            // sees them as "out"; reconnects go through the spectator
+            // branch next time they open the room.
+            if (!Array.isArray(room.spectators)) room.spectators = [];
+            const already = room.spectators.find(s => s.userId === currentUserId);
+            if (!already) {
+                room.spectators.push({
+                    userId: currentUserId,
+                    username: player.username,
+                    socketId: socket.id,
+                    perspectiveOf: null,
+                });
+            }
+            isSpectator = true;
+            addAndBroadcastAction(io, room, currentUserId, 'becomeSpectator', { player: player.username });
+            broadcastToRoom(io, room, 'notification', {
+                type: 'become-spectator',
+                message: `${player.username} is now spectating`,
             });
             broadcastRoomState(io, room);
             callback?.({ success: true });

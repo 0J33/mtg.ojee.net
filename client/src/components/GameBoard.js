@@ -25,7 +25,7 @@ import DraftPick from './DraftPick';
 import SealedBuilder from './SealedBuilder';
 import TournamentBracket from './TournamentBracket';
 import { useDialog } from './Dialog';
-import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE } from '../utils';
+import { useEscapeKey, useIsTouchDevice, parseGameValue, fmtNum, isInfinite, INFINITE, useOutsideClose } from '../utils';
 import { VERSION } from '../version';
 import * as sfx from '../sfx';
 
@@ -93,6 +93,45 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
         if (data?.decks) setMyDecks(data.decks);
     }, []);
     const [showPlayerMenu, setShowPlayerMenu] = useState(null);
+    // Commander damage picker — opens when the player right-click menu's
+    // "Commander damage..." item is clicked, so the user can pick any
+    // source (including themselves) from one list instead of scrolling a
+    // deep menu. null = closed, otherwise { toPlayerId, toUsername }.
+    const [cmdDmgPicker, setCmdDmgPicker] = useState(null);
+    // Per-viewer "hide" toggles — client-only, persisted in localStorage
+    // so the state survives refresh. Hiding a player collapses their
+    // zone to a 1-line header. Hiding a background just suppresses the
+    // player-zone-bg image for that one player from your view.
+    const [hiddenPlayers, setHiddenPlayers] = useState(() => {
+        try {
+            const raw = localStorage.getItem('mtg_hidden_players');
+            if (raw) return new Set(JSON.parse(raw));
+        } catch (_) {}
+        return new Set();
+    });
+    const [hiddenBackgrounds, setHiddenBackgrounds] = useState(() => {
+        try {
+            const raw = localStorage.getItem('mtg_hidden_backgrounds');
+            if (raw) return new Set(JSON.parse(raw));
+        } catch (_) {}
+        return new Set();
+    });
+    const togglePlayerHidden = useCallback((playerId) => {
+        setHiddenPlayers(prev => {
+            const next = new Set(prev);
+            if (next.has(playerId)) next.delete(playerId); else next.add(playerId);
+            try { localStorage.setItem('mtg_hidden_players', JSON.stringify([...next])); } catch (_) {}
+            return next;
+        });
+    }, []);
+    const togglePlayerBgHidden = useCallback((playerId) => {
+        setHiddenBackgrounds(prev => {
+            const next = new Set(prev);
+            if (next.has(playerId)) next.delete(playerId); else next.add(playerId);
+            try { localStorage.setItem('mtg_hidden_backgrounds', JSON.stringify([...next])); } catch (_) {}
+            return next;
+        });
+    }, []);
     const [showSettings, setShowSettings] = useState(false);
     const [customCardModal, setCustomCardModal] = useState(false);
     const [bgModal, setBgModal] = useState(false);
@@ -641,6 +680,18 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
             { label: 'Add emblem...', onClick: () => setEmblemAdderTarget(user.id) },
             { divider: true },
             { label: 'Concede', danger: true, onClick: handleConcede },
+            // Dead players can downgrade themselves to spectator so their
+            // zone stops taking up table space. Server-side check gates
+            // this on actual elimination.
+            ...((player.life <= 0 || player.conceded) ? [{
+                label: 'Become spectator',
+                onClick: async () => {
+                    const ok = await dialog.confirm('Switch to spectator mode? You will stop taking turns and your zone will be hidden.', {
+                        title: 'Spectate', confirmLabel: 'Spectate',
+                    });
+                    if (ok) socket.emit('becomeSpectator');
+                },
+            }] : []),
         ] : [];
 
         // Items shown only for OPPONENTS: browse-library (Bribery), add-emblem
@@ -658,10 +709,10 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
             ...designationItems,
             ...cycleItems,
             { divider: true },
-            ...gameState.players.filter(p => p.userId !== player.userId).map(p => ({
-                label: `Cmdr Dmg from ${p.username}`,
-                onClick: () => handleCommanderDamage(p.userId, player.userId),
-            })),
+            {
+                label: 'Commander damage...',
+                onClick: () => setCmdDmgPicker({ toPlayerId: player.userId, toUsername: player.username }),
+            },
             { divider: true },
             {
                 label: `Infect (${player.infect || 0}/10)`,
@@ -685,6 +736,20 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                 onClick: () => socket.emit('setCommanderDeaths', { targetPlayerId: player.userId, value: 0 }),
             }] : []),
             ...selfOnlyItems,
+            // Per-viewer "hide this player / their background" toggles —
+            // stored client-side only. Useful when you want to focus on a
+            // specific opponent or their background image is noisy.
+            ...(player.userId !== user.id ? [
+                { divider: true },
+                {
+                    label: hiddenPlayers.has(player.userId) ? 'Unhide this player' : 'Hide this player',
+                    onClick: () => togglePlayerHidden(player.userId),
+                },
+                {
+                    label: hiddenBackgrounds.has(player.userId) ? 'Show their background' : 'Hide their background',
+                    onClick: () => togglePlayerBgHidden(player.userId),
+                },
+            ] : []),
             ...(isHost && player.userId !== user.id ? [
                 { divider: true },
                 {
@@ -1210,10 +1275,29 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                 {(() => {
                     const renderPlayer = (player, idx) => {
                         const isSelf = player.userId === user.id;
+                        // Hidden players render as a tiny bar with a show button —
+                        // still reachable, but they don't eat grid space.
+                        if (!isSelf && hiddenPlayers.has(player.userId)) {
+                            return (
+                                <div key={player.userId} className="player-zone-wrapper is-other player-zone-hidden">
+                                    <div className="player-zone-hidden-bar">
+                                        <span className="player-zone-hidden-name">{player.username} · hidden</span>
+                                        <span className="player-zone-hidden-life">{fmtNum(player.life)} life</span>
+                                        <button className="small-btn" onClick={() => togglePlayerHidden(player.userId)}>Show</button>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        // Per-viewer background suppression — blank out the
+                        // player.background so the zone renders with no bg
+                        // image for this viewer only.
+                        const viewPlayer = (!isSelf && hiddenBackgrounds.has(player.userId))
+                            ? { ...player, background: null }
+                            : player;
                         return (
                             <div key={player.userId} className={`player-zone-wrapper ${isSelf ? 'is-self' : 'is-other'}`}>
                                 <PlayerZone
-                                    player={player}
+                                    player={viewPlayer}
                                     isOwner={isSelf}
                                     userId={user.id}
                                     allPlayers={gameState.players}
@@ -1277,13 +1361,28 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     // bottom row reads right-to-left so the turn order flows
                     // clockwise around the table instead of Z-pattern.
                     const total = gameState.players.length;
+                    // Team-aware ordering: put all of the viewer's teammates
+                    // on the same side as them (bottom row) so a team reads
+                    // as a single front. self goes last in the list so after
+                    // the clockwise reverse below, self lands at the left of
+                    // the bottom row (the "natural" home position).
+                    const selfP = gameState.players.find(p => p.userId === user.id);
+                    const hasTeams = !!selfP?.teamId && gameState.players.some(p => p.teamId && p.userId !== user.id);
+                    const orderedPlayers = (() => {
+                        if (!hasTeams) return gameState.players;
+                        const myTeam = selfP.teamId;
+                        const opponents = gameState.players.filter(p => p.teamId !== myTeam);
+                        const teammates = gameState.players.filter(p => p.teamId === myTeam && p.userId !== user.id);
+                        // Opponents first → top row. Teammates then self → bottom row.
+                        return [...opponents, ...teammates, selfP];
+                    })();
                     if (total >= 4) {
                         const cols = total <= 4 ? 2 : total <= 6 ? 3 : 4;
-                        const topRow = gameState.players.slice(0, cols);
-                        const bottomRow = [...gameState.players.slice(cols)].reverse();
+                        const topRow = orderedPlayers.slice(0, cols);
+                        const bottomRow = [...orderedPlayers.slice(cols)].reverse();
                         return [...topRow, ...bottomRow].map(p => renderPlayer(p, gameState.players.indexOf(p)));
                     }
-                    return gameState.players.map((p, i) => renderPlayer(p, i));
+                    return orderedPlayers.map(p => renderPlayer(p, gameState.players.indexOf(p)));
                 })()}
             </div>
 
@@ -1327,6 +1426,16 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         if (firstSelectedCard) setNoteEditor({ instanceId: firstSelectedCard.instanceId, bulkIds: selectedIds.size > 1 ? Array.from(selectedIds) : null });
                     }}>Note</button>
                     <button onClick={() => bulkTap()} title="Toggle tap/untap selected cards. Shortcut: spacebar">Tap</button>
+                    <button
+                        onClick={() => {
+                            const ids = Array.from(selectedIds);
+                            for (const id of ids) {
+                                const c = findCardWithZone(id)?.card;
+                                if (c) socket.emit('cloneCard', { instanceId: c.instanceId });
+                            }
+                        }}
+                        title="Clone each selected card (creates token copies on the battlefield)"
+                    >Clone</button>
                     <button onClick={() => bulkMove('battlefield')} title="Move to battlefield">→ BF</button>
                     <button onClick={() => bulkMove('hand')} title="Move to hand">→ Hand</button>
                     <button onClick={() => bulkMove('graveyard')} title="Move to graveyard">→ GY</button>
@@ -1651,6 +1760,16 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     y={showPlayerMenu.y}
                     items={showPlayerMenu.items}
                     onClose={() => setShowPlayerMenu(null)}
+                />
+            )}
+
+            {cmdDmgPicker && (
+                <CommanderDamagePicker
+                    target={gameState.players.find(p => p.userId === cmdDmgPicker.toPlayerId)}
+                    players={gameState.players}
+                    onClose={() => setCmdDmgPicker(null)}
+                    onApply={(fromId, amount) => socket.emit('setCommanderDamage', { fromPlayerId: fromId, toPlayerId: cmdDmgPicker.toPlayerId, damage: amount })}
+                    dialog={dialog}
                 />
             )}
 
@@ -1993,6 +2112,70 @@ function ScryCountModal({ onSubmit, onCancel }) {
     );
 }
 
+// Single modal to pick a commander-damage source + amount. Replaces the
+// N separate "Cmdr Dmg from X" entries in the player right-click menu.
+// Lists every player (including the target themselves, since you can
+// take damage from your own partner / token commander).
+function CommanderDamagePicker({ target, players, onClose, onApply, dialog }) {
+    useEscapeKey(onClose);
+    const overlayProps = useOutsideClose(onClose);
+    if (!target) return null;
+    const adjust = async (fromId, mode) => {
+        const current = target.commanderDamageFrom?.[fromId] || 0;
+        const verb = mode === 'set' ? 'Set' : 'Add';
+        const input = await dialog.prompt(
+            `${verb} commander damage on ${target.username} from ${players.find(p => p.userId === fromId)?.username || '?'}.\nCurrent: ${fmtNum(current)}/21`,
+            mode === 'set' ? String(isInfinite(current) ? 0 : current) : '1',
+            { title: `${verb} commander damage` },
+        );
+        if (input === null) return;
+        const s = String(input).trim().toLowerCase();
+        let next;
+        if (s === '∞' || s === 'inf' || s === 'infinity') next = INFINITE;
+        else {
+            const n = parseInt(s, 10);
+            if (isNaN(n)) return;
+            if (mode === 'set') next = Math.max(0, n);
+            else next = isInfinite(current) ? INFINITE : Math.max(0, current + n);
+        }
+        onApply(fromId, next);
+    };
+    return (
+        <div className="modal-overlay" {...overlayProps}>
+            <div className="modal cmd-dmg-picker-modal">
+                <div className="modal-header">
+                    <h2>Cmdr damage on {target.username}</h2>
+                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                </div>
+                <p className="muted" style={{ margin: '0 0 12px' }}>
+                    Pick the source. Commander damage from yourself counts too (partner commanders, token copies).
+                </p>
+                <div className="cmd-dmg-source-list">
+                    {players.map(p => {
+                        const dmg = target.commanderDamageFrom?.[p.userId] || 0;
+                        const lethal = dmg >= 21;
+                        return (
+                            <div key={p.userId} className={`cmd-dmg-source-row ${lethal ? 'lethal' : ''}`}>
+                                <span className="cmd-dmg-source-name">{p.username}{p.userId === target.userId ? ' (self)' : ''}</span>
+                                <span className="cmd-dmg-source-value">{fmtNum(dmg)}/21</span>
+                                <div className="cmd-dmg-source-actions">
+                                    <button className="small-btn" onClick={() => onApply(p.userId, isInfinite(dmg) ? INFINITE : Math.max(0, dmg - 1))}>−1</button>
+                                    <button className="small-btn" onClick={() => onApply(p.userId, isInfinite(dmg) ? INFINITE : dmg + 1)}>+1</button>
+                                    <button className="small-btn" onClick={() => adjust(p.userId, 'add')}>Add...</button>
+                                    <button className="small-btn" onClick={() => adjust(p.userId, 'set')}>Set...</button>
+                                    {dmg > 0 && (
+                                        <button className="small-btn danger" onClick={() => onApply(p.userId, 0)}>Clear</button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function CustomCardModal({ onClose }) {
     useEscapeKey(onClose);
     const dialog = useDialog();
@@ -2191,6 +2374,12 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
     });
     const [shared, setShared] = useState(!!sharedTeamLife);
     const [teamId, setTeamId] = useState(me?.teamId || '');
+    // Separate draft for the "+ New team..." input so typing the first
+    // character doesn't flip teamId out of the '__new__' sentinel and
+    // unmount the input (which was what closed the add-team UI after one
+    // keypress). The draft only commits to teamId once the user clicks
+    // Save or presses Enter.
+    const [newTeamDraft, setNewTeamDraft] = useState('');
     // Prefer the persisted choice over whatever the server currently has, so
     // opening Settings shows the user's actual preference immediately.
     const [colorDraft, setColorDraft] = useState(() => {
@@ -2224,8 +2413,16 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
             socket.emit('updateRoomSettings', { settings: draft });
             socket.emit('setSharedTeamLife', { value: shared });
         }
-        if (teamId !== (me?.teamId || '')) {
-            socket.emit('setTeam', { playerId: me?.userId, teamId: teamId || null, teamName: `Team ${teamId}` });
+        // If the user typed a new team name but hasn't hit Enter yet,
+        // commit the draft on Save.
+        let effectiveTeamId = teamId;
+        if (teamId === '__new__' && newTeamDraft.trim()) {
+            effectiveTeamId = newTeamDraft.trim();
+        } else if (teamId === '__new__') {
+            effectiveTeamId = me?.teamId || '';
+        }
+        if (effectiveTeamId !== (me?.teamId || '')) {
+            socket.emit('setTeam', { playerId: me?.userId, teamId: effectiveTeamId || null, teamName: `Team ${effectiveTeamId}` });
         }
         if (colorDraft && /^#[0-9a-fA-F]{6}$/.test(colorDraft)) {
             if (colorDraft !== me?.avatarColor) {
@@ -2320,7 +2517,19 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
                         </label>
                         {teamId === '__new__' && (
                             <label>New team name
-                                <input type="text" autoFocus placeholder="e.g. Red, Alpha, 1" onChange={e => setTeamId(e.target.value)} />
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder="e.g. Red, Alpha, 1"
+                                    value={newTeamDraft}
+                                    onChange={e => setNewTeamDraft(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && newTeamDraft.trim()) {
+                                            setTeamId(newTeamDraft.trim());
+                                            setNewTeamDraft('');
+                                        }
+                                    }}
+                                />
                             </label>
                         )}
                     </div>

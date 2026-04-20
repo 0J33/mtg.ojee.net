@@ -178,19 +178,59 @@ export function play(name) {
     try { recipe(); } catch (_) {}
 }
 
-// Install a delegated listener on document so every <button> click plays
-// the 'click' sound without each component having to opt in. Buttons that
-// already map to an action-specific sound (e.g. "Flip" → flip, "Shuffle"
-// → shuffle) can opt out with data-sfx="none" or supply their own via
-// data-sfx="tap".
+// Install a delegated listener on document so clicking *anything
+// clickable* plays a UI sound without each component having to opt in.
+// We walk up from the click target and fire the sound on the first
+// ancestor that looks interactive — either a known tag (button, link,
+// label, input), an explicit role="button"/data-sfx, or an element with
+// cursor: pointer/grab (catches cards, pile cards, etc.). Elements can
+// opt out with data-sfx="none" or override the sound with
+// data-sfx="<name>".
 function onGlobalClick(e) {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    if (btn.disabled) return;
-    const override = btn.getAttribute('data-sfx');
-    if (override === 'none') return;
-    play(override || 'click');
+    let el = e.target;
+    while (el && el !== document.body && el.nodeType === 1) {
+        const ds = el.getAttribute?.('data-sfx');
+        if (ds === 'none') return;
+        if (el.disabled) return;
+        if (ds) { play(ds); return; }
+        const tag = el.tagName;
+        if (tag === 'BUTTON' || tag === 'A' || tag === 'LABEL' || tag === 'INPUT' || tag === 'SELECT') {
+            play('click');
+            return;
+        }
+        if (el.getAttribute?.('role') === 'button') { play('click'); return; }
+        // getComputedStyle is relatively cheap per click (clicks are sparse),
+        // and catches any styled-pointer element (cards, draggables, labels
+        // with onClick, etc.) without requiring explicit opt-in.
+        try {
+            const cursor = window.getComputedStyle(el).cursor;
+            if (cursor === 'pointer' || cursor === 'grab' || cursor === 'grabbing') {
+                play('click');
+                return;
+            }
+        } catch (_) { /* getComputedStyle can throw on detached nodes */ }
+        el = el.parentElement;
+    }
+}
+// Eagerly unlock the AudioContext on the first user gesture of the
+// session so sounds triggered by *non-gesture* events (incoming socket
+// actions — another player tapping a card on their turn, notifications,
+// chat) can actually play. Chrome/Safari keep AudioContext suspended
+// until there's a user gesture; calling resume() inside a click handler
+// satisfies the policy once and frees subsequent plays.
+function unlockCtxOnGesture() {
+    ensureCtx();
+    if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+    }
 }
 if (typeof document !== 'undefined') {
     document.addEventListener('click', onGlobalClick, { capture: true });
+    // Unlock listeners are passive and on capture so they run before
+    // React handlers. Left on the element forever so if the context ever
+    // gets re-suspended (e.g. after a tab backgrounds), the next gesture
+    // reopens it.
+    document.addEventListener('pointerdown', unlockCtxOnGesture, { capture: true, passive: true });
+    document.addEventListener('keydown', unlockCtxOnGesture, { capture: true, passive: true });
+    document.addEventListener('touchstart', unlockCtxOnGesture, { capture: true, passive: true });
 }

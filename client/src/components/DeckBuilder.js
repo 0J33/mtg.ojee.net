@@ -3,6 +3,7 @@ import { decks, customCards, scryfall } from '../api';
 import { useEscapeKey } from '../utils';
 import { useDialog } from './Dialog';
 import ManaCost from './ManaCost';
+import { DFC_LAYOUTS, extractFaces } from '../cardFaces';
 
 export default function DeckBuilder({ deckId, onClose, onSaved }) {
     useEscapeKey(onClose);
@@ -81,12 +82,15 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
 
     const scryfallCardToEntry = (card) => {
         const face = card.card_faces?.[0];
+        const isDfc = DFC_LAYOUTS.has(card.layout);
         return {
             scryfallId: card.id,
             name: card.name,
             quantity: 1,
             imageUri: card.image_uris?.normal || face?.image_uris?.normal || '',
-            backImageUri: card.card_faces?.[1]?.image_uris?.normal || '',
+            // Only DFC layouts have a real back image. Adventures, splits,
+            // flips, and aftermaths share one image between their halves.
+            backImageUri: isDfc ? (card.card_faces?.[1]?.image_uris?.normal || '') : '',
             manaCost: card.mana_cost || face?.mana_cost || '',
             typeLine: card.type_line || face?.type_line || '',
             oracleText: card.oracle_text || face?.oracle_text || '',
@@ -96,6 +100,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
             colorIdentity: card.color_identity || [],
             producedMana: card.produced_mana || [],
             layout: card.layout || 'normal',
+            faces: extractFaces(card),
         };
     };
 

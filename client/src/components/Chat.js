@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import socket from '../socket';
 import * as sfx from '../sfx';
+import { useVerticalDragPos } from '../utils';
 
 /*
  * Chat sidebar — slides in from the right edge of the screen, hideable via a
@@ -14,6 +15,9 @@ import * as sfx from '../sfx';
  *                  so the parent can show an unread-badge on the toggle button
  */
 export default function Chat({ messages: historyMessages, currentUserId, open, onToggle, players }) {
+    // Drag-to-move the toggle button vertically. Position persists per
+    // browser — see useVerticalDragPos in utils.js.
+    const toggleDrag = useVerticalDragPos('mtg_chat_toggle_top');
     // Local mirror of messages so we can append newly received ones without
     // waiting for the next full gameState broadcast.
     const [messages, setMessages] = useState(historyMessages || []);
@@ -93,8 +97,10 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
             <button
                 className={`chat-toggle ${open ? 'open' : ''}`}
                 onClick={onToggle}
-                title={open ? 'Hide chat' : 'Show chat'}
+                title={open ? 'Hide chat (drag vertically to move)' : 'Show chat (drag vertically to move)'}
                 type="button"
+                style={toggleDrag.topStyle}
+                {...toggleDrag.dragHandlers}
             >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />

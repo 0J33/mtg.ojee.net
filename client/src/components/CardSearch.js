@@ -4,6 +4,7 @@ import { scryfall } from '../api';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
 import ManaCost from './ManaCost';
+import { DFC_LAYOUTS, extractFaces } from '../cardFaces';
 
 export default function CardSearch({ onClose, mode, deckTokens }) {
     useEscapeKey(onClose);
@@ -40,11 +41,12 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
 
     const handleSelect = (card) => {
         const face = card.card_faces?.[0];
+        const isDfc = DFC_LAYOUTS.has(card.layout);
         const cardData = {
             scryfallId: card.id,
             name: card.name,
             imageUri: card.image_uris?.normal || face?.image_uris?.normal || '',
-            backImageUri: card.card_faces?.[1]?.image_uris?.normal || '',
+            backImageUri: isDfc ? (card.card_faces?.[1]?.image_uris?.normal || '') : '',
             manaCost: card.mana_cost || face?.mana_cost || '',
             typeLine: card.type_line || face?.type_line || '',
             oracleText: card.oracle_text || face?.oracle_text || '',
@@ -52,6 +54,7 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
             toughness: card.toughness || face?.toughness || '',
             colors: card.colors || face?.colors || [],
             layout: card.layout || 'normal',
+            faces: extractFaces(card),
         };
 
         if (mode === 'token') {
