@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.12',
+        date: '2026-04-19',
+        changes: [
+            'Outside-click closes the chat panel, action log panel, and any expanded player zone (graveyard / exile / foretell / sideboard / companions / emblems). Matches the modal close-on-backdrop behavior. Drag-safe: dragging starts inside the panel and releases outside still don\'t count as an outside click',
+        ],
+    },
+    {
         version: '3.11',
         date: '2026-04-19',
         changes: [

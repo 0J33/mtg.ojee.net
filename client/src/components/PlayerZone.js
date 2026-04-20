@@ -5,7 +5,7 @@ import ContextMenu from './ContextMenu';
 import NoteEditor from './NoteEditor';
 import CounterModal from './CounterModal';
 import { useDialog } from './Dialog';
-import { useEscapeKey, useHorizontalWheel, fmtNum, parseGameValue, isInfinite, INFINITE } from '../utils';
+import { useEscapeKey, useHorizontalWheel, useOutsideClick, fmtNum, parseGameValue, isInfinite, INFINITE } from '../utils';
 
 // Color order used by the mana pool widget — matches the WUBRG convention
 // most MTG players expect, with colorless on the right.
@@ -80,6 +80,11 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
     };
     const [contextMenu, setContextMenu] = useState(null);
     const [expandedZone, setExpandedZone] = useState(null);
+    const sideZonesRef = useRef(null);
+    // Close any expanded zone (graveyard / exile / foretell / sideboard /
+    // companions / emblems) when the user clicks anywhere outside the
+    // side-zones strip. Matches the modal close-on-backdrop behavior.
+    useOutsideClick(sideZonesRef, () => setExpandedZone(null), !!expandedZone);
     const [editingLife, setEditingLife] = useState(false);
     const [lifeInput, setLifeInput] = useState('');
     const [counterModal, setCounterModal] = useState(null);
@@ -940,7 +945,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
             })()}
 
             {/* Side zones */}
-            <div className="side-zones">
+            <div className="side-zones" ref={sideZonesRef}>
                 <div className="zone graveyard-zone" data-drop-zone="graveyard" data-drop-player={player.userId}
                     onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, 'graveyard')}
                     onClick={() => setExpandedZone(expandedZone === 'graveyard' ? null : 'graveyard')}>

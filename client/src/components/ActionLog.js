@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useVerticalDragPos } from '../utils';
+import { useVerticalDragPos, useOutsideClick } from '../utils';
 
 /*
  * Action log side panel — mirrors Chat's visual pattern but shows the server's
@@ -175,6 +175,8 @@ function formatTime(ts) {
 export default function ActionLog({ history, players, open, onToggle }) {
     const toggleDrag = useVerticalDragPos('mtg_actionlog_toggle_top');
     const listRef = useRef(null);
+    const panelRef = useRef(null);
+    useOutsideClick(panelRef, () => { if (open) onToggle?.(); }, open);
     const playerNameById = {};
     for (const p of (players || [])) {
         playerNameById[p.userId] = p.username;
@@ -200,13 +202,14 @@ export default function ActionLog({ history, players, open, onToggle }) {
                 title={open ? 'Hide action log (drag vertically to move)' : 'Show action log (drag vertically to move)'}
                 type="button"
                 style={toggleDrag.topStyle}
+                data-outside-click-exempt="true"
                 {...toggleDrag.dragHandlers}
             >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18M3 12h18M3 18h12" />
                 </svg>
             </button>
-            <aside className={`action-log-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
+            <aside ref={panelRef} className={`action-log-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
                 <div className="chat-header">
                     <h3>Action Log</h3>
                     <button className="close-btn" onClick={onToggle} type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>

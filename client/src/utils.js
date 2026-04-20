@@ -287,6 +287,40 @@ export function use2DDragPos(key) {
     };
 }
 
+// Run `onOutside` when the user clicks anywhere outside the referenced
+// element. Matching rules mirror useOutsideClose: track whether the
+// mousedown landed inside so a drag that starts inside and releases
+// outside doesn't count as an outside click (useful for range sliders
+// or selecting text across a panel boundary). Also lets the panel's
+// own toggle button opt out via data-outside-click-exempt so clicking
+// the same button that opens the panel doesn't immediately re-close
+// it. No-op when `active` is false.
+export function useOutsideClick(ref, onOutside, active = true) {
+    useEffect(() => {
+        if (!active) return;
+        let downInside = false;
+        const onMouseDown = (e) => {
+            const el = ref.current;
+            if (!el) return;
+            downInside = el.contains(e.target);
+        };
+        const onClick = (e) => {
+            const el = ref.current;
+            if (!el) return;
+            if (el.contains(e.target)) return;       // click inside — keep open
+            if (downInside) { downInside = false; return; }
+            if (e.target.closest?.('[data-outside-click-exempt]')) return;
+            onOutside(e);
+        };
+        document.addEventListener('mousedown', onMouseDown, true);
+        document.addEventListener('click', onClick, true);
+        return () => {
+            document.removeEventListener('mousedown', onMouseDown, true);
+            document.removeEventListener('click', onClick, true);
+        };
+    }, [ref, onOutside, active]);
+}
+
 // Drop-in wrapper for a modal overlay — handles outside-click-to-close
 // while ignoring drags that started inside. Keeps the existing
 // .modal-overlay styling (z-index, flex centering, etc.) so there's no

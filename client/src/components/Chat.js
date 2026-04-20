@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import socket from '../socket';
 import * as sfx from '../sfx';
-import { useVerticalDragPos } from '../utils';
+import { useVerticalDragPos, useOutsideClick } from '../utils';
 
 /*
  * Chat sidebar — slides in from the right edge of the screen, hideable via a
@@ -27,6 +27,12 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
     const [dmTarget, setDmTarget] = useState(null);
     const listRef = useRef(null);
     const inputRef = useRef(null);
+    const panelRef = useRef(null);
+    // Close when the user clicks outside the chat panel. The toggle
+    // button itself is exempted via data-outside-click-exempt so
+    // clicking the toggle when open doesn't fire both "close on
+    // outside" then "open via onToggle".
+    useOutsideClick(panelRef, () => { if (open) onToggle?.(); }, open);
 
     // Whenever the authoritative history changes (e.g. on reconnect or initial
     // load), replace the local mirror. Incoming `chatMessage` events during a
@@ -100,6 +106,7 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
                 title={open ? 'Hide chat (drag vertically to move)' : 'Show chat (drag vertically to move)'}
                 type="button"
                 style={toggleDrag.topStyle}
+                data-outside-click-exempt="true"
                 {...toggleDrag.dragHandlers}
             >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -108,7 +115,7 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
                 {unread > 0 && !open && <span className="chat-unread-badge">{unread > 9 ? '9+' : unread}</span>}
             </button>
 
-            <aside className={`chat-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
+            <aside ref={panelRef} className={`chat-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
                 <div className="chat-header">
                     <h3>Chat</h3>
                     <button className="close-btn" onClick={onToggle} type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
