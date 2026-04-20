@@ -89,7 +89,11 @@ function createPlayerState(userId, username) {
         username,
         socketId: null,
         life: 40,
-        counters: { poison: 0, energy: 0, experience: 0 },
+        // Player counters are empty by default. poison / energy /
+        // experience are no longer pre-seeded — they get added only when
+        // actually incremented, so a fresh player has a clean header
+        // instead of three zeroed-out badges.
+        counters: {},
         commanderDeaths: 0,
         commanderDamageFrom: {},
         commanderTax: 0,

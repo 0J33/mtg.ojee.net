@@ -50,7 +50,7 @@ const playerStateSchema = new mongoose.Schema({
     username: { type: String, required: true },
     socketId: { type: String },
     life: { type: Number, default: 40 },
-    counters: { type: Map, of: Number, default: { poison: 0, energy: 0, experience: 0 } },
+    counters: { type: Map, of: Number, default: {} },
     manaPool: {
         W: { type: Number, default: 0 },
         U: { type: Number, default: 0 },

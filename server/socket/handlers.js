@@ -413,7 +413,7 @@ function loadDraftDecks(room) {
             sideboard: [], companions: [], foretell: [], emblems: [],
         };
         p.life = room.settings.startingLife;
-        p.counters = { poison: 0, energy: 0, experience: 0 };
+        p.counters = {};
         p.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
         p.commanderDamageFrom = {};
         // Main → library
@@ -750,7 +750,7 @@ module.exports = function registerSocketHandlers(io) {
             player.commanderTax = 0;
             player.commanderDamageFrom = {};
             player.life = room.settings.startingLife;
-            player.counters = { poison: 0, energy: 0, experience: 0 };
+            player.counters = {};
             player.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
 
             // Load commanders into command zone
@@ -2526,7 +2526,7 @@ module.exports = function registerSocketHandlers(io) {
                 }
 
                 player.life = room.settings.startingLife;
-                player.counters = { poison: 0, energy: 0, experience: 0 };
+                player.counters = {};
                 player.commanderDeaths = 0;
                 player.commanderDamageFrom = {};
                 player.infect = 0;

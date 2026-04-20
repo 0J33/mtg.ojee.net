@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.3',
+        date: '2026-04-19',
+        changes: [
+            'Players no longer start with empty poison / energy / experience badges in their header — these counters only appear once they\'re actually incremented. Previously the v3.2 "counters can be 0" change made the default seeds visible as zeroed badges',
+        ],
+    },
+    {
         version: '3.2',
         date: '2026-04-19',
         changes: [
