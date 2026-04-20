@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.13',
+        date: '2026-04-19',
+        changes: [
+            'Dialed down etched foil — v3.11 overshot (screen + plus-lighter at 0.6–0.75 opacity was bathing the whole card in gold). Now it\'s a thin gold inner frame + a subtle border-only ring gradient + a narrow passing glint, all on screen blend at ~0.25–0.35 opacity. Reads as "polished metallic frame" instead of "foil bath"',
+        ],
+    },
+    {
         version: '3.12',
         date: '2026-04-19',
         changes: [
