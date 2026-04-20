@@ -146,6 +146,9 @@ export const KEYWORDS = {
     'surveil': 'Look at the top N cards of your library, then put any number into your graveyard and the rest on top in any order.',
     'venture': 'Venture into the dungeon — enter the first room or advance to the next room.',
 
+    // Spells of Stone / preview-era mechanics
+    'prepared': 'While it\u2019s prepared, you may cast a copy of its spell. Doing so unprepares it.',
+
     // Static short words (can collide with common English — handled via word-boundary regex)
 };
 
@@ -189,40 +192,37 @@ const COMMON_DEFINED_TERM_STOP = new Set([
 //      prepared.").
 // Returns the best-fit description string, or null if nothing useful is
 // in the card text.
-function reminderFromOracle(oracle, keyword) {
+// Find a parenthetical reminder for `keyword` anywhere in the oracle
+// text. This is the authoritative card-supplied reminder — returns
+// null if no parenthetical mentions the keyword.
+function parenReminderFromOracle(oracle, keyword) {
     if (!oracle || !keyword) return null;
     const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const kwRe = new RegExp(`\\b${esc}\\b`, 'i');
-    // Case 1 — a parenthetical anywhere in the oracle text that
-    // mentions the keyword. This is the card's OWN reminder text
-    // (e.g. "(While it's prepared, you may cast a copy of its spell.
-    // Doing so unprepares it.)"). We scan all parentheticals and pick
-    // the first one that names the keyword, which is almost always the
-    // right reminder for that keyword. Handles reminders that sit a
-    // sentence or two away from the first keyword mention too.
     const parens = oracle.match(/\(([^)]+)\)/g) || [];
     for (const p of parens) {
         const body = p.slice(1, -1);
         if (kwRe.test(body)) return body.trim();
     }
-    // Case 2 — grab the full ABILITY PARAGRAPH(s) that mention the
-    // keyword. Scryfall oracle text separates abilities with "\n", so
-    // each paragraph is a self-contained ability block. For a card
-    // like Emeritus of Ideation, the "prepared" mechanic lives in one
-    // paragraph — "Whenever this creature attacks, you may exile eight
-    // cards from your graveyard. If you do, this creature becomes
-    // prepared." — and the "enters prepared" trigger in a second. Both
-    // paragraphs together give a complete explanation; filtering only
-    // sentences-with-the-keyword dropped the crucial middle sentence
-    // that defines what happens.
+    return null;
+}
+
+// Grab every ability paragraph that mentions `keyword`, concatenated.
+// Used as a last-resort fallback for defined terms that aren't in the
+// static dictionary and have no inline parenthetical reminder — it at
+// least gives the user a coherent excerpt of the rules text that
+// defines the term. Strips parentheticals first so we don't duplicate
+// what the parenthetical branch would return.
+function paragraphContextFromOracle(oracle, keyword) {
+    if (!oracle || !keyword) return null;
+    const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const kwRe = new RegExp(`\\b${esc}\\b`, 'i');
     const stripped = oracle.replace(/\s*\([^)]*\)\s*/g, ' ');
     const paragraphs = stripped.split(/\n+/).map(p => p.trim()).filter(Boolean);
     const hitParagraphs = paragraphs.filter(p => kwRe.test(p));
     if (hitParagraphs.length > 0) {
         return hitParagraphs.join(' ').replace(/\s+/g, ' ').trim();
     }
-    // Fallback: if the oracle is a single paragraph (no \n splits), at
-    // least try sentence-level filtering so we don't return null.
     const sentences = stripped.split(/(?<=[.!?])\s+/);
     const hits = sentences.filter(s => kwRe.test(s));
     if (hits.length === 0) return null;
@@ -256,17 +256,27 @@ export function detectKeywords(card) {
     };
 
     // 1. Scryfall keywords — the authoritative list.
+    // Priority: inline parenthetical reminder in the card's oracle text
+    // → our static dictionary (universal mechanic reminder) →
+    // paragraph-context fallback for card-specific defined terms →
+    // last-resort "see oracle text" message. The static dictionary is
+    // preferred over the paragraph-context fallback because the dict
+    // gives the universal mechanic reminder (what the keyword DOES),
+    // whereas the paragraph fallback only shows this card's trigger
+    // for the keyword — great for truly custom terms, useless when we
+    // already know the mechanic.
     const scryKeywords = Array.isArray(card.keywords) ? card.keywords : [];
     for (const kw of scryKeywords) {
         if (typeof kw !== 'string' || !kw.trim()) continue;
         const lower = kw.toLowerCase();
+        const parenReminder = parenReminderFromOracle(oracle, kw);
         const staticDesc = KEYWORDS[lower];
-        // Prefer the card's own reminder text when present; otherwise
-        // use our static dictionary; otherwise a last-resort description
-        // that points the player at the oracle text.
-        const cardReminder = reminderFromOracle(oracle, kw);
-        const description = cardReminder
+        const contextReminder = !parenReminder && !staticDesc
+            ? paragraphContextFromOracle(oracle, kw)
+            : null;
+        const description = parenReminder
             || staticDesc
+            || contextReminder
             || `See the card's text for what ${kw} does on this card.`;
         push(kw, description);
     }
@@ -317,7 +327,10 @@ export function detectKeywords(card) {
             if (KEYWORDS[word]) continue;          // already handled
             if (found.has(word)) continue;          // already surfaced
             if (typeLineWords.has(word)) continue;  // part of type line
-            const reminder = reminderFromOracle(oracle, word);
+            // Prefer the card's own parenthetical reminder if there is
+            // one (rare for truly custom terms); otherwise fall back to
+            // the paragraph-containing-the-word context.
+            const reminder = parenReminderFromOracle(oracle, word) || paragraphContextFromOracle(oracle, word);
             if (!reminder) continue;
             // Capitalize for display.
             const display = word.charAt(0).toUpperCase() + word.slice(1);

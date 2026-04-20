@@ -4,6 +4,14 @@
 
 export const CHANGELOG = [
     {
+        version: '3.9',
+        date: '2026-04-19',
+        changes: [
+            'Prepared added to the static keyword dictionary with the universal reminder "While it\'s prepared, you may cast a copy of its spell. Doing so unprepares it." — now shows consistently on every Prepared card (Emeritus of Ideation, Skycoach Conductor, etc.), not just cards that have the parenthetical inline',
+            'Keyword reminder priority: inline parenthetical → static dictionary → paragraph-context fallback. The dictionary now beats the paragraph fallback so known mechanics get their universal reminder instead of a per-card excerpt describing only that card\'s trigger',
+        ],
+    },
+    {
         version: '3.8',
         date: '2026-04-19',
         changes: [
