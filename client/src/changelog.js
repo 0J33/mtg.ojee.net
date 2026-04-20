@@ -4,6 +4,14 @@
 
 export const CHANGELOG = [
     {
+        version: '3.11',
+        date: '2026-04-19',
+        changes: [
+            'Etched foil visibility: switched the border shimmer from overlay (invisible on mid-tone art) to screen blend, bumped opacity, added a diagonal plus-lighter glint, and a soft gold inset shadow so the "polished metal frame" reads on any card art',
+            'Fix collapsed command zone stretching the hand-row taller than the hand. The vertical writing-mode label was growing to fit "Command (N)" top-to-bottom, which pulled the whole row taller and ate battlefield space. Cmd-zone now has an explicit card-height + label ceiling regardless of collapse state',
+        ],
+    },
+    {
         version: '3.10',
         date: '2026-04-19',
         changes: [

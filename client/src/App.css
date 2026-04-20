@@ -868,6 +868,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     border: 1px solid rgba(160,110,50,0.3);
     border-radius: 3px;
     overflow: hidden;
+    /* Explicit height tied to one card + label. Without it, the
+       collapsed zone's vertical writing-mode label was growing to fit
+       "Command (N)" vertically, pushing the whole hand-row taller
+       than the hand and eating battlefield space above. */
+    height: calc(var(--card-h, 98px) + 22px);
+    min-height: 0;
 }
 .command-zone.cmd-beside-hand.collapsed {
     /* Collapsed = just the slim vertical-text label; no width reserved
@@ -881,10 +887,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     justify-content: flex-start;
     text-align: center;
     gap: 6px;
-    height: 100%;
     cursor: pointer;
     white-space: nowrap;
     flex-direction: row;
+    /* Fill the cmd-zone without exceeding it; the parent has
+       overflow: hidden so overlong text truncates instead of
+       stretching the container. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
 }
 .command-zone.cmd-beside-hand.collapsed .cmd-zone-label-vertical .bf-row-toggle {
     flex-direction: row;
@@ -1140,33 +1151,42 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .card.etched::before, .card-zoom.etched::before, .card-max-image-wrap.etched::before {
     z-index: 2;
-    /* Metallic silver-gold shimmer around the border area */
+    /* Metallic silver-gold border shimmer. screen blend lifts the frame
+       visibly regardless of the card's underlying brightness — unlike
+       overlay which disappears on mid-tone art. The inner 50% of the
+       ellipse is transparent so the art itself is untouched. */
     background: radial-gradient(
         ellipse at 50% 50%,
-        transparent 45%,
-        rgba(200, 190, 170, 0.35) 60%,
-        rgba(220, 215, 200, 0.4) 70%,
-        rgba(180, 175, 165, 0.35) 80%,
-        rgba(200, 190, 170, 0.25) 90%,
-        transparent 100%
+        transparent 50%,
+        rgba(235, 220, 180, 0.6) 70%,
+        rgba(255, 240, 200, 0.75) 82%,
+        rgba(210, 195, 155, 0.6) 94%,
+        rgba(180, 165, 130, 0.5) 100%
     );
-    background-size: 200% 200%;
-    mix-blend-mode: overlay;
-    animation: etchedShimmer 6s ease-in-out infinite alternate;
+    background-size: 220% 220%;
+    mix-blend-mode: screen;
+    animation: etchedShimmer 5s ease-in-out infinite alternate;
 }
 .card.etched::after, .card-zoom.etched::after, .card-max-image-wrap.etched::after {
     z-index: 3;
-    /* Subtle edge highlight */
+    /* Diagonal glint that sweeps across the border. Using plus-lighter
+       on a narrow bright band gives a clear "polished metal" flash. */
     background: linear-gradient(
-        135deg,
-        transparent 30%,
-        rgba(255, 255, 255, 0.12) 50%,
-        transparent 70%
+        115deg,
+        transparent 38%,
+        rgba(255, 250, 230, 0.55) 50%,
+        transparent 62%
     );
     background-size: 300% 300%;
-    mix-blend-mode: overlay;
-    animation: etchedGlint 4s ease-in-out infinite alternate;
+    mix-blend-mode: plus-lighter;
+    animation: etchedGlint 3.2s ease-in-out infinite alternate;
 }
+/* Outer glow so even on very dark card art the etched border still
+   reads as "shiny metallic frame". Renders inside the rounded corners
+   because the parent has overflow: hidden. */
+.card.etched { box-shadow: inset 0 0 0 1.5px rgba(235, 220, 180, 0.45), 0 0 8px rgba(235, 220, 180, 0.25); }
+.card-zoom.etched { box-shadow: inset 0 0 0 2px rgba(235, 220, 180, 0.55), 0 0 14px rgba(235, 220, 180, 0.35); }
+.card-max-image-wrap.etched { box-shadow: inset 0 0 0 2px rgba(235, 220, 180, 0.55), 0 0 18px rgba(235, 220, 180, 0.35); }
 @keyframes etchedShimmer {
     0% { background-position: 0% 0%; }
     100% { background-position: 100% 100%; }
