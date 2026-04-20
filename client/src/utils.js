@@ -188,6 +188,99 @@ export function useVerticalDragPos(key, defaultTop = '50%') {
     };
 }
 
+// use2DDragPos — two-axis drag for floating panels (e.g. piles, drawing
+// toolbar). Unlike useVerticalDragPos the user can drag in any
+// direction. Position is persisted per key in localStorage. Drag is
+// started via the returned `dragHandlers` (attach them to your drag
+// handle / grip element). A post-drag click is swallowed so clicking
+// the grip by accident doesn't fire the underlying onClick.
+export function use2DDragPos(key) {
+    const [pos, setPos] = useState(() => {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const p = JSON.parse(raw);
+            if (typeof p?.left === 'number' && typeof p?.top === 'number') return p;
+        } catch (_) {}
+        return null;
+    });
+    const dragRef = useRef(null);
+    const justDraggedRef = useRef(false);
+
+    useEffect(() => {
+        if (!pos) return;
+        const onResize = () => setPos(p => {
+            if (!p) return p;
+            return {
+                left: Math.max(4, Math.min(p.left, window.innerWidth - 60)),
+                top: Math.max(4, Math.min(p.top, window.innerHeight - 60)),
+            };
+        });
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, [pos]);
+
+    const onPointerDown = (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
+        const el = e.currentTarget;
+        // Anchor on the grip element's host panel. We walk up looking for
+        // a node marked `data-drag-root` and fall back to the grip's
+        // immediate parent so it still works without annotation.
+        const host = el.closest('[data-drag-root]') || el.parentElement;
+        if (!host) return;
+        const rect = host.getBoundingClientRect();
+        dragRef.current = {
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            offsetX: e.clientX - rect.left,
+            offsetY: e.clientY - rect.top,
+            moved: false,
+        };
+        try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    };
+    const onPointerMove = (e) => {
+        const d = dragRef.current;
+        if (!d || d.pointerId !== e.pointerId) return;
+        if (!d.moved) {
+            if (Math.abs(e.clientX - d.startX) < 3 && Math.abs(e.clientY - d.startY) < 3) return;
+            d.moved = true;
+            e.preventDefault();
+        }
+        setPos({
+            left: Math.max(4, Math.min(e.clientX - d.offsetX, window.innerWidth - 60)),
+            top: Math.max(4, Math.min(e.clientY - d.offsetY, window.innerHeight - 40)),
+        });
+    };
+    const onPointerUp = (e) => {
+        const d = dragRef.current;
+        if (!d || d.pointerId !== e.pointerId) return;
+        dragRef.current = null;
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+        if (d.moved) {
+            justDraggedRef.current = true;
+            try { localStorage.setItem(key, JSON.stringify(pos)); } catch (_) {}
+        }
+    };
+    const onClickCapture = (e) => {
+        if (justDraggedRef.current) {
+            justDraggedRef.current = false;
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    };
+    const reset = () => {
+        setPos(null);
+        try { localStorage.removeItem(key); } catch (_) {}
+    };
+    return {
+        style: pos ? { left: `${pos.left}px`, top: `${pos.top}px`, right: 'auto', bottom: 'auto', transform: 'none' } : undefined,
+        handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onClickCapture },
+        reset,
+        moved: pos !== null,
+    };
+}
+
 // Drop-in wrapper for a modal overlay — handles outside-click-to-close
 // while ignoring drags that started inside. Keeps the existing
 // .modal-overlay styling (z-index, flex centering, etc.) so there's no

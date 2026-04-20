@@ -761,6 +761,26 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     },
                 },
             ] : []),
+            // Anyone except the host themselves can start a vote-kick
+            // against any other non-host player. Server also enforces the
+            // host-exemption + 3-player minimum.
+            ...(!isSelfMenu && player.userId !== gameState.hostId && gameState.players.length >= 3 && !gameState.voteKick ? [
+                { divider: true },
+                {
+                    label: `Vote-kick ${player.username}`,
+                    danger: true,
+                    onClick: async () => {
+                        const ok = await dialog.confirm(
+                            `Start a vote to kick ${player.username}? Majority of non-target players must vote yes within 60s.`,
+                            { title: 'Vote-kick', danger: true, confirmLabel: 'Start vote' },
+                        );
+                        if (!ok) return;
+                        socket.emit('startVoteKick', { targetUserId: player.userId }, (res) => {
+                            if (res?.error) dialog.alert(res.error, { title: 'Vote-kick' });
+                        });
+                    },
+                },
+            ] : []),
         ];
         setShowPlayerMenu({ x: e.clientX, y: e.clientY, items });
     };
@@ -1119,6 +1139,21 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                                         {' '}{fmtTimer(turnElapsed)}
                                     </span>
                                 )}
+                                {gameStarted && (gameState.settings?.maxTurnSeconds || 0) > 0 && (() => {
+                                    // Countdown until the server auto-ends the
+                                    // turn. Render amber when <10s remain, red
+                                    // when <3s. The server is authoritative so
+                                    // this is a visual nudge only.
+                                    const cap = gameState.settings.maxTurnSeconds;
+                                    const remainMs = Math.max(0, cap * 1000 - turnElapsed);
+                                    const s = Math.ceil(remainMs / 1000);
+                                    const cls = remainMs < 3000 ? 'critical' : remainMs < 10000 ? 'warn' : '';
+                                    return (
+                                        <span className={`turn-timer-cap ${cls}`} title={`Turn auto-ends in ${s}s (max ${cap}s)`}>
+                                            · ⏱ {s}s
+                                        </span>
+                                    );
+                                })()}
                             </span>
                             {gameStarted && (
                                 <span className="game-timer" title="Total game time">
@@ -1268,6 +1303,14 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <span>{pendingAction.message || 'Click a target...'}</span>
                     <button className="small-btn" onClick={() => setPendingAction(null)}>Cancel</button>
                 </div>
+            )}
+
+            {gameState.voteKick && (
+                <VoteKickBanner
+                    vote={gameState.voteKick}
+                    userId={user.id}
+                    isHost={isHost}
+                />
             )}
 
             {/* Player zones */}
@@ -2112,6 +2155,57 @@ function ScryCountModal({ onSubmit, onCancel }) {
     );
 }
 
+// Vote-kick banner — renders across the top while a vote is active.
+// Shows yes/no tallies + 60s countdown. The target sees it read-only
+// with a "you're being voted on" indicator; everyone else gets yes/no
+// buttons (or "Change vote" if they already voted). The initiator and
+// the host can also cancel the vote.
+function VoteKickBanner({ vote, userId, isHost }) {
+    const [now, setNow] = React.useState(() => Date.now());
+    React.useEffect(() => {
+        const id = setInterval(() => setNow(Date.now()), 500);
+        return () => clearInterval(id);
+    }, []);
+    const yes = (vote.yesVoters || []).length;
+    const no = (vote.noVoters || []).length;
+    const required = vote.required || 1;
+    const remaining = Math.max(0, Math.ceil(((vote.expiresAt || now) - now) / 1000));
+    const isTarget = userId === vote.targetUserId;
+    const myVote = (vote.yesVoters || []).includes(userId)
+        ? 'yes'
+        : (vote.noVoters || []).includes(userId)
+            ? 'no'
+            : null;
+    const canCancel = userId === vote.initiatedBy || isHost;
+    return (
+        <div className="vote-kick-banner">
+            <span className="vote-kick-text">
+                <strong>Vote-kick:</strong> {vote.targetUsername}
+                {vote.initiatedByName && <span className="muted"> (by {vote.initiatedByName})</span>}
+                <span className="vote-kick-tally"> · {yes}/{required} yes · {no} no · {remaining}s</span>
+            </span>
+            {!isTarget && (
+                <div className="vote-kick-actions">
+                    <button
+                        className={`small-btn ${myVote === 'yes' ? 'primary-btn' : ''}`}
+                        onClick={() => socket.emit('castVoteKick', { yes: true })}
+                        disabled={myVote === 'yes'}
+                    >Yes</button>
+                    <button
+                        className={`small-btn ${myVote === 'no' ? 'danger' : ''}`}
+                        onClick={() => socket.emit('castVoteKick', { yes: false })}
+                        disabled={myVote === 'no'}
+                    >No</button>
+                    {canCancel && (
+                        <button className="small-btn" onClick={() => socket.emit('cancelVoteKick')}>Cancel</button>
+                    )}
+                </div>
+            )}
+            {isTarget && <span className="muted">You cannot vote on your own vote-kick.</span>}
+        </div>
+    );
+}
+
 // Single modal to pick a commander-damage source + amount. Replaces the
 // N separate "Cmdr Dmg from X" entries in the player right-click menu.
 // Lists every player (including the target themselves, since you can
@@ -2371,6 +2465,9 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
         format: settings?.format ?? 'commander',
         mulliganRules: settings?.mulliganRules ?? 'vancouver',
         handSizeLimit: settings?.handSizeLimit ?? 7,
+        // 0 = no cap. When > 0 the server auto-ends the turn at this many
+        // seconds so a single player can't grind the game to a halt.
+        maxTurnSeconds: settings?.maxTurnSeconds ?? 0,
     });
     const [shared, setShared] = useState(!!sharedTeamLife);
     const [teamId, setTeamId] = useState(me?.teamId || '');
@@ -2474,6 +2571,16 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
                     </label>
                     <label>Hand-size limit
                         <input type="number" value={draft.handSizeLimit} onChange={e => setDraft({ ...draft, handSizeLimit: parseInt(e.target.value) || 0 })} disabled={!isHost} />
+                    </label>
+                    <label title="Server auto-ends the turn after this many seconds. 0 = no cap.">
+                        Max time per turn (sec, 0 = off)
+                        <input
+                            type="number"
+                            min="0"
+                            value={draft.maxTurnSeconds}
+                            onChange={e => setDraft({ ...draft, maxTurnSeconds: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                            disabled={!isHost}
+                        />
                     </label>
                 </div>
 
@@ -2818,62 +2925,148 @@ function MulliganBottomModal({ hand, need, onSubmit }) {
 
 function ProliferateModal({ players, onClose, onSubmit }) {
     useEscapeKey(onClose);
-    // Each counter on each player/card is its own row — no dropdowns, just
-    // a flat list of checkboxes. One row = one counter to bump.
-    // Shape: { key, label, counterName, value, type, id, selected }
-    const [items, setItems] = useState(() => {
-        const list = [];
+    // Build a player-grouped list of proliferate targets. Only counters
+    // with value > 0 are eligible (MTG rule: proliferate adds one of a
+    // counter kind you already have). Each group has the player's own
+    // counters first (poison / energy / experience / infect / custom)
+    // then their battlefield cards grouped by card, counter-per-row.
+    const groups = React.useMemo(() => {
+        const out = [];
         for (const p of players) {
-            const std = [
-                ['poison', (p.counters || {}).poison || 0],
-                ['energy', (p.counters || {}).energy || 0],
-                ['experience', (p.counters || {}).experience || 0],
-                ['infect', p.infect || 0],
-            ];
+            const playerItems = [];
+            const poison = (p.counters || {}).poison || 0;
+            const energy = (p.counters || {}).energy || 0;
+            const experience = (p.counters || {}).experience || 0;
+            const infect = p.infect || 0;
+            const standard = [
+                poison > 0 ? ['poison', poison] : null,
+                energy > 0 ? ['energy', energy] : null,
+                experience > 0 ? ['experience', experience] : null,
+                infect > 0 ? ['infect', infect] : null,
+            ].filter(Boolean);
+            for (const [name, v] of standard) {
+                playerItems.push({ key: `p-${p.userId}-${name}`, counterName: name, value: v, type: 'player', id: p.userId });
+            }
             for (const [k, v] of Object.entries(p.counters || {})) {
-                if (!['poison', 'energy', 'experience'].includes(k)) std.push([k, v || 0]);
-            }
-            for (const [name, value] of std) {
-                list.push({ key: `p-${p.userId}-${name}`, label: p.username, counterName: name, value, type: 'player', id: p.userId, selected: false });
-            }
-            for (const card of (p.zones?.battlefield || [])) {
-                for (const [name, value] of Object.entries(card.counters || {})) {
-                    if (value > 0) {
-                        list.push({ key: `c-${card.instanceId}-${name}`, label: card.name || 'Card', counterName: name, value, type: 'card', id: card.instanceId, selected: false });
-                    }
+                if (['poison', 'energy', 'experience'].includes(k)) continue;
+                if (v > 0) {
+                    playerItems.push({ key: `p-${p.userId}-${k}`, counterName: k, value: v, type: 'player', id: p.userId });
                 }
             }
+            const cardGroups = [];
+            for (const card of (p.zones?.battlefield || [])) {
+                const rows = [];
+                for (const [name, value] of Object.entries(card.counters || {})) {
+                    if (value > 0) {
+                        rows.push({ key: `c-${card.instanceId}-${name}`, counterName: name, value, type: 'card', id: card.instanceId });
+                    }
+                }
+                if (rows.length > 0) cardGroups.push({ name: card.name || 'Card', id: card.instanceId, rows });
+            }
+            if (playerItems.length + cardGroups.length > 0) {
+                out.push({ userId: p.userId, username: p.username, playerItems, cardGroups });
+            }
         }
-        return list;
+        return out;
+    }, [players]);
+
+    const allItems = React.useMemo(() => {
+        const keys = [];
+        for (const g of groups) {
+            for (const it of g.playerItems) keys.push(it.key);
+            for (const cg of g.cardGroups) for (const it of cg.rows) keys.push(it.key);
+        }
+        return keys;
+    }, [groups]);
+
+    const [selectedKeys, setSelectedKeys] = useState(() => new Set());
+    const toggle = (key) => setSelectedKeys(prev => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+    });
+    const toggleMany = (keys, on) => setSelectedKeys(prev => {
+        const next = new Set(prev);
+        for (const k of keys) { if (on) next.add(k); else next.delete(k); }
+        return next;
     });
 
-    const toggle = (key) => setItems(prev => prev.map(it => it.key === key ? { ...it, selected: !it.selected } : it));
+    const keyToItem = React.useMemo(() => {
+        const m = new Map();
+        for (const g of groups) {
+            for (const it of g.playerItems) m.set(it.key, it);
+            for (const cg of g.cardGroups) for (const it of cg.rows) m.set(it.key, it);
+        }
+        return m;
+    }, [groups]);
 
     const submit = () => {
-        const targets = items.filter(it => it.selected).map(it => ({ type: it.type, id: it.id, counter: it.counterName }));
+        const targets = [];
+        for (const key of selectedKeys) {
+            const it = keyToItem.get(key);
+            if (it) targets.push({ type: it.type, id: it.id, counter: it.counterName });
+        }
         onSubmit(targets);
     };
+    const selected = selectedKeys.size;
+    const allSelected = allItems.length > 0 && allItems.every(k => selectedKeys.has(k));
 
-    const selected = items.filter(it => it.selected).length;
+    const renderRow = (it) => (
+        <label key={it.key} className={`prolif-row ${selectedKeys.has(it.key) ? 'selected' : ''}`}>
+            <input type="checkbox" checked={selectedKeys.has(it.key)} onChange={() => toggle(it.key)} />
+            <span className="prolif-counter">{it.counterName}</span>
+            <span className="prolif-value">{it.value} <span className="prolif-arrow">→</span> <strong>{it.value + 1}</strong></span>
+        </label>
+    );
 
     return (
         <div className="modal-overlay">
-            <div className="modal" style={{ maxWidth: 500, maxHeight: '80vh', overflowY: 'auto' }}>
+            <div className="modal prolif-modal">
                 <div className="modal-header">
                     <h3>Proliferate</h3>
                     <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
                 </div>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    Check each counter you want to add +1 to.
+                <p className="muted" style={{ margin: '0 0 10px' }}>
+                    Tick each counter you want to add +1 to. Proliferate only affects counter types that already have at least one.
                 </p>
-                {items.length === 0 && <p className="muted">No counters in play.</p>}
-                <div className="proliferate-list">
-                    {items.map(it => (
-                        <label key={it.key} className={`proliferate-row ${it.selected ? '' : 'deselected'}`}>
-                            <input type="checkbox" checked={it.selected} onChange={() => toggle(it.key)} />
-                            <span className="proliferate-name">{it.label}</span>
-                            <span className="proliferate-counter">{it.counterName} ({it.value} → {it.value + 1})</span>
-                        </label>
+                <div className="prolif-toolbar">
+                    <button className="small-btn" onClick={() => toggleMany(allItems, !allSelected)}>
+                        {allSelected ? 'Deselect all' : 'Select all'}
+                    </button>
+                    <span className="muted">{selected} selected</span>
+                </div>
+                {groups.length === 0 && <p className="muted muted-centered">No counters in play.</p>}
+                <div className="prolif-groups">
+                    {groups.map(g => (
+                        <div key={g.userId} className="prolif-group">
+                            <div className="prolif-group-head">
+                                <strong>{g.username}</strong>
+                                <button
+                                    type="button"
+                                    className="small-btn"
+                                    onClick={() => {
+                                        const keys = [
+                                            ...g.playerItems.map(i => i.key),
+                                            ...g.cardGroups.flatMap(cg => cg.rows.map(r => r.key)),
+                                        ];
+                                        const allOn = keys.every(k => selectedKeys.has(k));
+                                        toggleMany(keys, !allOn);
+                                    }}
+                                >All</button>
+                            </div>
+                            {g.playerItems.length > 0 && (
+                                <div className="prolif-subgroup">
+                                    <div className="prolif-subgroup-label">Player</div>
+                                    {g.playerItems.map(renderRow)}
+                                </div>
+                            )}
+                            {g.cardGroups.map(cg => (
+                                <div key={cg.id} className="prolif-subgroup">
+                                    <div className="prolif-subgroup-label">{cg.name}</div>
+                                    {cg.rows.map(renderRow)}
+                                </div>
+                            ))}
+                        </div>
                     ))}
                 </div>
                 <div className="modal-actions">

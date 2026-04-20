@@ -4,6 +4,21 @@
 
 export const CHANGELOG = [
     {
+        version: '3.2',
+        date: '2026-04-19',
+        changes: [
+            'Max time per turn (host setting) — server auto-ends the turn after N seconds (0 = off). Live countdown badge next to the turn timer turns amber then red with a pulse as time runs out',
+            'Vote-kick — any player can right-click another non-host player (3+ players needed) to start a vote. Banner across the top shows tally and 60s countdown; majority of non-target players must vote yes',
+            'Counters can now be 0 and are kept explicitly. Use the × button on a counter row (or middle-click a player-counter badge) to actually remove the counter',
+            '"Until end of turn" counter toggle + hover pill redesigned — now a pill with an ⏱ glyph that lights up amber when active',
+            'Proliferate modal rebuilt — grouped by player (with their cards below), only shows counters with ≥1, select-all per player / overall, clearer value→value+1 display',
+            'Drawing toolbar can now be dragged by the grip on the left (same pattern as the piles panel)',
+            'Infect badge no longer gets swallowed by text-highlight on rapid clicking',
+            'Click SFX softened — quieter, warmer sine wave instead of the earlier sharp square',
+            'Hardened fallback for legacy imports of adventure/split cards that got a stale back-image: the "Other side" button now only appears when the card really has a separate back',
+        ],
+    },
+    {
         version: '3.1',
         date: '2026-04-19',
         changes: [

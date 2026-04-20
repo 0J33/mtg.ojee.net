@@ -571,9 +571,27 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ─── COUNTERS & DESIGNATIONS ─────────────────────────────── */
 .player-counters { display: flex; gap: 4px; flex-wrap: wrap; }
-.player-counter-badge { padding: 2px 8px; background: rgba(20, 22, 28, 0.95); border: 1px solid var(--border); border-radius: 2px; font-size: 0.7em; cursor: pointer; font-family: 'Cinzel', serif; letter-spacing: 1px; text-transform: uppercase; color: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
+.player-counter-badge { padding: 2px 8px; background: rgba(20, 22, 28, 0.95); border: 1px solid var(--border); border-radius: 2px; font-size: 0.7em; cursor: pointer; font-family: 'Cinzel', serif; letter-spacing: 1px; text-transform: uppercase; color: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.9); user-select: none; -webkit-user-select: none; }
 .player-counter-badge:hover { background: var(--bg-hover); }
-.cmd-dmg-badge, .infect-badge, .infect-total, .death-counter, .tax-counter { text-shadow: 0 1px 2px rgba(0,0,0,0.85); }
+.player-counter-badge { display: inline-flex; align-items: center; gap: 4px; }
+.player-counter-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 0 2px;
+    font-size: 0.9em;
+    line-height: 1;
+    border-radius: 2px;
+    user-select: none;
+}
+.player-counter-remove:hover { color: var(--danger); background: rgba(176,68,68,0.15); }
+.cmd-dmg-badge, .infect-badge, .infect-total, .death-counter, .tax-counter { text-shadow: 0 1px 2px rgba(0,0,0,0.85); user-select: none; -webkit-user-select: none; }
+/* Infect badge is a single click target — the browser's text-highlight
+   selection would otherwise swallow the first click on a "double-click
+   to select" pattern. Disable selection on the whole strip too. */
+.infect-inline { user-select: none; -webkit-user-select: none; }
+.infect-inline .infect-total { cursor: pointer; }
 .life-value { text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(212, 175, 111, 0.3) !important; }
 
 /* Multi-face card display — split / adventure / flip / aftermath / DFC */
@@ -615,6 +633,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .cmd-dmg-source-value { font-family: 'Cinzel', serif; font-weight: 700; min-width: 52px; text-align: center; color: var(--accent); }
 .cmd-dmg-source-row.lethal .cmd-dmg-source-value { color: var(--danger); }
 .cmd-dmg-source-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* Turn-timer cap badge next to the elapsed timer. Amber <10s, red <3s. */
+.turn-timer-cap { color: var(--text-mid); font-weight: 600; }
+.turn-timer-cap.warn { color: #d4a24c; }
+.turn-timer-cap.critical { color: var(--danger); animation: turnCapPulse 0.8s ease-in-out infinite; }
+@keyframes turnCapPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Vote-kick banner. Sits between the topbar and the player zones. */
+.vote-kick-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    background: linear-gradient(90deg, rgba(176,68,68,0.18), rgba(176,68,68,0.08));
+    border-bottom: 1px solid var(--danger);
+    flex-shrink: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85em;
+}
+.vote-kick-text { flex: 1; }
+.vote-kick-tally { color: var(--text-mid); letter-spacing: 1px; font-size: 0.9em; margin-left: 8px; }
+.vote-kick-actions { display: flex; gap: 6px; }
 
 /* Hidden player placeholder — replaces the full zone when a viewer
    hides an opponent from their own UI. Same wrapper element so the
@@ -951,9 +994,58 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Keyword tooltips — shown in hover panel and maximized view */
 /* End-of-turn counter tag */
-.eot-tag { color: var(--accent); font-style: italic; font-size: 0.85em; font-family: 'Cinzel', serif; letter-spacing: 1px; margin-left: 4px; }
-.counter-eot-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 0.85em; color: var(--text-mid, #aaa); cursor: pointer; user-select: none; }
-.counter-eot-row input { cursor: pointer; }
+/* "Until end of turn" marker on a counter line in the hover / maximize
+   view. Reads as a small pill so it doesn't get lost in the counter
+   text. */
+.eot-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: #e0a54d;
+    background: rgba(224, 165, 77, 0.14);
+    border: 1px solid rgba(224, 165, 77, 0.4);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 0.7em;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 1.2px;
+    margin-left: 6px;
+    font-style: normal;
+    text-transform: uppercase;
+    vertical-align: 1px;
+}
+.eot-tag::before { content: '⏱'; font-size: 0.95em; }
+
+/* "Until end of turn" checkbox inside the counter modal. Gets a pill
+   row that clearly reads as an option toggle when active. */
+.counter-eot-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+    padding: 6px 12px;
+    font-size: 0.85em;
+    color: var(--text-mid, #aaa);
+    cursor: pointer;
+    user-select: none;
+    background: rgba(224, 165, 77, 0.06);
+    border: 1px solid rgba(224, 165, 77, 0.25);
+    border-radius: 20px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.counter-eot-row:hover {
+    background: rgba(224, 165, 77, 0.14);
+    color: var(--text);
+}
+.counter-eot-row input {
+    cursor: pointer;
+    accent-color: #e0a54d;
+    width: 15px;
+    height: 15px;
+}
+.counter-eot-row input:checked + span,
+.counter-eot-row:has(input:checked) { color: #e0a54d; border-color: #e0a54d; background: rgba(224, 165, 77, 0.18); }
+.counter-eot-row span { letter-spacing: 0.5px; }
 
 /* Oracle text in hover panel */
 .hover-oracle-group { font-size: 0.88em; }
@@ -1234,6 +1326,20 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .drawing-layer.drawings-hidden .drawing-canvas { opacity: 0; }
 .drawing-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .drawing-toolbar { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: var(--bg-panel); border: 1px solid var(--border); padding: 10px 18px; border-radius: 4px; pointer-events: auto; z-index: 201; box-shadow: 0 8px 30px rgba(0,0,0,0.7); max-width: 92vw; flex-wrap: wrap; justify-content: center; }
+.drawing-toolbar-grip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    margin-right: 2px;
+    color: var(--text-faint, #888);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    flex-shrink: 0;
+}
+.drawing-toolbar-grip:hover { color: var(--accent); }
+.drawing-toolbar-grip:active { cursor: grabbing; }
 .tool-picker { display: flex; gap: 4px; padding-right: 8px; border-right: 1px solid var(--border-soft); }
 .tool-btn { background: var(--bg-deep); border: 1px solid var(--border); color: var(--text-mid); padding: 6px 8px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tool-btn.active { background: var(--accent); color: var(--bg-deep); border-color: var(--accent); }
@@ -3077,37 +3183,69 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .card-max-flip-preview:hover { color: var(--accent, #88aaff); border-color: var(--accent-dim); }
 
-/* Proliferate modal — interactive picker */
-.proliferate-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 8px 0;
-    max-height: 50vh;
-    overflow-y: auto;
-}
-.proliferate-row {
+/* Proliferate modal — grouped picker (player + their cards) */
+.prolif-modal { max-width: 560px; max-height: 82vh; display: flex; flex-direction: column; }
+.prolif-toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    background: rgba(255, 255, 255, 0.04);
+    gap: 10px;
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-soft, #2a2d36);
+}
+.prolif-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    margin: 4px 0;
+    padding-right: 4px;
+}
+.prolif-group {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--border-soft, #2a2d36);
     border-radius: 4px;
+    padding: 8px 10px;
+}
+.prolif-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    color: var(--accent);
+}
+.prolif-subgroup { margin: 4px 0 8px; padding-left: 6px; border-left: 2px solid rgba(212,175,111,0.2); }
+.prolif-subgroup:last-child { margin-bottom: 0; }
+.prolif-subgroup-label {
+    font-size: 0.7em;
+    color: var(--text-mid);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 4px 0 4px 2px;
+}
+.prolif-row {
+    display: grid;
+    grid-template-columns: 18px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.9em;
 }
-.proliferate-row.deselected { opacity: 0.4; }
-.proliferate-row input[type="checkbox"] { flex-shrink: 0; width: 16px; height: 16px; }
-.proliferate-name { flex: 1; font-weight: 600; }
-.proliferate-counter { color: var(--text-mid, #aaa); font-size: 11px; }
-.proliferate-row select {
-    padding: 2px 6px;
-    font-size: 11px;
-    background: var(--bg-deep, #111);
-    color: var(--text, #ddd);
-    border: 1px solid var(--border, #444);
-    border-radius: 2px;
-}
+.prolif-row:hover { background: rgba(212,175,111,0.06); }
+.prolif-row.selected { background: rgba(212,175,111,0.14); }
+.prolif-row input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; }
+.prolif-counter { color: var(--text); }
+.prolif-value { color: var(--text-mid); font-variant-numeric: tabular-nums; font-size: 0.9em; }
+.prolif-value strong { color: var(--accent); }
+.prolif-arrow { color: var(--text-faint); padding: 0 2px; }
 
 /* Pending-action banner — pick-target mode indicator */
 .pending-action-banner {

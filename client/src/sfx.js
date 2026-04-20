@@ -141,7 +141,9 @@ const THROTTLE_MS = {
 };
 
 const recipes = {
-    click:     () => tone({ freq: 900, type: 'square', duration: 0.05, peak: 0.08, attack: 0.001 }),
+    // Soft UI click — quieter and warmer than the old sharp square wave
+    // so it doesn't fatigue when clicking through menus.
+    click:     () => tone({ freq: 620, type: 'sine', duration: 0.04, peak: 0.035, attack: 0.002 }),
     tap:       () => { tone({ freq: 520, type: 'triangle', duration: 0.09, peak: 0.18, slideTo: 420 }); },
     untap:     () => { tone({ freq: 420, type: 'triangle', duration: 0.10, peak: 0.18, slideTo: 560 }); },
     flip:      () => { tone({ freq: 700, type: 'triangle', duration: 0.06, peak: 0.16, slideTo: 420 }); noise({ duration: 0.07, peak: 0.08, filterFreq: 3500, filterType: 'highpass' }); },

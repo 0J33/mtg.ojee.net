@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import socket from '../socket';
-import { useEscapeKey, useVerticalDragPos } from '../utils';
+import { useEscapeKey, useVerticalDragPos, use2DDragPos } from '../utils';
 
 export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle, penStateRef, onPenColorChange, hidden, onToggleHidden }) {
     useEscapeKey(() => { if (enabled) onToggle(); });
     const toggleDrag = useVerticalDragPos('mtg_drawing_toggle_top');
+    const toolbarDrag = use2DDragPos('mtg_drawing_toolbar_pos');
     const canvasRef = useRef(null);
     const isDrawingRef = useRef(false);
     const currentStrokeRef = useRef([]);
@@ -446,7 +447,18 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                 />
             )}
             {enabled && (
-                <div className="drawing-toolbar">
+                <div className="drawing-toolbar" data-drag-root style={toolbarDrag.style}>
+                    <span
+                        className="drawing-toolbar-grip"
+                        title="Drag to move"
+                        {...toolbarDrag.handlers}
+                    >
+                        <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+                            <circle cx="2.5" cy="2" r="1"/><circle cx="7.5" cy="2" r="1"/>
+                            <circle cx="2.5" cy="8" r="1"/><circle cx="7.5" cy="8" r="1"/>
+                            <circle cx="2.5" cy="14" r="1"/><circle cx="7.5" cy="14" r="1"/>
+                        </svg>
+                    </span>
                     <div className="tool-picker">
                         <button
                             className={`tool-btn ${tool === 'pen' ? 'active' : ''}`}

@@ -208,6 +208,11 @@ function createRoom(hostId, hostUsername, settings = {}) {
         // Shared piles — any player can create, delete, or put cards into them.
         // Each pile is { id, name, cards: [] }. Visible to everyone.
         piles: [],
+        // Active vote-kick, or null. Only one vote runs at a time. Shape:
+        // { targetUserId, targetUsername, initiatedBy, initiatedByName,
+        //   startedAt, expiresAt, yesVoters: [userId], noVoters: [userId],
+        //   required }
+        voteKick: null,
         settings: {
             startingLife: settings.startingLife || 40,
             useCommanderDamage: settings.useCommanderDamage !== false,
@@ -225,6 +230,10 @@ function createRoom(hostId, hostUsername, settings = {}) {
             // rules. Only enforced for players who set handSizeEnforce=true
             // on themselves — opt-in nudge, not mandatory.
             handSizeLimit: settings.handSizeLimit || 7,
+            // Max seconds per turn. 0 / null = no cap (default). When > 0
+            // the server runs a setTimeout on nextTurn and auto-advances
+            // if the player hasn't ended the turn themselves in time.
+            maxTurnSeconds: Math.max(0, parseInt(settings.maxTurnSeconds, 10) || 0),
         },
         teams: [],
         // True if "shared team life" is on — when team members take damage,
@@ -329,6 +338,17 @@ function getRoomStateForPlayer(room, userId, opts = {}) {
         // Private piles are filtered out entirely for non-owners (and for
         // spectators with no perspective over the owner). Public piles ship
         // their cards to everyone.
+        voteKick: room.voteKick ? {
+            targetUserId: room.voteKick.targetUserId,
+            targetUsername: room.voteKick.targetUsername,
+            initiatedBy: room.voteKick.initiatedBy,
+            initiatedByName: room.voteKick.initiatedByName,
+            startedAt: room.voteKick.startedAt,
+            expiresAt: room.voteKick.expiresAt,
+            yesVoters: room.voteKick.yesVoters || [],
+            noVoters: room.voteKick.noVoters || [],
+            required: room.voteKick.required,
+        } : null,
         piles: (room.piles || [])
             .filter(pile => {
                 if (!pile.private) return true;

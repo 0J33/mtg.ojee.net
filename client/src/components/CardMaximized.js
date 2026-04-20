@@ -5,6 +5,7 @@ import { scryfall } from '../api';
 import { useEscapeKey } from '../utils';
 import ManaCost, { OracleText } from './ManaCost';
 import { detectKeywords } from '../keywords';
+import { hasRealBack } from '../cardFaces';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
@@ -23,7 +24,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
     const [artsSide, setArtsSide] = useState('front');
     if (!card) return null;
 
-    const hasDFC = !!card.backImageUri;
+    const hasDFC = hasRealBack(card);
     const isFaceDown = card.faceDown;
     const isFlipped = card.flipped && hasDFC;
     // Determine which side is currently shown in-game
@@ -122,7 +123,10 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
 
     const largeUrl = imageUrl.replace('/normal/', '/large/').replace('/small/', '/large/');
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
-    const counterEntries = Object.entries(card.counters || {}).filter(([, v]) => v !== 0);
+    // Show every explicitly-added counter, even those at 0. Zero-value
+    // entries can still be meaningful (e.g. a charge-counter pool that
+    // drained to 0 this turn but may be re-added next upkeep).
+    const counterEntries = Object.entries(card.counters || {});
     const detectedKeywords = !isFaceDown ? detectKeywords(card) : [];
 
     const handleThumbHover = (e, imageUri) => {
@@ -229,7 +233,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                             <button
                                                 className="note-remove-btn"
                                                 title="Remove counter"
-                                                onClick={() => socket.emit('setCardCounter', { instanceId: card.instanceId, counter: name, value: 0 })}
+                                                onClick={() => socket.emit('removeCardCounter', { instanceId: card.instanceId, counter: name })}
                                             >×</button>
                                         </span>
                                     )}

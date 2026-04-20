@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import ManaCost, { OracleText } from './ManaCost';
 import { detectKeywords } from '../keywords';
+import { hasRealBack } from '../cardFaces';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
@@ -19,7 +20,9 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     const cardRef = useRef(null);
 
     const isFaceDown = card.faceDown || showBack;
-    const hasBack = !!card.backImageUri;
+    // Only consider a real DFC back — adventure/split/flip cards have no
+    // separate image, so trying to flip them would show a broken URL.
+    const hasBack = hasRealBack(card);
     const isFlipped = card.flipped && hasBack;
     // Server-side skin (visible to everyone) takes priority, then localStorage
     // fallback for any previously-set client-only skins. DFC cards have a
@@ -46,7 +49,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         // even for empty cards, which pushed left-side placements 260px too
         // far off the left edge of the card the user was hovering.
         const hasSideEffects = (Array.isArray(card.notes) && card.notes.length > 0)
-            || (card.counters && Object.values(card.counters).some(v => v !== 0))
+            || (card.counters && Object.keys(card.counters).length > 0)
             || (card.attachedTo && attachedToName)
             || (Array.isArray(attachments) && attachments.length > 0)
             || detectKeywords(card).length > 0;
@@ -74,7 +77,10 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
         setHoverPos({ x: posX, y: posY });
     };
 
-    const counterEntries = Object.entries(card.counters || {}).filter(([, v]) => v !== 0);
+    // Show every counter the user intentionally added (including 0-value
+    // ones — they mean "I'm tracking this counter type but the count is
+    // currently 0"). Use the remove-counter menu to actually delete.
+    const counterEntries = Object.entries(card.counters || {});
     const hasCounters = counterEntries.length > 0;
     const hasNotes = Array.isArray(card.notes) && card.notes.length > 0;
     const detectedKeywords = !isFaceDown ? detectKeywords(card) : [];
@@ -103,7 +109,11 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
     // text. For DFCs the back side has its own image, so the user can flip
     // to see it; we still show the faces list for non-English DFCs.
     const multiFaces = Array.isArray(card.faces) && card.faces.length >= 2 ? card.faces : null;
-    const showFaces = !!multiFaces && (!card.backImageUri || !!card.nonEnglish || !!card.textless);
+    // Show the per-face breakdown when the card has 2+ faces AND either
+    // there's no real back image (adventure/split/flip/aftermath share a
+    // single image) or the print is textless / non-English and the image
+    // itself has no readable rules text.
+    const showFaces = !!multiFaces && (!hasBack || !!card.nonEnglish || !!card.textless);
     const showSidePanel = hasEffects || hasKeywords || showOracleFallback || showFaces;
     const largeImageUrl = (imageUrl || CARD_BACK).replace('/normal/', '/large/').replace('/small/', '/large/');
 

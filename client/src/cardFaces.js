@@ -15,6 +15,18 @@ export const DFC_LAYOUTS = new Set([
     'transform', 'modal_dfc', 'double_faced_token', 'reversible_card', 'meld', 'battle',
 ]);
 
+// Returns true when the card instance has a real separate back face the
+// user can flip to. Guards against legacy deck entries where the server
+// pre-fix set backImageUri on adventure/split/flip/aftermath cards —
+// those have 2+ faces but no back image. The client treats them as
+// single-image so the "Other side" button doesn't reveal a broken image.
+export function hasRealBack(card) {
+    if (!card) return false;
+    if (!card.backImageUri) return false;
+    if (card.layout && !DFC_LAYOUTS.has(card.layout)) return false;
+    return true;
+}
+
 // Return a normalized array of face objects (name/mana cost/type line/
 // oracle text/power/toughness) when the Scryfall card has 2+ faces.
 // Returns null for single-face cards so the UI can short-circuit cheaply.

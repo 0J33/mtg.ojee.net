@@ -794,12 +794,23 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                 )}
 
                 <div className="player-counters" onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
-                    {Object.entries(player.counters || {}).filter(([, v]) => v > 0).map(([name, val]) => (
-                        <span key={name} className="player-counter-badge" title={`${name} · click +1 · right-click -1 · middle-click remove`}
+                    {Object.entries(player.counters || {}).map(([name, val]) => (
+                        <span
+                            key={name}
+                            className="player-counter-badge"
+                            title={`${name} · click +1 · right-click -1 · middle-click remove entirely`}
                             onClick={spectating ? undefined : (e) => { e.stopPropagation(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : val + 1 }); }}
                             onContextMenu={spectating ? (e) => { e.preventDefault(); e.stopPropagation(); } : (e) => { e.preventDefault(); e.stopPropagation(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: isInfinite(val) ? INFINITE : Math.max(0, val - 1) }); }}
-                            onMouseDown={spectating ? undefined : (e) => { if (e.button === 1) { e.preventDefault(); e.stopPropagation(); socket.emit('setPlayerCounter', { targetPlayerId: player.userId, counter: name, value: 0 }); } }}>
+                            onMouseDown={spectating ? undefined : (e) => { if (e.button === 1) { e.preventDefault(); e.stopPropagation(); socket.emit('removePlayerCounter', { targetPlayerId: player.userId, counter: name }); } }}
+                        >
                             {name}: {fmtNum(val)}
+                            {!spectating && (
+                                <button
+                                    className="player-counter-remove"
+                                    title="Remove counter entirely"
+                                    onClick={(e) => { e.stopPropagation(); socket.emit('removePlayerCounter', { targetPlayerId: player.userId, counter: name }); }}
+                                >×</button>
+                            )}
                         </span>
                     ))}
                 </div>

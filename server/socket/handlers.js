@@ -126,7 +126,8 @@ const GameRoom = require('../models/GameRoom');
 const SNAPSHOT_EVENTS = new Set([
     'moveCard', 'tapCard', 'bulkTap', 'bulkMove', 'flipCard', 'toggleFaceDown',
     'shuffleLibrary', 'mill', 'drawCards', 'reorderTopCards', 'scryToBottom',
-    'setLife', 'adjustLife', 'setPlayerCounter', 'setCardCounter', 'clearCardCounters',
+    'setLife', 'adjustLife', 'setPlayerCounter', 'removePlayerCounter',
+    'setCardCounter', 'removeCardCounter', 'clearCardCounters',
     'setCommanderDamage', 'incrementCommanderDeaths', 'setCommanderDeaths',
     'setInfect', 'setDesignation', 'createToken', 'createCustomCard',
     'setTeam', 'setTeamLife', 'nextTurn', 'setTurnIndex',
@@ -1658,6 +1659,21 @@ module.exports = function registerSocketHandlers(io) {
             callback?.({ success: true });
         });
 
+        // Delete a player counter entirely (not just zero it out). Used by
+        // the "×" button on the player-header counter badge.
+        socket.on('removePlayerCounter', ({ targetPlayerId, counter }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const player = getPlayerInRoom(room, targetPlayerId || currentUserId);
+            if (!player) return callback?.({ error: 'Player not found' });
+            if (player.counters && counter in player.counters) {
+                delete player.counters[counter];
+            }
+            addAndBroadcastAction(io, room, currentUserId, 'removePlayerCounter', { target: player.username, counter });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
         socket.on('setCardCounter', ({ instanceId, counter, value, mode, endOfTurn }, callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
@@ -1673,18 +1689,33 @@ module.exports = function registerSocketHandlers(io) {
                 newValue = current + value;
             }
             const clamped = clampGameValue(newValue);
-            if (clamped === 0) {
-                delete card.counters[counter];
-                delete card.endOfTurnCounters[counter];
-            } else {
-                card.counters[counter] = clamped;
-                if (endOfTurn) card.endOfTurnCounters[counter] = true;
-                else delete card.endOfTurnCounters[counter];
-            }
+            // Zero counters used to auto-delete. Now we keep them around so
+            // the user can track an "in-use" counter that happens to be at
+            // 0 (e.g. a Solar Flare counter that just got paid off but is
+            // still relevant to end-of-turn triggers). Use removeCardCounter
+            // or clearCardCounters to actually remove.
+            card.counters[counter] = clamped;
+            if (endOfTurn) card.endOfTurnCounters[counter] = true;
+            else delete card.endOfTurnCounters[counter];
             addAndBroadcastAction(io, room, currentUserId, 'setCardCounter', {
                 cardName: card.name, counter, value: clamped,
                 endOfTurn: !!endOfTurn,
             });
+            broadcastRoomState(io, room);
+            callback?.({ success: true });
+        });
+
+        // Completely remove a counter (not just zero it out).
+        socket.on('removeCardCounter', ({ instanceId, counter }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const card = findCardAnywhere(room, instanceId);
+            if (!card) return callback?.({ error: 'Card not found' });
+            if (card.counters && counter in card.counters) {
+                delete card.counters[counter];
+            }
+            if (card.endOfTurnCounters) delete card.endOfTurnCounters[counter];
+            addAndBroadcastAction(io, room, currentUserId, 'removeCardCounter', { cardName: card.name, counter });
             broadcastRoomState(io, room);
             callback?.({ success: true });
         });
@@ -1871,6 +1902,20 @@ module.exports = function registerSocketHandlers(io) {
                 return callback?.({ error: "Only the current turn player (or host) can end the turn" });
             }
 
+            advanceTurn(room, io, currentUserId, { auto: false });
+            callback?.({ success: true });
+        });
+
+        // Internal helper used by the nextTurn handler and the server-side
+        // max-turn-time auto-advance. Runs end-of-turn cleanup, advances the
+        // turn index (skipping teammates and eliminated players), resets
+        // per-turn state on the incoming player, auto-untaps, and empties
+        // the mana pool. Fires turnEnd / turnStart actions + the turn
+        // notification, then schedules the next auto-advance timeout if
+        // the room has a per-turn time cap configured.
+        function advanceTurn(room, io, actorUserId, { auto }) {
+            const endingPlayer = room.players[room.turnIndex];
+
             // Accumulate the ending player's turn time before advancing.
             if (endingPlayer && room.turnStartedAt) {
                 const elapsed = Date.now() - room.turnStartedAt;
@@ -1886,7 +1931,7 @@ module.exports = function registerSocketHandlers(io) {
             // Log the turn ending explicitly — lets the action log show a
             // clean "X ended their turn" → "Y's turn begins" sequence.
             if (endingPlayer) {
-                addAndBroadcastAction(io, room, currentUserId, 'turnEnd', { player: endingPlayer.username });
+                addAndBroadcastAction(io, room, actorUserId, 'turnEnd', { player: endingPlayer.username, auto: !!auto });
             }
 
             // Extra-turn queue check. If the head of the queue belongs to a
@@ -1899,7 +1944,7 @@ module.exports = function registerSocketHandlers(io) {
                 const idx = room.players.findIndex(p => p.userId === head.ownerId);
                 if (idx !== -1 && !isPlayerEliminated(room.players[idx])) {
                     nextPlayerIdx = idx;
-                    addAndBroadcastAction(io, room, currentUserId, 'extraTurnPop', { player: room.players[idx].username });
+                    addAndBroadcastAction(io, room, actorUserId, 'extraTurnPop', { player: room.players[idx].username });
                     break;
                 }
             }
@@ -1967,15 +2012,42 @@ module.exports = function registerSocketHandlers(io) {
                 newPlayer.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
             }
 
-            addAndBroadcastAction(io, room, currentUserId, 'turnStart', { player: newPlayer?.username });
+            addAndBroadcastAction(io, room, actorUserId, 'turnStart', { player: newPlayer?.username, auto: !!auto });
             broadcastToRoom(io, room, 'notification', {
                 type: 'turn',
-                message: `${newPlayer?.username || '?'}'s turn`,
+                message: auto
+                    ? `Time expired — ${newPlayer?.username || '?'}'s turn`
+                    : `${newPlayer?.username || '?'}'s turn`,
                 playerId: newPlayer?.userId,
             });
             broadcastRoomState(io, room);
-            callback?.({ success: true });
-        });
+            scheduleTurnTimeout(room, io);
+        }
+
+        // Arm a setTimeout that will auto-advance the turn when the room's
+        // settings.maxTurnSeconds cap is reached. Clears any existing
+        // timer first so we never run two in parallel. Guarded against
+        // edge cases: mulligan phase, no max set, no active player.
+        function scheduleTurnTimeout(room, io) {
+            if (room._turnTimeoutId) {
+                clearTimeout(room._turnTimeoutId);
+                room._turnTimeoutId = null;
+            }
+            const maxSec = room.settings?.maxTurnSeconds || 0;
+            if (!maxSec || maxSec <= 0) return;
+            if (room.mulliganPhase) return;
+            if (typeof room.turnIndex !== 'number' || room.turnIndex < 0) return;
+            const activePlayer = room.players[room.turnIndex];
+            if (!activePlayer) return;
+            room._turnTimeoutId = setTimeout(() => {
+                room._turnTimeoutId = null;
+                // Only auto-advance if the same player still has the turn
+                // (the manual nextTurn may have fired in the meantime).
+                if (room.mulliganPhase) return;
+                if (room.players[room.turnIndex]?.userId !== activePlayer.userId) return;
+                advanceTurn(room, io, activePlayer.userId, { auto: true });
+            }, maxSec * 1000);
+        }
 
         // Mulligan phase: user-initiated d20 roll. Clicking "Ready & Roll"
         // emits this event — the server rolls a d20 for the requesting
@@ -2058,6 +2130,9 @@ module.exports = function registerSocketHandlers(io) {
                     // the UI knows the phase is done.
                     for (const p of room.players) p.firstPlayerRoll = null;
                     room.rollEligibleIds = null;
+                    // Kick off the turn-timer for the first player if the
+                    // room enforces a per-turn cap.
+                    scheduleTurnTimeout(room, io);
                 } else {
                     // Multiple players tied at the top. Narrow the eligible
                     // set to ONLY those still tied, and clear just their
@@ -2479,6 +2554,10 @@ module.exports = function registerSocketHandlers(io) {
             room.cumulativeTurnTime = {};
             room.mulliganPhase = false;
             room.started = false;
+            // Cancel any pending turn-timer auto-advance.
+            if (room._turnTimeoutId) { clearTimeout(room._turnTimeoutId); room._turnTimeoutId = null; }
+            // Also clear any active vote-kick — it's stale after a reset.
+            room.voteKick = null;
             // Wipe the undo stack — old snapshots reference zone contents
             // that no longer exist after the restart.
             room.undoStack = [];
@@ -2847,13 +2926,16 @@ module.exports = function registerSocketHandlers(io) {
             if (!room) return callback?.({ error: 'Not in a room' });
             if (room.hostId !== currentUserId) return callback?.({ error: 'Only host can update settings' });
             if (!newSettings || typeof newSettings !== 'object') return callback?.({ error: 'No settings' });
-            const numericKeys = ['startingLife', 'commanderDamageLethal', 'maxPlayers', 'handSizeLimit'];
+            const numericKeys = ['startingLife', 'commanderDamageLethal', 'maxPlayers', 'handSizeLimit', 'maxTurnSeconds'];
             const stringKeys = ['format', 'mulliganRules'];
             const boolKeys = ['useCommanderDamage'];
             for (const k of numericKeys) {
                 if (newSettings[k] !== undefined) {
                     const v = clampGameValue(newSettings[k], { allowNegative: false });
-                    if (v > 0) room.settings[k] = v;
+                    // maxTurnSeconds accepts 0 to mean "disable the timer".
+                    // Every other numeric setting must be positive to apply.
+                    if (k === 'maxTurnSeconds') room.settings[k] = v;
+                    else if (v > 0) room.settings[k] = v;
                 }
             }
             for (const k of stringKeys) {
@@ -2872,6 +2954,9 @@ module.exports = function registerSocketHandlers(io) {
             }
             addAndBroadcastAction(io, room, currentUserId, 'updateRoomSettings', {});
             broadcastRoomState(io, room);
+            // Re-schedule the turn timer — the max might have changed, or
+            // been enabled/disabled.
+            scheduleTurnTimeout(room, io);
             callback?.({ success: true });
         });
 
@@ -2910,6 +2995,155 @@ module.exports = function registerSocketHandlers(io) {
         });
 
         // Concede ──────────────────────────────────────────────────────
+        // ─── VOTE KICK ────────────────────────────────────────────────
+        // Majority-vote boot for misbehaving players. Any player can start
+        // a vote against another player (never the host). Vote passes when
+        // strictly more than half of the non-target players vote yes. Auto
+        // fails after 60 seconds. The target cannot vote.
+        const VOTE_KICK_DURATION_MS = 60 * 1000;
+        const performKick = (room, targetUserId, reason) => {
+            const idx = room.players.findIndex(p => p.userId === targetUserId);
+            if (idx === -1) return false;
+            const kicked = room.players[idx];
+            if (kicked.socketId) {
+                io.to(kicked.socketId).emit('kicked', { roomCode: currentRoom, reason });
+                const kickedSocket = io.sockets.sockets.get(kicked.socketId);
+                if (kickedSocket) kickedSocket.leave(currentRoom);
+            }
+            room.players.splice(idx, 1);
+            return kicked;
+        };
+        const resolveVoteKick = (room, outcome) => {
+            const v = room.voteKick;
+            if (!v) return;
+            if (v.timerId) { clearTimeout(v.timerId); v.timerId = null; }
+            if (outcome === 'pass') {
+                const kicked = performKick(room, v.targetUserId, 'vote-kicked');
+                if (kicked) {
+                    addAndBroadcastAction(io, room, v.initiatedBy, 'voteKickPassed', {
+                        target: v.targetUsername,
+                        initiator: v.initiatedByName,
+                        yes: (v.yesVoters || []).length,
+                        required: v.required,
+                    });
+                    broadcastToRoom(io, room, 'notification', {
+                        type: 'vote-kick-passed',
+                        message: `${v.targetUsername} was kicked by vote`,
+                    });
+                }
+            } else if (outcome === 'fail') {
+                addAndBroadcastAction(io, room, v.initiatedBy, 'voteKickFailed', {
+                    target: v.targetUsername,
+                    reason: v.expiresAt && Date.now() >= v.expiresAt ? 'timeout' : 'majority-no',
+                    yes: (v.yesVoters || []).length,
+                    no: (v.noVoters || []).length,
+                    required: v.required,
+                });
+                broadcastToRoom(io, room, 'notification', {
+                    type: 'vote-kick-failed',
+                    message: `Vote-kick against ${v.targetUsername} failed`,
+                });
+            }
+            room.voteKick = null;
+            broadcastRoomState(io, room);
+        };
+        const checkVoteKickResolution = (room) => {
+            const v = room.voteKick;
+            if (!v) return;
+            const yes = (v.yesVoters || []).length;
+            const no = (v.noVoters || []).length;
+            // Required yes = strict majority of non-target voters.
+            if (yes >= v.required) return resolveVoteKick(room, 'pass');
+            // If even counting all remaining eligible votes as yes, the
+            // proposal can't reach threshold, fail early.
+            const eligible = room.players.filter(p => p.userId !== v.targetUserId).length;
+            const undecided = eligible - yes - no;
+            if (yes + undecided < v.required) return resolveVoteKick(room, 'fail');
+        };
+
+        socket.on('startVoteKick', ({ targetUserId, reason }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room) return callback?.({ error: 'Not in a room' });
+            const caller = getPlayerInRoom(room, currentUserId);
+            if (!caller) return callback?.({ error: 'Not in room' });
+            if (room.voteKick) return callback?.({ error: 'A vote-kick is already in progress' });
+            if (!targetUserId || targetUserId === currentUserId) {
+                return callback?.({ error: 'Pick another player to vote-kick' });
+            }
+            if (targetUserId === room.hostId) {
+                return callback?.({ error: 'Cannot vote-kick the host' });
+            }
+            const target = getPlayerInRoom(room, targetUserId);
+            if (!target) return callback?.({ error: 'Target not found' });
+            if (room.players.length < 3) {
+                return callback?.({ error: 'Vote-kick needs at least 3 players in the room' });
+            }
+            const eligible = room.players.filter(p => p.userId !== targetUserId).length;
+            const required = Math.floor(eligible / 2) + 1; // strict majority
+            const now = Date.now();
+            room.voteKick = {
+                targetUserId,
+                targetUsername: target.username,
+                initiatedBy: currentUserId,
+                initiatedByName: caller.username,
+                startedAt: now,
+                expiresAt: now + VOTE_KICK_DURATION_MS,
+                yesVoters: [currentUserId], // initiator auto-votes yes
+                noVoters: [],
+                required,
+                reason: typeof reason === 'string' ? reason.slice(0, 120) : '',
+                timerId: null,
+            };
+            room.voteKick.timerId = setTimeout(() => {
+                if (room.voteKick && room.voteKick.targetUserId === targetUserId) {
+                    resolveVoteKick(room, 'fail');
+                }
+            }, VOTE_KICK_DURATION_MS);
+            addAndBroadcastAction(io, room, currentUserId, 'voteKickStart', {
+                target: target.username,
+                initiator: caller.username,
+                required,
+                reason: room.voteKick.reason,
+            });
+            broadcastToRoom(io, room, 'notification', {
+                type: 'vote-kick-start',
+                message: `${caller.username} started a vote-kick against ${target.username}`,
+            });
+            broadcastRoomState(io, room);
+            checkVoteKickResolution(room);
+            callback?.({ success: true });
+        });
+
+        socket.on('castVoteKick', ({ yes }, callback) => {
+            const room = getRoom(currentRoom);
+            if (!room?.voteKick) return callback?.({ error: 'No vote in progress' });
+            const v = room.voteKick;
+            if (currentUserId === v.targetUserId) return callback?.({ error: 'You cannot vote on your own vote-kick' });
+            const player = getPlayerInRoom(room, currentUserId);
+            if (!player) return callback?.({ error: 'Not in room' });
+            // Remove previous vote (if any) before casting the new one so
+            // a player can change their mind.
+            v.yesVoters = (v.yesVoters || []).filter(id => id !== currentUserId);
+            v.noVoters = (v.noVoters || []).filter(id => id !== currentUserId);
+            if (yes) v.yesVoters.push(currentUserId);
+            else v.noVoters.push(currentUserId);
+            broadcastRoomState(io, room);
+            checkVoteKickResolution(room);
+            callback?.({ success: true });
+        });
+
+        socket.on('cancelVoteKick', (callback) => {
+            const room = getRoom(currentRoom);
+            if (!room?.voteKick) return callback?.({ error: 'No vote in progress' });
+            const v = room.voteKick;
+            // Only the initiator or the host can cancel a running vote.
+            if (v.initiatedBy !== currentUserId && room.hostId !== currentUserId) {
+                return callback?.({ error: 'Only the initiator or host can cancel the vote' });
+            }
+            resolveVoteKick(room, 'fail');
+            callback?.({ success: true });
+        });
+
         socket.on('concede', (callback) => {
             const room = getRoom(currentRoom);
             if (!room) return callback?.({ error: 'Not in a room' });
