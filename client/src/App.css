@@ -953,7 +953,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .card-zoom { width: 320px; flex-shrink: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.9); border: 1px solid var(--accent-dim); }
 .card-zoom img { width: 100%; display: block; }
 
-/* Effects panel — sits to the side of the card */
+/* Effects panel — sits to the side of the card. Sized to its content;
+   no scrollbar because the hover panel has pointer-events: none (we
+   can't scroll without moving the mouse off the card and dismissing
+   the hover). For cards whose content would exceed the viewport, click
+   to maximize — the max view gets its own scroll. */
 .card-effects-panel {
     background: var(--bg-panel);
     border: 1px solid var(--accent);
@@ -963,8 +967,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     font-family: 'EB Garamond', serif;
     font-size: 0.9em;
     width: 240px;
-    max-height: 460px;
-    overflow-y: auto;
 }
 .effect-group { margin-bottom: 12px; }
 .effect-group:last-child { margin-bottom: 0; }

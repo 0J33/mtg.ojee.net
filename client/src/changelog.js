@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.6',
+        date: '2026-04-19',
+        changes: [
+            'Hover preview panel no longer shows a useless scrollbar — the panel has pointer-events: none, so the mouse can\'t reach it to scroll. Sized to content instead; if a card has enough info to exceed the viewport, click to maximize (that view scrolls)',
+        ],
+    },
+    {
         version: '3.5',
         date: '2026-04-19',
         changes: [
