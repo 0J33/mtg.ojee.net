@@ -175,7 +175,13 @@ export function useVerticalDragPos(key, defaultTop = '50%') {
     };
 
     return {
-        topStyle: top !== null ? { top: `${top}px`, transform: 'translateY(-50%)' } : undefined,
+        // Also zero out `bottom` explicitly: the mobile CSS for some
+        // toggles (e.g. .piles-toggle) uses `top: auto; bottom: 200px;`
+        // to sit above the iOS home indicator. When we set `top: Npx`
+        // inline WITHOUT also clearing `bottom`, both edges are pinned
+        // and the toggle stretches vertically to fill the gap. Setting
+        // bottom: auto drops the mobile override so only our top wins.
+        topStyle: top !== null ? { top: `${top}px`, bottom: 'auto', transform: 'translateY(-50%)' } : undefined,
         dragHandlers: {
             onPointerDown,
             onPointerMove,

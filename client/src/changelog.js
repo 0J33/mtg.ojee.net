@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.10',
+        date: '2026-04-19',
+        changes: [
+            'Fix piles toggle stretching vertically when dragged on mobile. Mobile CSS sets `top: auto; bottom: 200px` for the piles button; applying our drag-position `top: Npx` inline left `bottom: 200px` untouched so the button was pinned to both edges and stretched. The drag hook now also sets `bottom: auto` so only our top wins. Other draggable toggles were unaffected because their mobile CSS doesn\'t pin the bottom edge',
+        ],
+    },
+    {
         version: '3.9',
         date: '2026-04-19',
         changes: [
