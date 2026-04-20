@@ -191,19 +191,30 @@ const COMMON_DEFINED_TERM_STOP = new Set([
 // in the card text.
 function reminderFromOracle(oracle, keyword) {
     if (!oracle || !keyword) return null;
-    // Case 1 — parenthetical reminder immediately after the keyword
-    // (optionally with a cost / value like "Ward {2}").
     const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const paren = new RegExp(`\\b${esc}\\b[^.(]*\\(([^)]+)\\)`, 'i');
-    const m = oracle.match(paren);
-    if (m) return m[1].trim();
-    // Case 2 — gather every sentence that mentions the keyword. For
-    // card-specific named abilities the keyword is typically referenced
-    // in 2+ sentences that together describe it (enters X / becomes X /
-    // triggers on X). Concatenate them so the reader gets the full
-    // definition without re-reading the whole card.
-    const sentences = oracle.split(/(?<=[.!?])\s+/);
-    const hits = sentences.filter(s => new RegExp(`\\b${esc}\\b`, 'i').test(s));
+    const kwRe = new RegExp(`\\b${esc}\\b`, 'i');
+    // Case 1 — a parenthetical anywhere in the oracle text that
+    // mentions the keyword. This is the card's OWN reminder text
+    // (e.g. "(While it's prepared, you may cast a copy of its spell.
+    // Doing so unprepares it.)"). We scan all parentheticals and pick
+    // the first one that names the keyword, which is almost always the
+    // right reminder for that keyword. Handles reminders that sit a
+    // sentence or two away from the first keyword mention too.
+    const parens = oracle.match(/\(([^)]+)\)/g) || [];
+    for (const p of parens) {
+        const body = p.slice(1, -1);
+        if (kwRe.test(body)) return body.trim();
+    }
+    // Case 2 — gather every NON-parenthetical sentence that mentions
+    // the keyword. For card-specific named abilities the keyword is
+    // referenced in 2+ sentences that together describe it
+    // (enters X / becomes X / triggers on X). Concatenate them so the
+    // reader gets the full definition without re-reading the whole card.
+    // We strip any parentheticals from each sentence first so they
+    // don't duplicate what Case 1 already showed.
+    const stripped = oracle.replace(/\s*\([^)]*\)\s*/g, ' ');
+    const sentences = stripped.split(/(?<=[.!?])\s+/);
+    const hits = sentences.filter(s => kwRe.test(s));
     if (hits.length === 0) return null;
     return hits.join(' ').replace(/\s+/g, ' ').trim();
 }

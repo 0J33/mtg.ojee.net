@@ -950,6 +950,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* z-index must sit above reveal-top (2500) and the peek-exile modal (1100)
    so hovering a card in ANY modal shows the zoom instead of going behind it. */
 .card-zoom-wrapper { position: fixed; z-index: 2600; pointer-events: none; display: flex; flex-direction: row; gap: 8px; align-items: flex-start; }
+/* When the card is in the lower half of the screen the wrapper is
+   anchored from the bottom edge and bottom-aligns its children so a
+   tall side panel grows upward (past the card top if need be) instead
+   of clipping off the viewport bottom. */
+.card-zoom-wrapper.anchor-bottom { align-items: flex-end; }
 .card-zoom { width: 320px; flex-shrink: 0; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.9); border: 1px solid var(--accent-dim); }
 .card-zoom img { width: 100%; display: block; }
 

@@ -72,9 +72,29 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                 ? Math.min(rect.right + 12, window.innerWidth - totalWidth - 10)
                 : Math.max(10, rect.left - totalWidth - 12);
         }
-        let posY = rect.top + rect.height / 2 - ZOOM_H / 2;
-        posY = Math.max(10, Math.min(posY, window.innerHeight - ZOOM_H - 10));
-        setHoverPos({ x: posX, y: posY });
+        // Vertical placement: anchor from whichever edge has more space.
+        // When the card is in the lower half of the screen, we anchor the
+        // preview's BOTTOM to the viewport so a tall hover panel grows
+        // upward from the card (instead of extending past the viewport's
+        // bottom where it would be invisible). Card in the upper half:
+        // anchor from top, as before.
+        const cardCenterY = rect.top + rect.height / 2;
+        const preferBottom = cardCenterY > window.innerHeight / 2;
+        let posY;
+        let fromBottom = false;
+        if (preferBottom) {
+            // Distance from the bottom of the viewport to the bottom edge
+            // of the preview. We want the preview's bottom ~= cardCenterY
+            // + ZOOM_H/2 (so the zoom image is roughly centered on the
+            // card horizontally). So bottom offset = innerHeight - that.
+            const desiredBottom = cardCenterY + ZOOM_H / 2;
+            posY = Math.max(10, window.innerHeight - desiredBottom);
+            fromBottom = true;
+        } else {
+            posY = cardCenterY - ZOOM_H / 2;
+            posY = Math.max(10, Math.min(posY, window.innerHeight - ZOOM_H - 10));
+        }
+        setHoverPos({ x: posX, y: posY, fromBottom });
     };
 
     // Show every counter the user intentionally added (including 0-value
@@ -149,7 +169,12 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
 
             {/* Hover zoom + side effects panel */}
             {hoverPos && !isDragging && !isFaceDown && createPortal(
-                <div className="card-zoom-wrapper" style={{ left: hoverPos.x, top: hoverPos.y }}>
+                <div
+                    className={`card-zoom-wrapper ${hoverPos.fromBottom ? 'anchor-bottom' : ''}`}
+                    style={hoverPos.fromBottom
+                        ? { left: hoverPos.x, bottom: hoverPos.y }
+                        : { left: hoverPos.x, top: hoverPos.y }}
+                >
                     <div className={`card-zoom ${card.foil || ''}`}>
                         <img src={largeImageUrl} alt={card.name} />
                     </div>

@@ -4,6 +4,14 @@
 
 export const CHANGELOG = [
     {
+        version: '3.7',
+        date: '2026-04-19',
+        changes: [
+            'Hover preview: when the card is in the lower half of the screen, the preview now anchors from the bottom and grows upward — so a tall hover panel (e.g. adventure cards with both-halves breakdown + keywords) extends above the card instead of clipping off the viewport bottom',
+            'Keyword reminder text: the parenthetical scan now finds the reminder anywhere in the oracle text (not just immediately after the keyword word). For Skycoach Conductor, "Prepared" now shows the actual inline reminder — "While it\'s prepared, you may cast a copy of its spell. Doing so unprepares it." — instead of collapsing fragments from outside the parens',
+        ],
+    },
+    {
         version: '3.6',
         date: '2026-04-19',
         changes: [
