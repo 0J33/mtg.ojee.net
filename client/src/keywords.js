@@ -205,14 +205,24 @@ function reminderFromOracle(oracle, keyword) {
         const body = p.slice(1, -1);
         if (kwRe.test(body)) return body.trim();
     }
-    // Case 2 — gather every NON-parenthetical sentence that mentions
-    // the keyword. For card-specific named abilities the keyword is
-    // referenced in 2+ sentences that together describe it
-    // (enters X / becomes X / triggers on X). Concatenate them so the
-    // reader gets the full definition without re-reading the whole card.
-    // We strip any parentheticals from each sentence first so they
-    // don't duplicate what Case 1 already showed.
+    // Case 2 — grab the full ABILITY PARAGRAPH(s) that mention the
+    // keyword. Scryfall oracle text separates abilities with "\n", so
+    // each paragraph is a self-contained ability block. For a card
+    // like Emeritus of Ideation, the "prepared" mechanic lives in one
+    // paragraph — "Whenever this creature attacks, you may exile eight
+    // cards from your graveyard. If you do, this creature becomes
+    // prepared." — and the "enters prepared" trigger in a second. Both
+    // paragraphs together give a complete explanation; filtering only
+    // sentences-with-the-keyword dropped the crucial middle sentence
+    // that defines what happens.
     const stripped = oracle.replace(/\s*\([^)]*\)\s*/g, ' ');
+    const paragraphs = stripped.split(/\n+/).map(p => p.trim()).filter(Boolean);
+    const hitParagraphs = paragraphs.filter(p => kwRe.test(p));
+    if (hitParagraphs.length > 0) {
+        return hitParagraphs.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    // Fallback: if the oracle is a single paragraph (no \n splits), at
+    // least try sentence-level filtering so we don't return null.
     const sentences = stripped.split(/(?<=[.!?])\s+/);
     const hits = sentences.filter(s => kwRe.test(s));
     if (hits.length === 0) return null;

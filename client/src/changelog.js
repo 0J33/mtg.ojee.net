@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.8',
+        date: '2026-04-19',
+        changes: [
+            'Keyword reminder (no-parenthetical case) now grabs the entire ability PARAGRAPH that mentions the keyword instead of only the sentences containing the word itself. For Emeritus of Ideation, "Prepared" now shows the full "This creature enters prepared. Whenever this creature attacks, you may exile eight cards from your graveyard. If you do, this creature becomes prepared." — the crucial middle sentence that defines the trigger is no longer dropped',
+        ],
+    },
+    {
         version: '3.7',
         date: '2026-04-19',
         changes: [
