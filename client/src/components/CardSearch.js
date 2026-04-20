@@ -55,6 +55,7 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
             colors: card.colors || face?.colors || [],
             layout: card.layout || 'normal',
             faces: extractFaces(card),
+            keywords: Array.isArray(card.keywords) ? card.keywords : [],
         };
 
         if (mode === 'token') {

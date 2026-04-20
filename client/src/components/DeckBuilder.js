@@ -101,6 +101,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
             producedMana: card.produced_mana || [],
             layout: card.layout || 'normal',
             faces: extractFaces(card),
+            keywords: Array.isArray(card.keywords) ? card.keywords : [],
         };
     };
 

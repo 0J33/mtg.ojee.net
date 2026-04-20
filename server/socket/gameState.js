@@ -78,6 +78,11 @@ function createCardInstance(cardData, overrides = {}) {
         // second half isn't visible in the main image, and for showing
         // the back face's text under the CardMaximized flip preview.
         faces: Array.isArray(cardData.faces) ? cardData.faces : null,
+        // Scryfall's full keyword list (both evergreen + named abilities
+        // on this card). Used by the client to build the Keywords
+        // reminder-text section without limiting it to our static
+        // dictionary.
+        keywords: Array.isArray(cardData.keywords) ? cardData.keywords : [],
         ...overrides,
     };
 }

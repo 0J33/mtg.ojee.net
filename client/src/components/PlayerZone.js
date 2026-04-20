@@ -750,11 +750,12 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                     </div>
                 )}
 
-                {/* Infect / poison next to HP — owner always sees it (even at 0)
-                    so they can click to add. Others only see it when >0. Click
-                    behavior mirrors the other counter badges: left +1,
-                    right -1, middle clear, shift+click opens a set prompt. */}
-                {(totalInfect > 0 || isOwner) && (
+                {/* Infect / poison next to HP — hidden when 0 so the header
+                    stays clean. Use the right-click menu's "Infect..." entry
+                    or Proliferate to start a poison count. Once above 0 it
+                    responds to L-click +1 / R-click −1 / middle-click clear /
+                    Shift-click to set. */}
+                {totalInfect > 0 && (
                     <div
                         className="infect-inline"
                         onClick={(e) => e.stopPropagation()}

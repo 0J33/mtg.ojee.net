@@ -4,6 +4,14 @@
 
 export const CHANGELOG = [
     {
+        version: '3.4',
+        date: '2026-04-19',
+        changes: [
+            'Keyword reminder text now works for any keyword the card actually has — uses Scryfall\'s authoritative keywords list (passed through on import / token fetch / pack gen / deck save). Card-specific named abilities (Prepared, Vanish, anything custom) get their definition pulled from the card\'s own oracle text when the static dictionary doesn\'t know the keyword',
+            'Infect badge hidden again when the player has 0 poison counters (use the right-click menu to start a poison count)',
+        ],
+    },
+    {
         version: '3.3',
         date: '2026-04-19',
         changes: [

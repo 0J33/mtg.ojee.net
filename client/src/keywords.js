@@ -149,23 +149,89 @@ export const KEYWORDS = {
     // Static short words (can collide with common English — handled via word-boundary regex)
 };
 
-// Detect keywords mentioned in the card's oracle text and type line.
+// Pull reminder text for a single keyword from the card's own oracle
+// text. Handles two common forms:
+//   1. Parenthetical reminder: "Flying (Can't be blocked except by...)".
+//   2. Defined named ability: a sentence that mentions the keyword and
+//      describes what it does (e.g. for "Prepared": "This creature
+//      enters prepared. Whenever this creature attacks... becomes
+//      prepared.").
+// Returns the best-fit description string, or null if nothing useful is
+// in the card text.
+function reminderFromOracle(oracle, keyword) {
+    if (!oracle || !keyword) return null;
+    // Case 1 — parenthetical reminder immediately after the keyword
+    // (optionally with a cost / value like "Ward {2}").
+    const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const paren = new RegExp(`\\b${esc}\\b[^.(]*\\(([^)]+)\\)`, 'i');
+    const m = oracle.match(paren);
+    if (m) return m[1].trim();
+    // Case 2 — gather every sentence that mentions the keyword. For
+    // card-specific named abilities the keyword is typically referenced
+    // in 2+ sentences that together describe it (enters X / becomes X /
+    // triggers on X). Concatenate them so the reader gets the full
+    // definition without re-reading the whole card.
+    const sentences = oracle.split(/(?<=[.!?])\s+/);
+    const hits = sentences.filter(s => new RegExp(`\\b${esc}\\b`, 'i').test(s));
+    if (hits.length === 0) return null;
+    return hits.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+// Detect keywords the card has. Priority:
+//   1. Scryfall-authoritative `card.keywords` array (includes every
+//      evergreen + card-specific named ability). Each entry gets a
+//      description: the static dictionary's standard reminder when we
+//      know it, otherwise a reminder extracted from the card's own
+//      oracle text (for made-up / named abilities), otherwise the raw
+//      keyword name as-is (last resort).
+//   2. Fallback: scan oracle text + type line for static-dictionary
+//      keyword mentions (for cards that pre-date the keywords field or
+//      for custom cards without it).
 // Returns an array of { keyword, description } objects, deduplicated.
 export function detectKeywords(card) {
     if (!card) return [];
-    const text = `${card.typeLine || ''}\n${card.oracleText || ''}`.toLowerCase();
-    if (!text.trim()) return [];
-    const found = new Set();
+    const oracle = card.oracleText || '';
     const results = [];
-    // Sort keys by length desc so multi-word keywords (e.g. "first strike")
-    // match before shorter overlapping ones (e.g. "strike").
-    const keys = Object.keys(KEYWORDS).sort((a, b) => b.length - a.length);
-    for (const key of keys) {
-        const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const pattern = new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, 'i');
-        if (pattern.test(text) && !found.has(key)) {
-            found.add(key);
-            results.push({ keyword: key, description: KEYWORDS[key] });
+    const found = new Set();
+
+    const push = (keyword, description) => {
+        const key = keyword.trim();
+        if (!key) return;
+        const lowerKey = key.toLowerCase();
+        if (found.has(lowerKey)) return;
+        found.add(lowerKey);
+        results.push({ keyword: key, description: description || '' });
+    };
+
+    // 1. Scryfall keywords — the authoritative list.
+    const scryKeywords = Array.isArray(card.keywords) ? card.keywords : [];
+    for (const kw of scryKeywords) {
+        if (typeof kw !== 'string' || !kw.trim()) continue;
+        const lower = kw.toLowerCase();
+        const staticDesc = KEYWORDS[lower];
+        // Prefer the card's own reminder text when present; otherwise
+        // use our static dictionary; otherwise a last-resort description
+        // that points the player at the oracle text.
+        const cardReminder = reminderFromOracle(oracle, kw);
+        const description = cardReminder
+            || staticDesc
+            || `See the card's text for what ${kw} does on this card.`;
+        push(kw, description);
+    }
+
+    // 2. Fallback scan of oracle / type line for unknown-keywords-list
+    // cases (custom cards without Scryfall metadata). Only adds entries
+    // that weren't already surfaced by the authoritative list.
+    const text = `${card.typeLine || ''}\n${oracle}`.toLowerCase();
+    if (text.trim()) {
+        const keys = Object.keys(KEYWORDS).sort((a, b) => b.length - a.length);
+        for (const key of keys) {
+            if (found.has(key)) continue;
+            const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`, 'i');
+            if (pattern.test(text)) {
+                push(key, KEYWORDS[key]);
+            }
         }
     }
     return results;

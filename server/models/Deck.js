@@ -36,6 +36,10 @@ const cardEntrySchema = new mongoose.Schema({
     // flips, aftermaths, DFCs). Null for single-face cards. Each face has
     // name/mana cost/type line/oracle text/power/toughness/colors.
     faces: { type: Array, default: null },
+    // Scryfall-authoritative keyword list — drives the hover / maximize
+    // "Keywords" section so we catch card-specific named abilities our
+    // static dictionary doesn't know about (e.g. Prepared, Vanish).
+    keywords: { type: [String], default: undefined },
 }, { _id: false });
 
 const deckSchema = new mongoose.Schema({

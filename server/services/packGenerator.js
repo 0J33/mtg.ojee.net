@@ -73,6 +73,7 @@ function cardToEntry(card) {
         layout: card.layout || 'normal',
         rarity: card.rarity,
         faces: extractFaces(card),
+        keywords: Array.isArray(card.keywords) ? card.keywords : [],
     };
 }
 

@@ -63,6 +63,12 @@ function scryfallCardToEntry(card) {
         textless: !!card.textless,
         nonEnglish: !!(card.lang && card.lang !== 'en'),
         faces: extractFaces(card),
+        // Scryfall's authoritative keyword list — includes both evergreen
+        // keywords (Flying, Ward) AND card-specific named abilities
+        // ("Prepared" on custom/preview cards). We stash it so the client
+        // can show every keyword, even when our static dictionary doesn't
+        // know about it.
+        keywords: Array.isArray(card.keywords) ? card.keywords : [],
     };
 }
 
@@ -253,6 +259,7 @@ router.post('/moxfield', async (req, res) => {
                     layout: card.layout || 'normal',
                     foil: foilFinish,
                     faces: extractFaces(card),
+                    keywords: Array.isArray(card.keywords) ? card.keywords : [],
                 });
             }
         };
