@@ -851,12 +851,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Command zone + Hand side-by-side row. Command zone sits on the LEFT
    and shrinks to a slim vertical label when collapsed so the hand takes
-   the full remaining width. */
+   the full remaining width. The row has an explicit min-height tied to
+   the card dimensions so collapsed/expanded cmd-zone and the hand all
+   report the same height — the row itself dictates, and stretch makes
+   both children follow. */
 .hand-row {
     display: flex;
     flex-direction: row;
     gap: 3px;
     flex-shrink: 0;
+    align-items: stretch;
+    min-height: calc(var(--card-h, 98px) + 10px);
 }
 .command-zone.cmd-beside-hand {
     display: flex;
@@ -868,12 +873,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
     border: 1px solid rgba(160,110,50,0.3);
     border-radius: 3px;
     overflow: hidden;
-    /* Explicit height tied to one card + label. Without it, the
-       collapsed zone's vertical writing-mode label was growing to fit
-       "Command (N)" vertically, pushing the whole hand-row taller
-       than the hand and eating battlefield space above. */
-    height: calc(var(--card-h, 98px) + 22px);
+    /* Stretch to match the hand-row's height (which is in turn pegged
+       to card-h + padding). min-height: 0 plus overflow: hidden means
+       the collapsed vertical-writing-mode label can't grow the parent
+       row taller than the hand. */
     min-height: 0;
+    align-self: stretch;
 }
 .command-zone.cmd-beside-hand.collapsed {
     /* Collapsed = just the slim vertical-text label; no width reserved

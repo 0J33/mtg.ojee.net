@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.15',
+        date: '2026-04-19',
+        changes: [
+            'Command zone height now exactly matches the hand zone in both open and closed states. Dropped the hardcoded height on .command-zone.cmd-beside-hand; the hand-row now has align-items: stretch + an explicit min-height of card-h + 10 so the row itself dictates the height and both children follow',
+        ],
+    },
+    {
         version: '3.14',
         date: '2026-04-19',
         changes: [
