@@ -4,6 +4,14 @@
 
 export const CHANGELOG = [
     {
+        version: '3.19',
+        date: '2026-04-19',
+        changes: [
+            'Extracted the full card hover preview (zoom + keywords / oracle / multi-face breakdown / counters / notes / attachments) into a shared component used everywhere: board cards, pile cards, draft / sealed pickers, card search, deck viewer. All hover zooms now show the same side panel with keyword reminders',
+            'Scryfall search results get their keyword list + face data normalized into the hover shape on the fly, so hovering a draft pick shows the same Prepared / Flying / Ward reminders as a card already in your library',
+        ],
+    },
+    {
         version: '3.18',
         date: '2026-04-19',
         changes: [

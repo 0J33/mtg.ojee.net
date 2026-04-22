@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { decks } from '../api';
 import { useEscapeKey } from '../utils';
 import { useDialog } from './Dialog';
 import ManaCost from './ManaCost';
+import CardHoverPreview from './CardHoverPreview';
 
 export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
     useEscapeKey(onClose);
@@ -26,15 +26,23 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
         const rect = e.currentTarget.getBoundingClientRect();
         const ZOOM_W = 320;
         const ZOOM_H = 460;
-        // Place to the side of the row, not the cursor
+        // Anchor next to the row so the preview doesn't follow the cursor.
         const spaceRight = window.innerWidth - rect.right;
-        let posX;
-        if (spaceRight >= ZOOM_W + 20) posX = rect.right + 12;
-        else if (rect.left >= ZOOM_W + 20) posX = rect.left - ZOOM_W - 12;
-        else posX = Math.max(10, window.innerWidth - ZOOM_W - 10);
-        let posY = rect.top + rect.height / 2 - ZOOM_H / 2;
-        posY = Math.max(10, Math.min(posY, window.innerHeight - ZOOM_H - 10));
-        setHoverPos({ x: posX, y: posY });
+        let x;
+        if (spaceRight >= ZOOM_W + 20) x = rect.right + 12;
+        else if (rect.left >= ZOOM_W + 20) x = rect.left - ZOOM_W - 12;
+        else x = Math.max(10, window.innerWidth - ZOOM_W - 10);
+        const cardCenterY = rect.top + rect.height / 2;
+        const preferBottom = cardCenterY > window.innerHeight / 2;
+        let y;
+        let fromBottom = false;
+        if (preferBottom) {
+            y = Math.max(10, window.innerHeight - (cardCenterY + ZOOM_H / 2));
+            fromBottom = true;
+        } else {
+            y = Math.max(10, Math.min(cardCenterY - ZOOM_H / 2, window.innerHeight - ZOOM_H - 10));
+        }
+        setHoverPos({ x, y, fromBottom });
     };
 
     if (loading) return (
@@ -147,21 +155,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                 </div>
             </div>
 
-            {hoveredCard && hoveredCard.imageUri && createPortal(
-                <div
-                    className="card-zoom"
-                    style={{
-                        position: 'fixed',
-                        left: hoverPos.x,
-                        top: hoverPos.y,
-                        zIndex: 4000,
-                        pointerEvents: 'none',
-                    }}
-                >
-                    <img src={hoveredCard.imageUri} alt={hoveredCard.name} />
-                </div>,
-                document.body
-            )}
+            <CardHoverPreview card={hoveredCard} pos={hoveredCard ? hoverPos : null} />
         </div>
     );
 }

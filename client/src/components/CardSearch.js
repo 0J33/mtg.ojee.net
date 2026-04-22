@@ -1,10 +1,33 @@
 import React, { useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { scryfall } from '../api';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
 import ManaCost from './ManaCost';
 import { DFC_LAYOUTS, extractFaces } from '../cardFaces';
+import CardHoverPreview, { computeHoverPos } from './CardHoverPreview';
+
+// Normalize a raw Scryfall card into the shape CardHoverPreview expects
+// (imageUri / oracleText / typeLine / faces / keywords / etc.). Used by
+// search / draft flows that work with Scryfall results directly.
+function scryfallToHoverCard(card) {
+    const face = card.card_faces?.[0];
+    const isDfc = DFC_LAYOUTS.has(card.layout);
+    return {
+        name: card.name,
+        imageUri: card.image_uris?.normal || face?.image_uris?.normal || '',
+        backImageUri: isDfc ? (card.card_faces?.[1]?.image_uris?.normal || '') : '',
+        manaCost: card.mana_cost || face?.mana_cost || '',
+        typeLine: card.type_line || face?.type_line || '',
+        oracleText: card.oracle_text || face?.oracle_text || '',
+        power: card.power || face?.power || '',
+        toughness: card.toughness || face?.toughness || '',
+        layout: card.layout || 'normal',
+        faces: extractFaces(card),
+        keywords: Array.isArray(card.keywords) ? card.keywords : [],
+        textless: !!card.textless,
+        nonEnglish: !!(card.lang && card.lang !== 'en'),
+    };
+}
 
 export default function CardSearch({ onClose, mode, deckTokens }) {
     useEscapeKey(onClose);
@@ -17,12 +40,9 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
     const debounceRef = useRef(null);
 
     const handleHover = (e, card) => {
-        const face = card.card_faces?.[0];
-        const url = card.image_uris?.large || card.image_uris?.normal || face?.image_uris?.large || face?.image_uris?.normal;
-        if (!url) return;
-        const x = e.clientX > window.innerWidth / 2 ? e.clientX - 340 : e.clientX + 20;
-        const y = Math.max(10, Math.min(e.clientY - 60, window.innerHeight - 460));
-        setHover({ url, x, y });
+        const hoverCard = scryfallToHoverCard(card);
+        if (!hoverCard.imageUri) return;
+        setHover({ card: hoverCard, pos: computeHoverPos(e) });
     };
 
     const handleSearch = (q) => {
@@ -130,12 +150,7 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
                     })}
                 </div>
             </div>
-            {hover && createPortal(
-                <div className="card-zoom" style={{ position: 'fixed', left: hover.x, top: hover.y, zIndex: 2600, pointerEvents: 'none' }}>
-                    <img src={hover.url} alt="" />
-                </div>,
-                document.body
-            )}
+            <CardHoverPreview card={hover?.card || null} pos={hover?.pos || null} />
         </div>
     );
 }

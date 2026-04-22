@@ -4,6 +4,7 @@ import socket from '../socket';
 import { useDialog } from './Dialog';
 import ContextMenu from './ContextMenu';
 import { useVerticalDragPos } from '../utils';
+import CardHoverPreview, { computeHoverPos } from './CardHoverPreview';
 
 const CARD_BACK = 'https://backs.scryfall.io/large/0/a/0aeebaf5-8c7d-4636-9e82-8c27447861f7.jpg';
 
@@ -52,32 +53,17 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
     const dragRef = useRef(null); // { startX, startY, origLeft, origTop, pointerId }
     const [cardMenu, setCardMenu] = useState(null); // { x, y, pile, card }
     const toggleDrag = useVerticalDragPos('mtg_piles_toggle_top');
-    // Hover zoom for pile card thumbnails — same preview the board
-    // cards get on hover, positioned next to the mouse. Cleared on
-    // mouseleave. Not a modal; pointer-events: none so it can't block
-    // the click that would otherwise follow.
-    const [hoverZoom, setHoverZoom] = useState(null); // { url, x, y } | null
+    // Hover preview for pile thumbnails — reuses CardHoverPreview so
+    // pile cards show the same zoom + side panel (keywords, counters,
+    // notes, multi-face breakdown) the board gets.
+    const [hoverCard, setHoverCard] = useState(null); // card object
+    const [hoverPos, setHoverPos] = useState(null);
     const onCardHover = (e, card) => {
-        if (card.faceDown) { setHoverZoom(null); return; }
-        const src = (card.flipped && card.backImageUri)
-            ? card.backImageUri
-            : (card.skinUrl || card.imageUri);
-        if (!src) return;
-        const ZOOM_W = 320;
-        const ZOOM_H = 460;
-        const spaceRight = window.innerWidth - e.clientX;
-        const x = spaceRight >= ZOOM_W + 20
-            ? e.clientX + 16
-            : Math.max(10, e.clientX - ZOOM_W - 16);
-        let y = e.clientY - ZOOM_H / 2;
-        y = Math.max(10, Math.min(y, window.innerHeight - ZOOM_H - 10));
-        setHoverZoom({
-            url: src.replace('/normal/', '/large/').replace('/small/', '/large/'),
-            foil: card.foil || '',
-            x, y,
-        });
+        if (card.faceDown) { setHoverCard(null); return; }
+        setHoverCard(card);
+        setHoverPos(computeHoverPos(e));
     };
-    const onCardLeave = () => setHoverZoom(null);
+    const onCardLeave = () => { setHoverCard(null); setHoverPos(null); };
 
     // Clamp on window resize so the panel can't get stuck off-screen.
     useEffect(() => {
@@ -424,15 +410,7 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                 </div>,
                 document.body
             )}
-            {hoverZoom && createPortal(
-                <div
-                    className={`card-zoom ${hoverZoom.foil || ''}`}
-                    style={{ position: 'fixed', left: hoverZoom.x, top: hoverZoom.y, zIndex: 3500, pointerEvents: 'none' }}
-                >
-                    <img src={hoverZoom.url} alt="" />
-                </div>,
-                document.body
-            )}
+            <CardHoverPreview card={hoverCard} pos={hoverPos} />
             {cardMenu && (
                 <ContextMenu
                     x={cardMenu.x}

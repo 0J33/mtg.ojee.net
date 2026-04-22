@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import socket from '../socket';
 import { useEscapeKey } from '../utils';
+import CardHoverPreview, { computeHoverPos } from './CardHoverPreview';
 
 /**
  * Draft pick interface with pack opening animation.
@@ -12,7 +12,12 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
     const [waiting, setWaiting] = useState(false);
     const [opening, setOpening] = useState(false);
     const [revealed, setRevealed] = useState(false);
-    const [hover, setHover] = useState(null); // { imageUri, x, y }
+    const [hover, setHover] = useState(null); // { card, pos }
+    const onHover = (e, card) => {
+        if (!card?.imageUri) return;
+        setHover({ card, pos: computeHoverPos(e) });
+    };
+    const onHoverLeave = () => setHover(null);
 
     // When a new pack arrives, reset state
     useEffect(() => {
@@ -98,8 +103,8 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                             <div className="draft-picks-grid">
                                 {picks.map((c, i) => (
                                     <div key={i} className="draft-pick-thumb" title={c.name} onClick={() => onMaximize?.(c)}
-                                        onMouseMove={(e) => c.imageUri && setHover({ imageUri: c.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
-                                        onMouseLeave={() => setHover(null)}>
+                                        onMouseMove={(e) => onHover(e, c)}
+                                        onMouseLeave={onHoverLeave}>
                                         {c.imageUri && <img src={c.imageUri.replace('/normal/', '/small/')} alt={c.name} />}
                                     </div>
                                 ))}
@@ -118,8 +123,8 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                                 style={{ animationDelay: revealed ? `${i * 40}ms` : '0ms' }}
                                 onClick={() => setSelectedIdx(i)}
                                 onDoubleClick={() => { setSelectedIdx(i); setTimeout(() => { socket.emit('draft:pick', { cardIndex: i }); setWaiting(true); }, 0); }}
-                                onMouseMove={(e) => card.imageUri && setHover({ imageUri: card.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
-                                onMouseLeave={() => setHover(null)}
+                                onMouseMove={(e) => onHover(e, card)}
+                                onMouseLeave={onHoverLeave}
                             >
                                 {card.imageUri ? (
                                     <img src={card.imageUri} alt={card.name} />
@@ -149,8 +154,8 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                             <div className="draft-picks-grid">
                                 {picks.map((c, i) => (
                                     <div key={i} className="draft-pick-thumb" title={c.name} onClick={() => onMaximize?.(c)}
-                                        onMouseMove={(e) => c.imageUri && setHover({ imageUri: c.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
-                                        onMouseLeave={() => setHover(null)}>
+                                        onMouseMove={(e) => onHover(e, c)}
+                                        onMouseLeave={onHoverLeave}>
                                         {c.imageUri && <img src={c.imageUri.replace('/normal/', '/small/')} alt={c.name} />}
                                     </div>
                                 ))}
@@ -160,13 +165,8 @@ export default function DraftPick({ pack, round, pickNumber, totalRounds, picks,
                 </>
             )}
 
-            {/* Hover zoom portal */}
-            {hover && hover.imageUri && createPortal(
-                <div className="card-zoom" style={{ position: 'fixed', left: hover.x, top: hover.y, zIndex: 3000, pointerEvents: 'none' }}>
-                    <img src={hover.imageUri} alt="" />
-                </div>,
-                document.body
-            )}
+            {/* Full hover preview (zoom + keywords / oracle / multi-face panel). */}
+            <CardHoverPreview card={hover?.card || null} pos={hover?.pos || null} />
         </div>
     );
 }

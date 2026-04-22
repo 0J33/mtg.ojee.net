@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import socket from '../socket';
 import { scryfall } from '../api';
+import CardHoverPreview, { computeHoverPos } from './CardHoverPreview';
 
 const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G', 'C', 'M', 'L'];
 function cardColorKey(card) {
@@ -163,7 +163,7 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize, setCod
             className={`sealed-card rarity-${card.rarity || 'common'}`}
             onClick={() => onClick(idx)}
             onContextMenu={(e) => { e.preventDefault(); onMaximize?.(card); }}
-            onMouseMove={(e) => card.imageUri && setHover({ imageUri: card.imageUri, x: Math.min(e.clientX + 16, window.innerWidth - 340), y: Math.max(10, Math.min(e.clientY - 40, window.innerHeight - 460)) })}
+            onMouseMove={(e) => card.imageUri && setHover({ card, pos: computeHoverPos(e) })}
             onMouseLeave={() => setHover(null)}
             title={`${card.name}\n${card.typeLine}`}
         >
@@ -245,12 +245,7 @@ export default function SealedBuilder({ pool, onSubmit, mode, onMaximize, setCod
                 </button>
             </div>
 
-            {hover && hover.imageUri && createPortal(
-                <div className="card-zoom" style={{ position: 'fixed', left: hover.x, top: hover.y, zIndex: 3000, pointerEvents: 'none' }}>
-                    <img src={hover.imageUri} alt="" />
-                </div>,
-                document.body
-            )}
+            <CardHoverPreview card={hover?.card || null} pos={hover?.pos || null} />
         </div>
     );
 }
