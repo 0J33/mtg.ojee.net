@@ -627,12 +627,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
    "Cmdr Dmg from <name>" submenu explosion. */
 .cmd-dmg-picker-modal { max-width: 520px; }
 .cmd-dmg-source-list { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; }
-.cmd-dmg-source-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-soft); border-radius: 3px; }
+.cmd-dmg-source-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-soft); border-radius: 3px; flex-wrap: nowrap; }
 .cmd-dmg-source-row.lethal { border-color: var(--danger); background: rgba(176,68,68,0.15); }
-.cmd-dmg-source-name { flex: 1; font-family: 'Cinzel', serif; letter-spacing: 1px; }
-.cmd-dmg-source-value { font-family: 'Cinzel', serif; font-weight: 700; min-width: 52px; text-align: center; color: var(--accent); }
+/* min-width: 0 so the name can shrink below its content width and
+   ellipsize. Without this the flex item is pinned at content width and
+   long names push the action buttons onto a second row. */
+.cmd-dmg-source-name { flex: 1 1 auto; min-width: 0; font-family: 'Cinzel', serif; letter-spacing: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmd-dmg-source-value { font-family: 'Cinzel', serif; font-weight: 700; min-width: 52px; text-align: center; color: var(--accent); flex-shrink: 0; }
 .cmd-dmg-source-row.lethal .cmd-dmg-source-value { color: var(--danger); }
-.cmd-dmg-source-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.cmd-dmg-source-actions { display: flex; gap: 4px; flex-wrap: nowrap; flex-shrink: 0; }
 
 /* Turn-timer cap badge next to the elapsed timer. Amber <10s, red <3s. */
 .turn-timer-cap { color: var(--text-mid); font-weight: 600; }

@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.17',
+        date: '2026-04-19',
+        changes: [
+            'Commander damage picker rows stay on one line even with long usernames. Name ellipsizes, action buttons (−1 / +1 / Add... / Set... / Clear) no longer wrap to a second row',
+        ],
+    },
+    {
         version: '3.16',
         date: '2026-04-19',
         changes: [
