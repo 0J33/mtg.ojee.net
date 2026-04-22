@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.18',
+        date: '2026-04-19',
+        changes: [
+            'Pile cards now hover-zoom. Hovering a thumbnail in an expanded pile shows the full-size card preview next to the pointer — same 320×460 zoom you get over battlefield cards, face-down cards are excluded',
+        ],
+    },
+    {
         version: '3.17',
         date: '2026-04-19',
         changes: [
