@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.16',
+        date: '2026-04-19',
+        changes: [
+            'Commander damage picker: Clear button now renders in every row with disabled state when damage is 0, instead of appearing/disappearing. Keeps the action layout stable as you click +1 / −1',
+        ],
+    },
+    {
         version: '3.15',
         date: '2026-04-19',
         changes: [

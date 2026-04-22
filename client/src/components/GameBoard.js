@@ -2257,9 +2257,12 @@ function CommanderDamagePicker({ target, players, onClose, onApply, dialog }) {
                                     <button className="small-btn" onClick={() => onApply(p.userId, isInfinite(dmg) ? INFINITE : dmg + 1)}>+1</button>
                                     <button className="small-btn" onClick={() => adjust(p.userId, 'add')}>Add...</button>
                                     <button className="small-btn" onClick={() => adjust(p.userId, 'set')}>Set...</button>
-                                    {dmg > 0 && (
-                                        <button className="small-btn danger" onClick={() => onApply(p.userId, 0)}>Clear</button>
-                                    )}
+                                    <button
+                                        className="small-btn danger"
+                                        onClick={() => onApply(p.userId, 0)}
+                                        disabled={dmg === 0}
+                                        title={dmg === 0 ? 'Already 0' : 'Set this source\'s damage back to 0'}
+                                    >Clear</button>
                                 </div>
                             </div>
                         );
