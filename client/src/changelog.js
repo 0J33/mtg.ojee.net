@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
     {
+        version: '3.20',
+        date: '2026-07-20',
+        changes: [
+            'Fix the two oldest changelog version labels rendering as "VBIG BATCH (PRE-1.0)" and "VV0.1 – V0.8 (FOUNDATION)". The list now only prepends "v" to numeric versions, so prose/pre-prefixed labels render as authored ("Big batch (pre-1.0)", "v0.1 – v0.8 (foundation)")',
+        ],
+    },
+    {
         version: '3.19',
         date: '2026-04-19',
         changes: [
@@ -539,7 +546,7 @@ export const CHANGELOG = [
         ],
     },
     {
-        version: 'v0.1 – v0.8 (foundation)',
+        version: 'v0.1 – 0.8 (foundation)',
         date: '2026-04-09',
         changes: [
             'Initial commit — MTG Commander online tabletop',

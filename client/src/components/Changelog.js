@@ -20,7 +20,7 @@ export default function Changelog({ onClose }) {
                     {CHANGELOG.map((entry, i) => (
                         <div key={i} className="changelog-entry">
                             <div className="changelog-version-row">
-                                <span className="changelog-version">v{entry.version}</span>
+                                <span className="changelog-version">{/^\d/.test(entry.version) ? `v${entry.version}` : entry.version}</span>
                                 <span className="changelog-date">{entry.date}</span>
                             </div>
                             <ul className="changelog-list">
