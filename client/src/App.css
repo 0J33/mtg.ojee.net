@@ -242,7 +242,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
 /* ─── DECK LIST ───────────────────────────────────────────── */
-.deck-list { display: flex; flex-direction: column; gap: 7px; max-height: 350px; overflow-y: auto; }
+.deck-list { display: flex; flex-direction: column; gap: 7px; max-height: 340px; overflow-y: auto; }
 .deck-item {
     display: flex;
     align-items: center;
