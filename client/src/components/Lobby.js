@@ -182,7 +182,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
         <div className="lobby-page">
             <div className="lobby-header">
                 <h1>
-                    <img src="/mtg.png" alt="" className="mtg-logo" />
+                    <img src="/mtg-logo.svg" alt="" className="mtg-logo" />
                     mtg.ojee.net <span className="lobby-version lobby-version-link" onClick={() => setChangelogOpen(true)} title="View changelog">v{VERSION}</span>
                 </h1>
                 <div className="lobby-user">

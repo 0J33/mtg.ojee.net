@@ -1084,7 +1084,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
             {/* Top bar */}
             <div className="game-topbar">
                 <div className="topbar-left">
-                    <img src="/mtg.png" alt="" className="topbar-logo" />
+                    <img src="/mtg-logo.svg" alt="" className="topbar-logo" />
                     <span className="topbar-version">v{VERSION}</span>
                     <button
                         type="button"
