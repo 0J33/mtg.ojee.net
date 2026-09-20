@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import Icon from './Icons';
 import socket from '../socket';
 import { useEscapeKey, useVerticalDragPos, use2DDragPos } from '../utils';
 
@@ -453,11 +454,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                         title="Drag to move"
                         {...toolbarDrag.handlers}
                     >
-                        <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-                            <circle cx="2.5" cy="2" r="1"/><circle cx="7.5" cy="2" r="1"/>
-                            <circle cx="2.5" cy="8" r="1"/><circle cx="7.5" cy="8" r="1"/>
-                            <circle cx="2.5" cy="14" r="1"/><circle cx="7.5" cy="14" r="1"/>
-                        </svg>
+                        <Icon name="grip" size={10} />
                     </span>
                     <div className="tool-picker">
                         <button
@@ -466,10 +463,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                             title="Pen"
                             type="button"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 19l7-7 3 3-7 7-3-3z" />
-                                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                            </svg>
+                            <Icon name="pen" size={16} />
                         </button>
                         <button
                             className={`tool-btn ${tool === 'eraser' ? 'active' : ''}`}
@@ -477,10 +471,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                             title="Eraser"
                             type="button"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M3 17l6 6 12-12-6-6-12 12z" />
-                                <path d="M9 23l12-12" />
-                            </svg>
+                            <Icon name="eraser" size={16} />
                         </button>
                     </div>
                     <div className="color-picker">
@@ -512,12 +503,7 @@ export default function DrawingCanvas({ drawings, enabled, onToggle, hideToggle,
                     style={toggleDrag.topStyle}
                     {...toggleDrag.dragHandlers}
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 19l7-7 3 3-7 7-3-3z" />
-                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                        <path d="M2 2l7.586 7.586" />
-                        <circle cx="11" cy="11" r="2" />
-                    </svg>
+                    <Icon name="pen" size={20} />
                 </button>
             )}
         </div>

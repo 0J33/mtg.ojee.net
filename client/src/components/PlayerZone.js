@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import Icon from './Icons';
 import socket from '../socket';
 import Card from './Card';
 import ContextMenu from './ContextMenu';
@@ -347,9 +348,9 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
 
         const bfRowItems = (zone === 'battlefield') ? [
             { divider: true },
-            { label: `Display in: Creatures${card.bfRow === 'creatures' ? ' ✓' : ''}`, onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: 'creatures' }) },
-            { label: `Display in: Artifacts${card.bfRow === 'artifacts' ? ' ✓' : ''}`, onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: 'artifacts' }) },
-            { label: `Display in: Lands${card.bfRow === 'lands' ? ' ✓' : ''}`, onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: 'lands' }) },
+            { label: `Display in: Creatures${card.bfRow === 'creatures' ? ' (shown)' : ''}`, onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: 'creatures' }) },
+            { label: `Display in: Artifacts${card.bfRow === 'artifacts' ? ' (shown)' : ''}`, onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: 'artifacts' }) },
+            { label: `Display in: Lands${card.bfRow === 'lands' ? ' (shown)' : ''}`, onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: 'lands' }) },
             ...(card.bfRow ? [{ label: 'Display in: Auto', onClick: () => socket.emit('setBfRow', { instanceId: card.instanceId, bfRow: null }) }] : []),
         ] : [];
 
@@ -713,7 +714,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 clientY: rect.bottom + 4,
                             });
                         }}
-                    ><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+                    ><Icon name="grip" size={14} /></button>
                 )}
 
                 <div className="life-counter">
@@ -794,7 +795,7 @@ export default function PlayerZone({ player, isOwner, userId, allPlayers, onMaxi
                                 if (e.button === 1) { e.preventDefault(); e.stopPropagation(); socket.emit('setInfect', { toPlayerId: player.userId, amount: 0 }); }
                             }}
                         >
-                            ☣ {fmtNum(totalInfect)}/10
+                            <Icon name="infect" size={12} /> {fmtNum(totalInfect)}/10
                         </span>
                     </div>
                 )}
@@ -1091,7 +1092,7 @@ function BattlefieldRow({ extraClass, isCollapsed, onToggle, label, cards, rende
             style={{ flex: isCollapsed ? '0 0 auto' : '1 1 0' }}>
             <div className="bf-row-label">
                 <span className="bf-row-toggle" onClick={onToggle}>
-                    <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span className="bf-collapse-icon"><Icon name="expand" size={10} style={isCollapsed ? { transform: 'rotate(-90deg)' } : undefined} /></span>
                     {label} ({cards.length})
                 </span>
             </div>
@@ -1116,7 +1117,7 @@ function CommandZoneCell({ player, renderCards, onDragOver, onDrop, isCollapsed,
             onDrop={onDrop}>
             <div className={`bf-row-label cmd-zone-label ${isCollapsed ? 'cmd-zone-label-vertical' : ''}`}>
                 <span className="bf-row-toggle" onClick={onToggle}>
-                    <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span className="bf-collapse-icon"><Icon name="expand" size={10} style={isCollapsed ? { transform: 'rotate(-90deg)' } : undefined} /></span>
                     Command ({player.zones.commandZone?.length || 0})
                 </span>
                 {!isCollapsed && (player.commanderDeaths > 0 || player.commanderTax > 0) && (
@@ -1149,7 +1150,7 @@ function LandsRow({ cards, renderCards, onDragOver, onDrop, isCollapsed, onToggl
             onDrop={onDrop}>
             <div className="bf-row-label">
                 <span className="bf-row-toggle" onClick={onToggle}>
-                    <span className="bf-collapse-icon"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={isCollapsed ? {transform:'rotate(-90deg)'} : {}}><polyline points="6 9 12 15 18 9"/></svg></span>
+                    <span className="bf-collapse-icon"><Icon name="expand" size={10} style={isCollapsed ? { transform: 'rotate(-90deg)' } : undefined} /></span>
                     Lands ({cards.length})
                 </span>
             </div>

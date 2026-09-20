@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import Icon from './Icons';
 import socket from '../socket';
 
 /*
@@ -187,16 +188,7 @@ export default function Cursors({ containerRef, currentUserId, players }) {
                         '--cursor-color': e.color,
                     }}
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" style={{ display: 'block', overflow: 'visible' }}>
-                        {/* Classic pointer shape. Uses currentColor so the label + arrow share the hue. */}
-                        <path
-                            d="M4 2 L4 20 L9 15 L12 22 L15 20 L12 13 L19 13 Z"
-                            fill="var(--cursor-color)"
-                            stroke="#000"
-                            strokeWidth="1"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
+                    <Icon name="cursor" size={20} style={{ display: 'block', overflow: 'visible' }} />
                     <span className={`cursor-label ${e.darkBg ? 'dark-bg' : ''}`}>{e.username}{e.isSpectator && ' [spec]'}</span>
                 </div>
             ))}

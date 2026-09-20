@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Icon from './Icons';
 import { decks } from '../api';
 import { useEscapeKey } from '../utils';
 import { useDialog } from './Dialog';
@@ -50,7 +51,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
             <div className="modal">
                 <div className="modal-header">
                     <h2>Loading deck...</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted muted-centered">Loading...</p>
             </div>
@@ -62,7 +63,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
             <div className="modal">
                 <div className="modal-header">
                     <h2>Deck not found</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
             </div>
         </div>
@@ -96,7 +97,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
             <div className="modal deck-viewer">
                 <div className="modal-header">
                     <h2>{deck.name}</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted">
                     {totalCount} cards ({uniqueCount} unique) · {deck.format}

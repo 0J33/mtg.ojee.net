@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Icon from './Icons';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
 import { scryfall } from '../api';
@@ -276,7 +277,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                         <div className="card-effects-section">
                             <strong>Attached to</strong>
                             <div className="note-line-max">
-                                <span className="note-text">🔗 {attachedToName}</span>
+                                <span className="note-text"><Icon name="link" size={12} /> {attachedToName}</span>
                             </div>
                         </div>
                     )}
@@ -294,7 +295,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                                             onMouseLeave={() => setHoverThumb(null)}
                                         />
                                     )}
-                                    <span className="note-text">🔗 {att.name}</span>
+                                    <span className="note-text"><Icon name="link" size={12} /> {att.name}</span>
                                 </div>
                             ))}
                         </div>
@@ -473,7 +474,7 @@ export default function CardMaximized({ card, onClose, onClickCard, onAddNote, o
                         </div>
                     )}
                 </div>
-                <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
             </div>
             {hoverThumb && createPortal(
                 <div className="card-zoom" style={{ position: 'fixed', left: hoverThumb.x, top: hoverThumb.y, zIndex: 3500, pointerEvents: 'none' }}>

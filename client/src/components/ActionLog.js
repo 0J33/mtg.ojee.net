@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import Icon from './Icons';
 import { useVerticalDragPos, useOutsideClick } from '../utils';
 
 /*
@@ -110,7 +111,7 @@ function formatEntry(entry, playerNameById) {
         case 'flipCoin':
             return `${actorName} flipped ${d.count} coin(s): ${(d.results || []).join(', ')}`;
         case 'victory':
-            return `🏆 ${d.player || '?'} is the last player standing!`;
+            return `${d.player || '?'} is the last player standing!`;
         // ─── Big-batch printers ───────────────────────────────────
         case 'addMana':
             return `${actorName} added ${Math.abs(d.amount || 1)}× ${d.color || '?'} to mana pool`;
@@ -205,14 +206,12 @@ export default function ActionLog({ history, players, open, onToggle }) {
                 data-outside-click-exempt="true"
                 {...toggleDrag.dragHandlers}
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18M3 12h18M3 18h12" />
-                </svg>
+                <Icon name="log" size={18} />
             </button>
             <aside ref={panelRef} className={`action-log-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
                 <div className="chat-header">
                     <h3>Action Log</h3>
-                    <button className="close-btn" onClick={onToggle} type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onToggle} type="button"><Icon name="close" size={16} /></button>
                 </div>
                 <div className="action-log-messages" ref={listRef}>
                     {entries.length === 0 && <div className="chat-empty">No actions yet.</div>}

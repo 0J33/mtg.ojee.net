@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Icon from './Icons';
 import { createPortal } from 'react-dom';
 import ManaCost, { OracleText } from './ManaCost';
 import { detectKeywords } from '../keywords';
@@ -161,7 +162,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                 {damage > 0 && <div className="card-damage-badge" title={`${damage} damage marked`}>{damage}</div>}
                 {/* Suspend counters — tick down each upkeep server-side */}
                 {suspendCount > 0 && <div className="card-suspend-badge" title={`${suspendCount} time counter(s)`}>⌛{suspendCount}</div>}
-                {goaded && <div className="card-goad-badge" title="Goaded — must attack">⚔</div>}
+                {goaded && <div className="card-goad-badge" title="Goaded — must attack"><Icon name="goad" size={12} /></div>}
                 {tempControlled && <div className="card-temp-control-badge" title="Under temporary control (returns end of turn)">↶</div>}
                 {attached && <div className="card-attached-badge" title={`Attached to ${attachedToName || '?'}`}>🔗</div>}
                 {hasAttachments && <div className="card-has-attachments-badge" title={`${attachments.length} attached`}>🔗{attachments.length}</div>}
@@ -247,7 +248,7 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                                 <div className="effect-group">
                                     <div className="effect-group-label">Attached to</div>
                                     <div className="effect-line attach-effect">
-                                        <span className="effect-icon">🔗</span>
+                                        <span className="effect-icon"><Icon name="link" size={11} /></span>
                                         <span><strong>{attachedToName}</strong></span>
                                     </div>
                                 </div>

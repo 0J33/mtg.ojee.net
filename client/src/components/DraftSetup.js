@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Icon from './Icons';
 import { draft } from '../api';
 import { useEscapeKey } from '../utils';
 import socket from '../socket';
@@ -63,7 +64,7 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
                 <div className="modal-header">
                     <h2>{mode === 'sealed' ? 'Sealed' : 'Draft'} Setup</h2>
                     <button className="close-btn" onClick={onClose}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        <Icon name="close" size={16} />
                     </button>
                 </div>
 

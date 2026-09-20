@@ -7,7 +7,7 @@ import DeckBuilder from './DeckBuilder';
 import CustomCardManager from './CustomCardManager';
 import Changelog from './Changelog';
 import { useDialog } from './Dialog';
-import { IconPencil, IconShare } from './Icons';
+import Icon, { IconPencil, IconShare } from './Icons';
 import { VERSION } from '../version';
 
 export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, onShareConsumed }) {
@@ -263,7 +263,7 @@ export default function Lobby({ user, onJoinRoom, onLogout, pendingShareCode, on
                                 <button className="small-btn" title="Edit deck" onClick={(e) => { e.stopPropagation(); setBuildingDeck(deck._id); }}>Edit</button>
                                 <button className="icon-btn" title="Rename" onClick={(e) => startRename(deck, e)}><IconPencil /></button>
                                 <button className="icon-btn" title="Share deck (generates share code)" onClick={(e) => handleShareDeck(deck._id, e)}><IconShare /></button>
-                                <button className="delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteDeck(deck._id); }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                <button className="delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteDeck(deck._id); }}><Icon name="close" size={16} /></button>
                             </div>
                         ))}
                     </div>

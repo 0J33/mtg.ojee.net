@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import Icon from './Icons';
 import { createPortal } from 'react-dom';
 import socket from '../socket';
 import { useDialog } from './Dialog';
@@ -198,10 +199,7 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                 style={toggleDrag.topStyle}
                 {...toggleDrag.dragHandlers}
             >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="5" width="14" height="10" rx="1" />
-                    <rect x="7" y="9" width="14" height="10" rx="1" />
-                </svg>
+                <Icon name="piles" size={18} />
                 {(piles?.length > 0) && <span className="piles-toggle-badge">{piles.length}</span>}
             </button>
 
@@ -219,11 +217,7 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                         title="Drag to move"
                     >
                         <span className="piles-drag-grip" aria-hidden="true" title="Drag to move">
-                            <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
-                                <circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/>
-                                <circle cx="3" cy="8" r="1.2"/><circle cx="9" cy="8" r="1.2"/>
-                                <circle cx="3" cy="13" r="1.2"/><circle cx="9" cy="13" r="1.2"/>
-                            </svg>
+                            <Icon name="grip" size={12} />
                         </span>
                         <h3>Piles {totalCards > 0 && <span className="muted">({totalCards} cards)</span>}</h3>
                         <div className="piles-panel-actions">
@@ -232,11 +226,11 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                             )}
                             {pos && (
                                 <button className="icon-btn" onClick={resetPos} title="Reset position" type="button">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg>
+                                    <Icon name="reset" size={14} />
                                 </button>
                             )}
                             <button className="icon-btn" onClick={() => setOpen(false)} title="Close">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <Icon name="close" size={14} />
                             </button>
                         </div>
                     </div>
@@ -287,7 +281,7 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                         <span className="pile-chevron">{isExpanded ? '\u25BC' : '\u25B6'}</span>
                                         {pile.private && (
                                             <span className="pile-private-badge" title={isOwner ? 'Private — only you can see these cards' : 'Private pile'}>
-                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                                <Icon name="lock" size={11} />
                                             </span>
                                         )}
                                         {isRenaming ? (
@@ -312,10 +306,10 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                                 {isRenaming ? (
                                                     <>
                                                         <button className="icon-btn" onClick={renamePile} title="Save">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                                            <Icon name="check" size={14} />
                                                         </button>
                                                         <button className="icon-btn" onClick={() => { setRenameFor(null); setNewName(''); }} title="Cancel">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                            <Icon name="close" size={14} />
                                                         </button>
                                                     </>
                                                 ) : (
@@ -327,20 +321,20 @@ export default function PilesPanel({ piles, players, userId, onMaximizeCard, spe
                                                                 title={pile.private ? 'Make public' : 'Make private'}
                                                             >
                                                                 {pile.private ? (
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                                                                    <Icon name="unlock" size={14} />
                                                                 ) : (
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                                                    <Icon name="lock" size={14} />
                                                                 )}
                                                             </button>
                                                         )}
                                                         <button className="icon-btn" onClick={() => { setRenameFor(pile.id); setNewName(pile.name); }} title="Rename">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                                            <Icon name="pencil" size={14} />
                                                         </button>
                                                         <button className="icon-btn" onClick={() => shufflePile(pile.id)} title="Shuffle">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                                                            <Icon name="shuffle" size={14} />
                                                         </button>
                                                         <button className="icon-btn" onClick={() => deletePile(pile)} title="Delete pile">
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                            <Icon name="close" size={14} />
                                                         </button>
                                                     </>
                                                 )}

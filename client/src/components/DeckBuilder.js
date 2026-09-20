@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import Icon from './Icons';
 import { decks, customCards, scryfall } from '../api';
 import { useEscapeKey } from '../utils';
 import { useDialog } from './Dialog';
@@ -225,19 +226,19 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                         className={`db-foil-btn ${c.foil === 'foil' ? 'active' : ''} ${c.foil === 'etched' ? 'etched' : ''}`}
                         title={!c.foil ? 'Make foil' : c.foil === 'foil' ? 'Switch to etched' : 'Remove effect'}
                         onClick={() => cycleFoil(i, section)}
-                    >{c.foil === 'etched' ? 'E' : '✦'}</button>
+                    >{c.foil === 'etched' ? 'E' : <Icon name="foil" size={12} />}</button>
                     {!c.isCustom && c.scryfallId && (
                         <button
                             className={`db-skin-btn ${c.skinUrl ? 'active' : ''}`}
                             title={c.skinUrl ? 'Change / remove alternate art' : 'Pick alternate art'}
                             onClick={() => openSkinPicker(i, section)}
-                        >🎨</button>
+                        ><Icon name="palette" size={13} /></button>
                     )}
                     {section !== 'commanders' && (
                         <button className="db-promote" title="Make commander" onClick={() => {
                             removeFromSection(i, section);
                             setCommanders(prev => [...prev, { ...c, quantity: 1 }]);
-                        }}>★</button>
+                        }}><Icon name="star" size={12} /></button>
                     )}
                     {section === 'commanders' && (
                         <button className="db-promote" title="Demote to mainboard" onClick={() => {
@@ -256,7 +257,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
             <div className="modal deck-builder-modal">
                 <div className="modal-header">
                     <h2>Deck Builder</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <div className="db-name-row">
                     <input type="text" placeholder="Deck name" value={name} onChange={e => setName(e.target.value)} />
@@ -342,7 +343,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                                                 {t.imageUri && <img src={t.imageUri.replace('/normal/', '/small/')} alt={t.name} />}
                                                 <div className="db-search-info"><strong>{t.name}</strong></div>
                                                 <button className="delete-btn" onClick={() => removeToken(i)} title="Remove token">
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                    <Icon name="close" size={16} />
                                                 </button>
                                             </div>
                                         ))}
@@ -394,7 +395,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                         <div className="modal-header">
                             <h3>Alternate art · {skinPicker.cardName}</h3>
                             <button className="close-btn" onClick={() => setSkinPicker(null)}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <Icon name="close" size={16} />
                             </button>
                         </div>
                         <div className="db-skin-actions">

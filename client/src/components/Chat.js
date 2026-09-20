@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Icon from './Icons';
 import socket from '../socket';
 import * as sfx from '../sfx';
 import { useVerticalDragPos, useOutsideClick } from '../utils';
@@ -109,16 +110,14 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
                 data-outside-click-exempt="true"
                 {...toggleDrag.dragHandlers}
             >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
+                <Icon name="chat" size={20} />
                 {unread > 0 && !open && <span className="chat-unread-badge">{unread > 9 ? '9+' : unread}</span>}
             </button>
 
             <aside ref={panelRef} className={`chat-panel ${open ? 'open' : ''}`} aria-hidden={!open}>
                 <div className="chat-header">
                     <h3>Chat</h3>
-                    <button className="close-btn" onClick={onToggle} type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onToggle} type="button"><Icon name="close" size={16} /></button>
                 </div>
                 <div className="chat-messages" ref={listRef}>
                     {messages.length === 0 && <div className="chat-empty">No messages yet.</div>}

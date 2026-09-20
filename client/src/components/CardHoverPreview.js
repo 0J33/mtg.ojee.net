@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icons';
 import { createPortal } from 'react-dom';
 import ManaCost, { OracleText } from './ManaCost';
 import { detectKeywords } from '../keywords';
@@ -121,7 +122,7 @@ export default function CardHoverPreview({ card, pos, attachedToName, attachment
                         <div className="effect-group">
                             <div className="effect-group-label">Attached to</div>
                             <div className="effect-line attach-effect">
-                                <span className="effect-icon">🔗</span>
+                                <span className="effect-icon"><Icon name="link" size={11} /></span>
                                 <span><strong>{attachedToName}</strong></span>
                             </div>
                         </div>

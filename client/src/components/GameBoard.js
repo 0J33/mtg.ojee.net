@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import Icon from './Icons';
 import socket from '../socket';
 import { decks, customCards } from '../api';
 import PlayerZone from './PlayerZone';
@@ -1169,7 +1170,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     {Array.isArray(gameState.extraTurns) && gameState.extraTurns.length > 0 && (
                         <span className="extra-turn-indicator" title="Extra turns queued">
                             ↺ {gameState.extraTurns.length}: {gameState.extraTurns.map(t => t.ownerName).join(', ')}
-                            {!isSpectator && <button className="small-btn" style={{ marginLeft: 4 }} onClick={() => socket.emit('removeExtraTurn', { index: 0 })}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>}
+                            {!isSpectator && <button className="small-btn" style={{ marginLeft: 4 }} onClick={() => socket.emit('removeExtraTurn', { index: 0 })}><Icon name="close" size={16} /></button>}
                         </span>
                     )}
                     {/* Stack indicator — auto-shown when non-empty */}
@@ -1207,7 +1208,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                                 onClick={() => setShowSpectatorList(v => !v)}
                                 title="Click to see who's watching"
                             >
-                                👁 {gameState.spectators.length} watching
+                                <Icon name="eye" size={13} /> {gameState.spectators.length} watching
                             </button>
                             {showSpectatorList && (
                                 <div className="spectator-list-popover" onMouseLeave={() => setShowSpectatorList(false)}>
@@ -1217,7 +1218,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                                             <span className={`dot ${s.connected ? 'online' : 'offline'}`} />
                                             {s.username}
                                             {isHost && (
-                                                <button className="spectator-kick-btn" title={`Kick ${s.username}`} onClick={(e) => { e.stopPropagation(); socket.emit('kickSpectator', { targetUserId: s.userId }); }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                                <button className="spectator-kick-btn" title={`Kick ${s.username}`} onClick={(e) => { e.stopPropagation(); socket.emit('kickSpectator', { targetUserId: s.userId }); }}><Icon name="close" size={16} /></button>
                                             )}
                                         </div>
                                     ))}
@@ -1264,20 +1265,14 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="topbar-group topbar-utils">
                         <SoundToggleButton />
                         <button onClick={() => setSettingsModalOpen(true)} className="topbar-icon-btn" title="Game settings">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                            </svg>
+                            <Icon name="settings" size={16} />
                         </button>
                         <button onClick={() => setGuideOpen(true)} className="topbar-icon-btn" title="How to play">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                            </svg>
+                            <Icon name="help" size={16} />
                         </button>
                         {!isSpectator && (
                             <button onClick={() => setBgModal(true)} className="topbar-icon-btn" title="Set background image">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-                                </svg>
+                                <Icon name="image" size={16} />
                             </button>
                         )}
                     </div>
@@ -1614,7 +1609,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="modal revealed-hand-modal">
                         <div className="modal-header">
                             <h3>{revealedHand.revealedByName || 'Someone'} revealed their hand</h3>
-                            <button className="close-btn" onClick={onDismissRevealedHand}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            <button className="close-btn" onClick={onDismissRevealedHand}><Icon name="close" size={16} /></button>
                         </div>
                         <div className="revealed-hand-grid">
                             {(revealedHand.cards || []).length === 0 && <div className="muted">Empty hand.</div>}
@@ -1639,7 +1634,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="modal peek-exile-modal">
                         <div className="modal-header">
                             <h3>Looking at top {peekSession.count} of {peekSession.targetUsername}'s library</h3>
-                            <button className="close-btn" onClick={() => setPeekSession(null)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            <button className="close-btn" onClick={() => setPeekSession(null)}><Icon name="close" size={16} /></button>
                         </div>
                         <p className="muted">Pick one card to exile face-down under your control. The rest go to the bottom in random order.</p>
                         <div className="revealed-hand-grid">
@@ -1662,7 +1657,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
             {victoryAnim && (
                 <div className="victory-overlay">
                     <div className="victory-content">
-                        <div className="victory-crown">👑</div>
+                        <div className="victory-crown"><Icon name="crown" size={56} /></div>
                         <div className="victory-label">Victory</div>
                         <div className="victory-name">{victoryAnim.username}</div>
                         <div className="victory-sub">is the last player standing</div>
@@ -1722,7 +1717,7 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                     <div className="modal">
                         <div className="modal-header">
                             <h2>Select Deck</h2>
-                            <button className="close-btn" onClick={() => setShowDeckPicker(false)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            <button className="close-btn" onClick={() => setShowDeckPicker(false)}><Icon name="close" size={16} /></button>
                         </div>
                         <div className="deck-picker-actions">
                             <button className="small-btn" onClick={() => setIngameDeckBuilderOpen(false)}>Build New</button>
@@ -1868,18 +1863,14 @@ export default function GameBoard({ user, gameState, setGameState, roomCode, isS
                         onClick={() => setTouchInteractMode(m => m === 'select' ? 'normal' : 'select')}
                         title="Select mode: tap cards to multi-select"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                        </svg>
+                        <Icon name="select" size={20} />
                     </button>
                     <button
                         className={`touch-mode-btn ${touchInteractMode === 'menu' ? 'active' : ''}`}
                         onClick={() => setTouchInteractMode(m => m === 'menu' ? 'normal' : 'menu')}
                         title="Menu mode: tap a card to open its context menu"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                            <circle cx="12" cy="4" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="20" r="2.5"/>
-                        </svg>
+                        <Icon name="grip" size={20} />
                     </button>
                 </div>
             )}
@@ -2093,7 +2084,7 @@ function DiceModal({ onClose }) {
             <div className="modal dice-modal">
                 <div className="modal-header">
                     <h2>Roll</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <div className="dice-count">
                     <label>Count:</label>
@@ -2129,7 +2120,7 @@ function ScryCountModal({ onSubmit, onCancel }) {
             <div className="modal scry-count-modal">
                 <div className="modal-header">
                     <h2>Scry</h2>
-                    <button className="close-btn" onClick={onCancel}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onCancel}><Icon name="close" size={16} /></button>
                 </div>
                 <label className="muted">How many cards to scry?</label>
                 <input
@@ -2239,7 +2230,7 @@ function CommanderDamagePicker({ target, players, onClose, onApply, dialog }) {
             <div className="modal cmd-dmg-picker-modal">
                 <div className="modal-header">
                     <h2>Cmdr damage on {target.username}</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted" style={{ margin: '0 0 12px' }}>
                     Pick the source. Commander damage from yourself counts too (partner commanders, token copies).
@@ -2327,7 +2318,7 @@ function CustomCardModal({ onClose }) {
                 <div className="modal custom-card-modal">
                     <div className="modal-header">
                         <h2>{editing._id ? 'Edit' : 'Create'} Custom Card</h2>
-                        <button className="close-btn" onClick={() => setEditing(null)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                        <button className="close-btn" onClick={() => setEditing(null)}><Icon name="close" size={16} /></button>
                     </div>
                     <input type="text" placeholder="Card name" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
                     <input type="text" placeholder="Image URL" value={editing.imageUrl} onChange={e => setEditing({ ...editing, imageUrl: e.target.value })} />
@@ -2352,7 +2343,7 @@ function CustomCardModal({ onClose }) {
             <div className="modal custom-card-modal">
                 <div className="modal-header">
                     <h2>Custom Cards</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <button onClick={() => setEditing(blankCard())} className="primary-btn">+ New Custom Card</button>
                 {loading ? <p className="muted muted-centered">Loading...</p> : savedCards.length === 0 ? (
@@ -2413,7 +2404,7 @@ function BackgroundModal({ onClose }) {
             <div className="modal bg-modal">
                 <div className="modal-header">
                     <h2>Set Background</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <input
                     type="text"
@@ -2443,7 +2434,7 @@ function BackgroundModal({ onClose }) {
                                     className="bg-saved-remove"
                                     onClick={() => handleRemoveSaved(link)}
                                     title="Remove from saved"
-                                ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                                ><Icon name="close" size={16} /></button>
                             </div>
                         ))}
                     </div>
@@ -2541,7 +2532,7 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
             <div className="modal settings-modal">
                 <div className="modal-header">
                     <h2>Game Settings</h2>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted" style={{ marginTop: 0 }}>
                     Settings are pure tools — nothing is enforced. Host can change them mid-game; existing life totals stay as they are.
@@ -2746,17 +2737,9 @@ function SoundToggleButton() {
             onClick={() => sfx.toggleMuted()}
         >
             {muted ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                    <line x1="23" y1="9" x2="17" y2="15"/>
-                    <line x1="17" y1="9" x2="23" y2="15"/>
-                </svg>
+                <Icon name="mute" size={16} />
             ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                </svg>
+                <Icon name="sound" size={16} />
             )}
         </button>
     );
@@ -2772,7 +2755,7 @@ function CardFieldEditorModal({ card, field, onClose, onSubmit }) {
             <div className="modal small-modal">
                 <div className="modal-header">
                     <h3>{labels[field] || field}</h3>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted">{card.name}</p>
                 <input
@@ -2800,7 +2783,7 @@ function EmblemAdderModal({ targetPlayerId, onClose, onSubmit }) {
             <div className="modal">
                 <div className="modal-header">
                     <h3>Add emblem</h3>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <input type="text" placeholder="Emblem name (e.g. 'Teferi emblem')" value={name} onChange={e => setName(e.target.value)} autoFocus />
                 <textarea placeholder="Effect text" value={text} onChange={e => setText(e.target.value)} rows={4} />
@@ -2824,7 +2807,7 @@ function BrowseLibraryModal({ player, library, onClose, onMaximizeCard, onSteal 
             <div className="modal browse-library-modal">
                 <div className="modal-header">
                     <h3>{player.username}'s library ({library.length} cards)</h3>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <input type="text" placeholder="Filter by name" value={filter} onChange={e => setFilter(e.target.value)} autoFocus />
                 <p className="muted">Click "Take" to put a card on your battlefield (Bribery / Acquire). Click the card to view it.</p>
@@ -2858,7 +2841,7 @@ function RevealHandPickerModal({ hand, targets, onClose, onSubmit }) {
             <div className="modal">
                 <div className="modal-header">
                     <h3>Reveal which cards from your hand?</h3>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <div className="reveal-target-row">
                     <label>To:</label>
@@ -3027,7 +3010,7 @@ function ProliferateModal({ players, onClose, onSubmit }) {
             <div className="modal prolif-modal">
                 <div className="modal-header">
                     <h3>Proliferate</h3>
-                    <button className="close-btn" onClick={onClose}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted" style={{ margin: '0 0 10px' }}>
                     Tick each counter you want to add +1 to. Proliferate only affects counter types that already have at least one.
