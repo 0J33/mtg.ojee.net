@@ -164,8 +164,8 @@ export default function Card({ card, onClick, onContextMenu, isDragging, small, 
                 {suspendCount > 0 && <div className="card-suspend-badge" title={`${suspendCount} time counter(s)`}>⌛{suspendCount}</div>}
                 {goaded && <div className="card-goad-badge" title="Goaded — must attack"><Icon name="goad" size={12} /></div>}
                 {tempControlled && <div className="card-temp-control-badge" title="Under temporary control (returns end of turn)">↶</div>}
-                {attached && <div className="card-attached-badge" title={`Attached to ${attachedToName || '?'}`}>🔗</div>}
-                {hasAttachments && <div className="card-has-attachments-badge" title={`${attachments.length} attached`}>🔗{attachments.length}</div>}
+                {attached && <div className="card-attached-badge" title={`Attached to ${attachedToName || '?'}`}><Icon name="link" size={11} /></div>}
+                {hasAttachments && <div className="card-has-attachments-badge" title={`${attachments.length} attached`}><Icon name="link" size={11} />{attachments.length}</div>}
             </div>
 
             {/* Hover zoom + side effects panel */}

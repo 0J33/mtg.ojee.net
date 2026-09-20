@@ -127,7 +127,7 @@ const PAGES = [
                     Spectators join via the lobby's <strong>Spectate</strong> button or by
                     clicking an invite link and picking <em>Spectate</em>. They see every
                     player's hand, but can't interact — only chat and point with the cursor.
-                    The topbar shows "👁 N watching"; click it to see their usernames.
+                    The topbar shows <Icon name="eye" size={12} /> N watching; click it to see their usernames.
                 </p>
                 <p>To reveal your hand to a specific person, right-click your own player name → "Reveal hand to X". Revealing "to all" sends to every other player but not yourself.</p>
             </>
@@ -179,7 +179,7 @@ const PAGES = [
                     <li><strong>Mark damage</strong> — opens a small modal, sets a red badge in the corner. Clears at end of turn for everyone, automatically.</li>
                     <li><strong>Suspend counters</strong> — purple ⌛ badge. Auto-decrements at the start of the suspended player's next turn; the action log says "X is ready to cast" when it hits 0.</li>
                     <li><strong>Phase out / Phase in</strong> — visually fades the card. Doesn't actually exempt anything from targeting (no rules engine), it's just the marker.</li>
-                    <li><strong>Goad / Remove goad</strong> — orange ⚔ badge.</li>
+                    <li><strong>Goad / Remove goad</strong> — orange <Icon name="goad" size={12} /> badge.</li>
                     <li><strong>Clone (token)</strong> — duplicates the card as a token-marked copy.</li>
                     <li><strong>Take control (until EOT)</strong> on opponents' cards — moves the card to your battlefield with a blue ring. End your turn and it goes back automatically.</li>
                 </ul>
@@ -200,10 +200,10 @@ const PAGES = [
         ),
     },
     {
-        title: 'Game settings (⚙)',
+        title: 'Game settings',
         body: (
             <>
-                <p>The new <strong>⚙</strong> button in the topbar opens a Settings modal. The host can change everything live, mid-game:</p>
+                <p>The new <strong><Icon name="settings" size={12} /></strong> button in the topbar opens a Settings modal. The host can change everything live, mid-game:</p>
                 <ul>
                     <li><strong>Format presets</strong>: commander, brawl, standard, modern, legacy, vintage, pauper, oathbreaker, draft, free — picking one fills in starting life and commander damage.</li>
                     <li><strong>Numbers</strong>: starting life, commander damage lethal, max players, hand-size limit.</li>
@@ -254,7 +254,7 @@ const PAGES = [
                     <li>Eliminated and conceded players are skipped automatically on turn pass</li>
                     <li>Custom dice: the Roll modal now supports d2, d3, and any custom number of sides</li>
                 </ul>
-                <p>When one player (or one team) is the last surviving group, a 🏆 victory animation fires for the whole table.</p>
+                <p>When one player (or one team) is the last surviving group, a <Icon name="trophy" size={12} /> victory animation fires for the whole table.</p>
                 <p className="guide-tip">
                     If anything gets weird, <strong>Undo</strong> is your friend. If it's really
                     stuck, leaving and rejoining the room restores the last server state.
