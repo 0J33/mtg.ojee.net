@@ -72,7 +72,7 @@ export default function TournamentBracket({ tournament, isHost, userId, onClose 
 
                 {champion && (
                     <div className="bracket-champion">
-                        <span className="bracket-trophy">&#127942;</span>
+                        <Icon name="trophy" size={22} className="bracket-trophy" />
                         <strong>{rounds[rounds.length - 1]?.[0]?.player1?.userId === champion
                             ? rounds[rounds.length - 1][0].player1.username
                             : rounds[rounds.length - 1][0].player2?.username

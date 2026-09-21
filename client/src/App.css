@@ -3527,7 +3527,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .bracket-win-btn:hover { background: #aac8ff; }
 .bracket-result { font-size: 0.7em; color: var(--accent); text-align: center; margin-top: 4px; }
 .bracket-champion { text-align: center; padding: 16px; font-size: 1.1em; margin-top: 12px; border-top: 1px solid var(--border-soft, #333); }
-.bracket-trophy { font-size: 1.5em; margin-right: 8px; }
+/* The trophy is an svg now, not a 🏆 the browser picked a font for, so it
+   sizes by attribute and only needs its gap and baseline here. */
+.bracket-trophy { margin-right: 8px; vertical-align: -0.22em; }
 .bracket-hint { text-align: center; font-size: 0.75em; padding: 8px 0; }
 
 @media (max-width: 700px) {
