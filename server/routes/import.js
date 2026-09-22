@@ -298,7 +298,7 @@ router.post('/moxfield', async (req, res) => {
                 try {
                     const res = await fetch(`${SCRYFALL_BASE}/cards/collection`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'User-Agent': 'MTGOjeeNet/1.0', 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             identifiers: batch.map(r => ({ id: r.sid })),
                         }),
@@ -348,7 +348,7 @@ router.post('/moxfield', async (req, res) => {
             try {
                 const tfRes = await fetch(`${SCRYFALL_BASE}/cards/collection`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'User-Agent': 'MTGOjeeNet/1.0', 'Content-Type': 'application/json' },
                     body: JSON.stringify({ identifiers: batch.map(id => ({ id })) }),
                 });
                 if (tfRes.ok) {

@@ -20,7 +20,8 @@ async function scryfallFetch(url) {
     const wait = Math.max(0, 100 - (now - lastRequest));
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
     lastRequest = Date.now();
-    const res = await fetch(url);
+    // Scryfall rejects requests without an identifying User-Agent (400 generic_user_agent).
+    const res = await fetch(url, { headers: { 'User-Agent': 'MTGOjeeNet/1.0', 'Accept': 'application/json' } });
     if (!res.ok) throw new Error(`Scryfall ${res.status}: ${await res.text()}`);
     return res.json();
 }
