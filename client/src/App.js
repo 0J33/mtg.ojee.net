@@ -5,7 +5,9 @@ import Login from './components/Login';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
 import { useDialog } from './components/Dialog';
+import Icon from './components/Icons';
 import './App.css';
+import './home.css';
 
 // Parse an /invite/{code} URL on first load. We don't pull in react-router just
 // for this single route — we read window.location once, stash the code, and
@@ -70,6 +72,7 @@ export default function App() {
     const [loading, setLoading] = useState(true);
     const [gameState, setGameState] = useState(null);
     const [roomCode, setRoomCode] = useState(null);
+    const [inviteNote, setInviteNote] = useState(null);
     // True when the current user joined as a spectator (read-only view, chat only).
     const [isSpectator, setIsSpectator] = useState(false);
     const [revealedCard, setRevealedCard] = useState(null);
@@ -211,6 +214,15 @@ export default function App() {
             setGameState(null);
             setRoomCode(null);
         });
+        // The server closes a table nobody has been at for an hour.
+        socket.on('roomClosed', ({ reason } = {}) => {
+            localStorage.removeItem('mtg_lastRoom');
+            localStorage.removeItem('mtg_lastRoomIsSpec');
+            setGameState(null);
+            setRoomCode(null);
+            setIsSpectator(false);
+            dialog.alert(reason || 'This table was closed.', { title: 'Table closed' });
+        });
         return () => {
             socket.off('connect', onConnect);
             socket.off('disconnect');
@@ -222,6 +234,7 @@ export default function App() {
             socket.off('newStroke');
             socket.off('actionEntry');
             socket.off('kicked');
+            socket.off('roomClosed');
             clearInterval(watchdog);
             socket.disconnect();
         };
@@ -273,38 +286,28 @@ export default function App() {
         setIsSpectator(false);
     }, []);
 
-    if (loading) return <div className="app-loading">Loading...</div>;
+    if (loading) return <div className="app-loading">Loading…</div>;
     if (!user) return <Login onLogin={setUser} />;
-    if (reconnecting) return <div className="app-loading">Reconnecting to room...</div>;
+    if (reconnecting) return <div className="app-loading">Taking you back to your table…</div>;
     // Invite link landed them here — show a role-picker before touching state.
     // Sits above the lobby render so it takes precedence regardless of whether
     // the user had a saved room (which we skipped auto-rejoining because
     // pendingInvite is set).
     if (pendingInvite && !gameState) {
         return (
-            <div className="lobby-page invite-choice-page">
-                <div className="lobby-section invite-choice-card">
-                    <h2>Join room {pendingInvite}</h2>
-                    <p className="muted">
-                        You've been invited to a game. Choose how you want to enter:
-                    </p>
-                    <div className="invite-choice-actions">
-                        <button className="primary-btn" onClick={() => handleAcceptInvite(false)}>
-                            Join as Player
-                        </button>
-                        <button onClick={() => handleAcceptInvite(true)}>
-                            Join as Spectator
-                        </button>
+            <main className="mh-invite">
+                <section className="mh-slip" aria-labelledby="mh-invite-title">
+                    <span className="mh-pin"><Icon name="pin" size={20} /></span>
+                    <h1 id="mh-invite-title">You're invited to a table</h1>
+                    <p className="mh-invite-code">{pendingInvite}</p>
+                    <div className="mh-invite-actions">
+                        <button className="mh-primary" onClick={() => handleAcceptInvite(false)}>Sit down and play</button>
+                        <button className="mh-btn" onClick={() => handleAcceptInvite(true)}>Just watch</button>
                     </div>
-                    <p className="muted invite-choice-hint">
-                        Players take a seat, draw cards, and play. Spectators watch
-                        every hand face-up but can only chat — no interaction.
-                    </p>
-                    <button className="invite-choice-cancel" onClick={handleDeclineInvite}>
-                        Cancel · go to lobby
-                    </button>
-                </div>
-            </div>
+                    <p>Players take a seat and play. Watchers see every hand face-up and can chat, but can't touch anything.</p>
+                    <button className="mh-link" onClick={handleDeclineInvite}>Not now, take me home</button>
+                </section>
+            </main>
         );
     }
     if (!gameState) return (
@@ -316,12 +319,15 @@ export default function App() {
                 if (opts.state) setGameState(opts.state);
                 setRoomCode(code);
                 setIsSpectator(!!opts.asSpectator);
+                setInviteNote(opts.invite || null);
             }}
             onLogout={handleLogout}
         />
     );
 
     return (
+        <>
+        {inviteNote && <InviteNote invite={inviteNote} onClose={() => setInviteNote(null)} />}
         <GameBoard
             user={user}
             gameState={gameState}
@@ -334,5 +340,34 @@ export default function App() {
             revealedHand={revealedHand}
             onDismissRevealedHand={() => setRevealedHand(null)}
         />
+        </>
+    );
+}
+
+// Arriving at a table you just started: say the invite link is on the
+// clipboard, or hand it over to copy when the browser wouldn't allow it.
+function InviteNote({ invite, onClose }) {
+    const [copied, setCopied] = useState(invite.copied);
+    useEffect(() => {
+        if (!copied) return undefined;
+        const id = setTimeout(onClose, 6000);
+        return () => clearTimeout(id);
+    }, [copied, onClose]);
+    const copy = async () => {
+        try { await navigator.clipboard.writeText(invite.url); setCopied(true); } catch (_) { /* the field stays selectable */ }
+    };
+    return (
+        <div className="mh-invite-note" role="status">
+            {copied ? (
+                <p><Icon name="copy" size={15} /> Invite link copied. Paste it into your call.</p>
+            ) : (
+                <>
+                    <p>Send your friends this link:</p>
+                    <input className="mh-input" readOnly value={invite.url} onFocus={(e) => e.target.select()} aria-label="Invite link" />
+                    <button className="mh-primary" onClick={copy}>Copy</button>
+                </>
+            )}
+            <button className="mh-note-close" onClick={onClose} aria-label="Dismiss"><Icon name="close" size={16} /></button>
+        </div>
     );
 }

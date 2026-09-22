@@ -243,6 +243,9 @@ function createRoom(hostId, hostUsername, settings = {}) {
             // the server runs a setTimeout on nextTurn and auto-advances
             // if the player hasn't ended the turn themselves in time.
             maxTurnSeconds: Math.max(0, parseInt(settings.maxTurnSeconds, 10) || 0),
+            // Private tables are left out of the home screen's list for anyone
+            // not seated at them; the code and invite link still open them.
+            private: !!settings.private,
         },
         teams: [],
         // True if "shared team life" is on — when team members take damage,
@@ -256,6 +259,7 @@ function createRoom(hostId, hostUsername, settings = {}) {
         cumulativeTurnTime: {},    // { [userId]: totalMs } accumulated per player
         createdAt: Date.now(),
         lastActivity: Date.now(),
+        lastOnlineAt: Date.now(),  // idle-close clock (socket/lobby.js)
     };
 
     room.players[0].life = room.settings.startingLife;

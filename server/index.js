@@ -52,6 +52,9 @@ app.use('/api/draft', require('./routes/draft'));
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+// How many public tables are open - all a signed-out visitor gets to know.
+app.get('/api/rooms/open', (req, res) => res.json(require('./socket/lobby').openCounts()));
+
 // Socket.io
 registerSocketHandlers(io);
 

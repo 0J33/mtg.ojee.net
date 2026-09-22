@@ -16,6 +16,11 @@ export const auth = {
     logout: () => request('/api/auth/logout', { method: 'POST' }),
 };
 
+// How many public tables are open (the only room info a signed-out visitor gets).
+export const rooms = {
+    open: () => request('/api/rooms/open'),
+};
+
 export const decks = {
     list: () => request('/api/decks'),
     get: (id) => request(`/api/decks/${id}`),

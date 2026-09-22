@@ -4,6 +4,7 @@ const {
     shuffleArray, getRoomStateForPlayer, activeRooms,
     pushUndo, popUndo, restoreSnapshot, appendChatMessage, INFINITE,
 } = require('./gameState');
+const lobby = require('./lobby');
 
 // Returns true if `p` is eliminated (dead). Mirrors the client's logic:
 // zero/negative life, 21+ commander damage from any source, 10+ poison,
@@ -239,6 +240,9 @@ function broadcastRoomStateImmediate(io, room) {
     // Cancel any pending debounce for this room so we don't double-send.
     const pending = pendingBroadcasts.get(room.roomCode);
     if (pending) { clearTimeout(pending); pendingBroadcasts.delete(room.roomCode); }
+    // Any change to a table (seats, decks, turns) refreshes the home screens' list.
+    lobby.markPresence(room);
+    lobby.lobbyChanged(io);
 
     for (const player of room.players) {
         if (player.socketId) {
@@ -445,10 +449,35 @@ const SPECTATOR_ALLOWED_EVENTS = new Set([
     // Spectator-specific features that don't mutate game state.
     'setSpectatorPerspective',
     'requestState',
+    'lobby:subscribe', 'lobby:unsubscribe',
     'disconnect', 'disconnecting',
 ]);
 
+// A table nobody has been at for an hour is closed: removed from memory and
+// from Mongo, and anyone still attached is sent home. Their clients forget it
+// as a rejoin target when the rejoin fails.
+const IDLE_SWEEP_MS = Number(process.env.ROOM_IDLE_SWEEP_MS) || 5 * 60 * 1000;
+
+function closeRoom(io, room, reason) {
+    const code = room.roomCode;
+    io.to(code).emit('roomClosed', { roomCode: code, reason });
+    io.in(code).socketsLeave(code);
+    stopAutoSave(code);
+    if (room._turnTimeoutId) clearTimeout(room._turnTimeoutId);
+    if (room.voteKick?.timerId) clearTimeout(room.voteKick.timerId);
+    const pending = pendingBroadcasts.get(code);
+    if (pending) { clearTimeout(pending); pendingBroadcasts.delete(code); }
+    deleteRoom(code);
+    GameRoom.deleteOne({ roomCode: code }).catch(() => {});
+    console.log(`[lobby] closed ${code}: ${reason}`);
+    lobby.lobbyChanged(io);
+}
+
 module.exports = function registerSocketHandlers(io) {
+    setInterval(() => {
+        for (const room of lobby.idleRooms()) closeRoom(io, room, 'Nobody was at this table for an hour.');
+    }, IDLE_SWEEP_MS).unref();
+
     io.on('connection', (socket) => {
         console.log(`[socket] connected: ${socket.id}`);
         let currentRoom = null;
@@ -475,6 +504,12 @@ module.exports = function registerSocketHandlers(io) {
             next();
         });
 
+        // ─── LOBBY LIST ─────────────────────────────────────────────────
+        // The home screen subscribes while it's showing and gets 'lobby:rooms'
+        // on every change to any table (see lobby.js).
+        socket.on('lobby:subscribe', ({ userId } = {}) => lobby.subscribe(socket, userId));
+        socket.on('lobby:unsubscribe', () => lobby.unsubscribe(socket));
+
         // ─── ROOM MANAGEMENT ────────────────────────────────────────────
         socket.on('createRoom', ({ userId, username, settings }, callback) => {
             console.log(`[socket] createRoom from ${socket.id} user=${userId} username=${username}`);
@@ -485,6 +520,7 @@ module.exports = function registerSocketHandlers(io) {
                 room.players[0].socketId = socket.id;
                 socket.join(room.roomCode);
                 startAutoSave(room.roomCode);
+                lobby.lobbyChanged(io);
                 // Emit gameState so client transitions to GameBoard
                 socket.emit('gameState', getRoomStateForPlayer(room, userId));
                 const response = { success: true, roomCode: room.roomCode };
@@ -722,6 +758,8 @@ module.exports = function registerSocketHandlers(io) {
                     const player = getPlayerInRoom(room, currentUserId);
                     if (player) player.socketId = null;
                 }
+                // the idle-close clock starts from the last person leaving
+                room.lastOnlineAt = Date.now();
                 broadcastRoomState(io, room);
                 if (room.players.every(p => !p.socketId)) {
                     stopAutoSave(currentRoom);
@@ -2928,7 +2966,7 @@ module.exports = function registerSocketHandlers(io) {
             if (!newSettings || typeof newSettings !== 'object') return callback?.({ error: 'No settings' });
             const numericKeys = ['startingLife', 'commanderDamageLethal', 'maxPlayers', 'handSizeLimit', 'maxTurnSeconds'];
             const stringKeys = ['format', 'mulliganRules'];
-            const boolKeys = ['useCommanderDamage'];
+            const boolKeys = ['useCommanderDamage', 'private'];
             for (const k of numericKeys) {
                 if (newSettings[k] !== undefined) {
                     const v = clampGameValue(newSettings[k], { allowNegative: false });
@@ -3884,6 +3922,7 @@ module.exports = function registerSocketHandlers(io) {
                 const player = getPlayerInRoom(room, currentUserId);
                 if (player) player.socketId = null;
             }
+            room.lastOnlineAt = Date.now();
 
             broadcastRoomState(io, room);
 
