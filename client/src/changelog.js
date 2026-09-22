@@ -4,6 +4,20 @@
 
 export const CHANGELOG = [
     {
+        version: '4.0',
+        date: '2026-09-22',
+        changes: [
+            'One account for mtg.ojee.net and dnd.ojee.net: make it on either site and it works on both, and signing in or out of one does the same on the other',
+            'New home screen: every open table is pinned to the board, with who is seated, the commanders they brought, and what the table is doing (waiting, mulligans, playing, drafting). Sit down, watch or rejoin in one click, or type a table code at the top',
+            'Start a table picks the format and copies the invite link for you. Tick "Invite only" to keep a table off the board; it still opens by code or link',
+            'A table with nobody at it for an hour now closes by itself, and anyone still in it is sent home with a note. The board shows the countdown',
+            'New sign-in screen showing tonight\'s open tables behind it, and a clearer invite page (sit down, just watch, or not now)',
+            'Draft and Sealed work again: the set list was failing to load',
+            'Menus tidied throughout: dark themed checkboxes and number fields, readable text and timestamps, clearer empty, loading and error messages in card search, the deck builder, deck viewer, custom cards, settings, dice, library search, scry, chat, the action log, the guide and draft setup',
+            'Deck viewer counts cards, not card names, and says "1 card"; the action log no longer says "(? goes first)" or "1 players"; the guide now describes the d20 roll for who goes first',
+        ],
+    },
+    {
         version: '3.20',
         date: '2026-07-20',
         changes: [

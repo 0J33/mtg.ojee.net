@@ -5,3 +5,7 @@ build/
 .env.production
 *.log
 .DS_Store
+
+# Impeccable scratch: review captures and question-page state
+.impeccable/review/
+.impeccable/questions/
