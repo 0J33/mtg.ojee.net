@@ -23,17 +23,18 @@ const PAGES = [
                     not a rules engine — you move cards, change life totals, and draw stuff
                     however your playgroup actually plays.
                 </p>
-                <p className="guide-disclaimer">
-                    Magic: The Gathering is a trademark of Wizards of the Coast. This project is not produced, endorsed, or supported by Wizards of the Coast. Card data from Scryfall. Deck import via Moxfield.
-                </p>
                 <p>
                     Quick start: <strong>Load Deck</strong> in the topbar, then
-                    <strong> Start Game</strong> once everyone's loaded. A random player
-                    goes first and each player draws 7 cards.
+                    <strong> Start Game</strong> once everyone's loaded. Everyone draws 7,
+                    takes any mulligans, then clicks <strong>Ready &amp; Roll d20</strong>;
+                    the highest roll goes first.
                 </p>
                 <p className="guide-tip">
                     Use the arrows below or <kbd>←</kbd> <kbd>→</kbd> to flip through
                     these pages. Press <kbd>Esc</kbd> to close.
+                </p>
+                <p className="guide-disclaimer">
+                    Magic: The Gathering is a trademark of Wizards of the Coast. This project is not produced, endorsed, or supported by Wizards of the Coast. Card data from Scryfall. Deck import via Moxfield.
                 </p>
             </>
         ),
@@ -96,7 +97,7 @@ const PAGES = [
         title: 'Turns & phases',
         body: (
             <>
-                <p><strong>Mulligan phase</strong>: after Start Game, every player draws 7 and can mulligan freely (7 → 7 → 6 → 5). Each player clicks <strong>Ready</strong> in the topbar when they're done. Once everyone is ready, the server rolls a d20 for each player — highest roll takes turn 1, with the rolls shown as toasts so the whole table sees what happened.</p>
+                <p><strong>Mulligan phase</strong>: after Start Game, every player draws 7 and can mulligan freely (7 → 7 → 6 → 5). Each player clicks <strong>Ready &amp; Roll d20</strong> in the topbar when they're done. Once everyone has rolled, the d20s decide the order — highest roll takes turn 1, with the rolls shown as toasts so the whole table sees what happened.</p>
                 <p>The <strong>turn indicator</strong> in the topbar shows whose turn it is. Only the <em>current turn player</em> (or the host) can press <strong>End Turn</strong>.</p>
                 <p>Dead/eliminated players (life ≤ 0, 21+ commander damage, 10+ poison) are <em>automatically skipped</em> on turn advance.</p>
                 <p><strong>Turn-start nudges</strong>: on your turn, the Draw button glows amber until you draw, and any land card in your hand glows until you drop your first land. Purely visual reminders — nothing is enforced, just hard to forget your land drop.</p>

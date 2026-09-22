@@ -11,6 +11,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
     const dialog = useDialog();
     const [deck, setDeck] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [failed, setFailed] = useState(false);
     const [hoveredCard, setHoveredCard] = useState(null);
     const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
@@ -18,7 +19,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
         decks.get(deckId).then(data => {
             if (data.deck) setDeck(data.deck);
             setLoading(false);
-        });
+        }).catch(() => { setFailed(true); setLoading(false); });
     }, [deckId]);
 
     const handleHover = (e, card) => {
@@ -62,9 +63,12 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
         <div className="modal-overlay">
             <div className="modal">
                 <div className="modal-header">
-                    <h2>Deck not found</h2>
+                    <h2>{failed ? "Couldn't open deck" : 'Deck not found'}</h2>
                     <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
+                <p className="muted">
+                    {failed ? "Couldn't reach the server. Check your connection and try again." : 'It may have been deleted. Close this and pick another deck.'}
+                </p>
             </div>
         </div>
     );
@@ -100,7 +104,7 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                     <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
                 <p className="muted">
-                    {totalCount} cards ({uniqueCount} unique) · {deck.format}
+                    {totalCount} {totalCount === 1 ? 'card' : 'cards'} ({uniqueCount} unique) · {deck.format}
                     {deck.tokens?.length > 0 && ` · ${deck.tokens.length} tokens`}
                     {deck.sharedByUsername && (
                         <> · <span className="deck-author-badge">shared by {deck.sharedByUsername}</span></>
@@ -123,12 +127,14 @@ export default function DeckViewer({ deckId, onClose, onDelete, onEdit }) {
                     </div>
                 )}
                 <div className="preview-section">
-                    <strong>Mainboard ({deck.mainboard?.length || 0})</strong>
-                    {renderCardList(deck.mainboard)}
+                    <strong>Mainboard ({(deck.mainboard || []).reduce((s, c) => s + (c.quantity || 1), 0)})</strong>
+                    {deck.mainboard?.length > 0
+                        ? renderCardList(deck.mainboard)
+                        : <p className="muted">No cards in the mainboard yet. Edit Deck to add some.</p>}
                 </div>
                 {deck.sideboard?.length > 0 && (
                     <div className="preview-section">
-                        <strong>Sideboard ({deck.sideboard.length})</strong>
+                        <strong>Sideboard ({deck.sideboard.reduce((s, c) => s + (c.quantity || 1), 0)})</strong>
                         {renderCardList(deck.sideboard)}
                     </div>
                 )}

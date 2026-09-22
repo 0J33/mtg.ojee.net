@@ -17,7 +17,7 @@ function formatEntry(entry, playerNameById) {
     const d = entry.data || {};
     switch (entry.type) {
         case 'startGame':
-            return `Game started (${d.firstPlayer || '?'} goes first)`;
+            return d.firstPlayer ? `Game started. ${d.firstPlayer} goes first` : 'Game started';
         case 'restartGame':
             return `${actorName} restarted the game`;
         case 'initialDraw':
@@ -77,7 +77,7 @@ function formatEntry(entry, playerNameById) {
         case 'mulligan':
             return `${actorName} mulled to ${d.handSize} (mull #${d.mulliganNumber})`;
         case 'mulliganPhaseStart':
-            return `Mulligan phase started (${d.players || '?'} players)`;
+            return d.players ? `Mulligan phase started (${d.players} ${d.players === 1 ? 'player' : 'players'})` : 'Mulligan phase started';
         case 'setMulliganReady':
             return `${d.player || actorName} ${d.ready ? 'is ready' : 'un-readied'}`;
         case 'rollForFirstPlayer':
@@ -148,7 +148,7 @@ function formatEntry(entry, playerNameById) {
         case 'concede':
             return `${d.player || actorName} conceded`;
         case 'mulliganBottom':
-            return `${d.player || actorName} bottomed ${d.count || 0} card(s)`;
+            return `${d.player || actorName} put ${d.count || 0} ${d.count === 1 ? 'card' : 'cards'} on the bottom`;
         case 'takeControl':
             return `${actorName} took control of ${d.cardName || 'a card'} from ${d.from || '?'}${d.untilEndOfTurn ? ' (until EOT)' : ''}`;
         case 'setHandSizeEnforce':
@@ -214,7 +214,7 @@ export default function ActionLog({ history, players, open, onToggle }) {
                     <button className="close-btn" onClick={onToggle} type="button"><Icon name="close" size={16} /></button>
                 </div>
                 <div className="action-log-messages" ref={listRef}>
-                    {entries.length === 0 && <div className="chat-empty">No actions yet.</div>}
+                    {entries.length === 0 && <div className="chat-empty">Nothing has happened yet. Every move at the table shows up here.</div>}
                     {entries.map(e => (
                         <div key={e.actionId} className={`action-log-entry type-${e.type}`}>
                             <div className="action-log-time">{formatTime(e.timestamp)}</div>

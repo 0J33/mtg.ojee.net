@@ -36,6 +36,7 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [failed, setFailed] = useState(false);
     const [count, setCount] = useState(1);
     const [hover, setHover] = useState(null);
     const debounceRef = useRef(null);
@@ -49,13 +50,19 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
     const handleSearch = (q) => {
         setQuery(q);
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (q.length < 2) { setResults([]); return; }
+        if (q.length < 2) { setResults([]); setFailed(false); return; }
 
         debounceRef.current = setTimeout(async () => {
             setLoading(true);
             const searchQuery = mode === 'token' ? `${q} is:token` : q;
-            const data = await scryfall.search(searchQuery, { include_extras: mode === 'token' });
-            setResults(data.data || []);
+            try {
+                const data = await scryfall.search(searchQuery, { include_extras: mode === 'token' });
+                setResults(data.data || []);
+                setFailed(false);
+            } catch (_) {
+                setResults([]);
+                setFailed(true);
+            }
             setLoading(false);
         }, 300);
     };
@@ -103,10 +110,10 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
                         autoFocus
                     />
                     {mode === 'token' && (
-                        <div className="count-input">
-                            <label>Count:</label>
+                        <label className="count-input">
+                            How many
                             <input type="number" min={1} max={99} value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value) || 1))} />
-                        </div>
+                        </label>
                     )}
                 </div>
                 {/* Deck tokens — quick-spawn section at the top of token search */}
@@ -132,6 +139,10 @@ export default function CardSearch({ onClose, mode, deckTokens }) {
                 )}
                 <div className="search-results">
                     {loading && <div className="muted">Searching...</div>}
+                    {!loading && failed && <p className="error search-empty">Search failed. Check your connection and try again.</p>}
+                    {!loading && !failed && query.trim().length >= 2 && results.length === 0 && (
+                        <p className="muted search-empty">No {mode === 'token' ? 'tokens' : 'cards'} match "{query.trim()}".</p>
+                    )}
                     {results.map(card => {
                         const face = card.card_faces?.[0];
                         const img = card.image_uris?.small || face?.image_uris?.small || '';

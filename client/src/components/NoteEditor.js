@@ -20,8 +20,12 @@ export default function NoteEditor({ instanceId, onClose }) {
         if (q.length < 2) { setCardResults([]); return; }
         debounceRef.current = setTimeout(async () => {
             setSearching(true);
-            const data = await scryfall.search(q);
-            setCardResults((data.data || []).slice(0, 6));
+            try {
+                const data = await scryfall.search(q);
+                setCardResults((data.data || []).slice(0, 6));
+            } catch (_) {
+                setCardResults([]);
+            }
             setSearching(false);
         }, 300);
     };
@@ -58,9 +62,10 @@ export default function NoteEditor({ instanceId, onClose }) {
                     autoFocus
                 />
                 <div className="note-card-section">
-                    <label className="muted">Attach card (optional)</label>
+                    <label className="muted" htmlFor="note-attach-search">Attach a card (optional)</label>
                     <input
                         type="text"
+                        id="note-attach-search"
                         placeholder="Search a card to attach..."
                         value={cardQuery}
                         onChange={e => { handleSearch(e.target.value); setSelectedCard(null); }}

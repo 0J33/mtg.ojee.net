@@ -319,7 +319,7 @@ export default function DeckImport({ onImport, onDeckCreated, onClose, initialSh
                         <div className="import-preview">
                             <h3>Select Commander(s)</h3>
                             <p className="muted">
-                                Click legendary cards to mark them as commanders. Selected: {commanderIds.size}
+                                Click a legendary card to make it your commander (pick two for partners). Selected: {commanderIds.size}
                                 <br />
                                 <span className="deck-card-counts">
                                     {(() => {
@@ -336,14 +336,16 @@ export default function DeckImport({ onImport, onDeckCreated, onClose, initialSh
                                     <strong>Possible Commanders ({legendaries.length})</strong>
                                     <div className="commander-picks">
                                         {legendaries.map((c, i) => (
-                                            <div
+                                            <button
+                                                type="button"
                                                 key={i}
                                                 className={`commander-pick ${commanderIds.has(c.scryfallId) ? 'selected' : ''}`}
                                                 onClick={() => toggleCommander(c.scryfallId)}
+                                                aria-pressed={commanderIds.has(c.scryfallId)}
                                             >
-                                                {c.imageUri && <img src={c.imageUri.replace('/normal/', '/small/')} alt={c.name} />}
+                                                {c.imageUri && <img src={c.imageUri.replace('/normal/', '/small/')} alt="" />}
                                                 <span>{c.name}</span>
-                                            </div>
+                                            </button>
                                         ))}
                                     </div>
                                 </div>

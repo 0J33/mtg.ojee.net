@@ -47,14 +47,14 @@ export default function TournamentBracket({ tournament, isHost, userId, onClose 
                                             <div className={`bracket-player ${match.winner === p1?.userId ? 'winner' : ''} ${match.winner && match.winner !== p1?.userId ? 'loser' : ''}`}>
                                                 <span className="bracket-player-name">{p1?.username || 'BYE'}</span>
                                                 {canReport && p1 && (
-                                                    <button className="bracket-win-btn" onClick={() => reportResult(match.id, p1.userId)} title="Report as winner">W</button>
+                                                    <button className="bracket-win-btn" onClick={() => reportResult(match.id, p1.userId)} title="Report as the winner">Won</button>
                                                 )}
                                             </div>
                                             <div className="bracket-vs">vs</div>
                                             <div className={`bracket-player ${match.winner === p2?.userId ? 'winner' : ''} ${match.winner && match.winner !== p2?.userId ? 'loser' : ''}`}>
                                                 <span className="bracket-player-name">{p2?.username || 'BYE'}</span>
                                                 {canReport && p2 && (
-                                                    <button className="bracket-win-btn" onClick={() => reportResult(match.id, p2.userId)} title="Report as winner">W</button>
+                                                    <button className="bracket-win-btn" onClick={() => reportResult(match.id, p2.userId)} title="Report as the winner">Won</button>
                                                 )}
                                             </div>
                                             {match.status === 'done' && match.winner && (
@@ -82,7 +82,7 @@ export default function TournamentBracket({ tournament, isHost, userId, onClose 
 
                 {!champion && isHost && (
                     <div className="bracket-hint muted">
-                        Active matches are highlighted. Click W next to a player's name to report them as the winner.
+                        Matches in play are outlined in gold. Click Won beside whoever won to move them on.
                     </div>
                 )}
             </div>

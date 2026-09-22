@@ -2086,10 +2086,10 @@ function DiceModal({ onClose }) {
                     <h2>Roll</h2>
                     <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
-                <div className="dice-count">
-                    <label>Count:</label>
+                <label className="dice-count">
+                    How many
                     <input type="number" min={1} max={20} value={count} onChange={e => setCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))} />
-                </div>
+                </label>
                 <div className="dice-grid">
                     {sides.map(s => (
                         <button key={s} className="dice-btn" onClick={() => roll(s)}>d{s}</button>
@@ -2100,12 +2100,13 @@ function DiceModal({ onClose }) {
                     <input
                         type="number"
                         min={2}
-                        placeholder="Custom sides"
+                        placeholder="Other die: number of sides"
+                        aria-label="Sides on a custom die"
                         value={customSides}
                         onChange={e => setCustomSides(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && rollCustom()}
                     />
-                    <button className="small-btn" onClick={rollCustom} disabled={!customSides || parseInt(customSides) < 2}>Roll d{customSides || '?'}</button>
+                    <button className="small-btn" onClick={rollCustom} disabled={!customSides || parseInt(customSides) < 2}>{parseInt(customSides) >= 2 ? `Roll d${parseInt(customSides)}` : 'Roll'}</button>
                 </div>
             </div>
         </div>
@@ -2270,12 +2271,18 @@ function CustomCardModal({ onClose }) {
     const [savedCards, setSavedCards] = useState([]);
     const [editing, setEditing] = useState(null); // null = list view, otherwise card object
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
 
     const blankCard = () => ({ name: '', imageUrl: '', manaCost: '', typeLine: '', oracleText: '', power: '', toughness: '' });
 
     const refresh = async () => {
-        const data = await customCards.list();
-        if (data.cards) setSavedCards(data.cards);
+        try {
+            const data = await customCards.list();
+            if (data.cards) setSavedCards(data.cards);
+            setLoadError(!data.cards);
+        } catch (_) {
+            setLoadError(true);
+        }
         setLoading(false);
     };
 
@@ -2296,10 +2303,14 @@ function CustomCardModal({ onClose }) {
     };
 
     const handleSave = async () => {
-        if (editing._id) {
-            await customCards.update(editing._id, editing);
-        } else {
-            await customCards.create(editing);
+        try {
+            const res = editing._id
+                ? await customCards.update(editing._id, editing)
+                : await customCards.create(editing);
+            if (res?.error) { dialog.alert(res.error, { title: 'Save failed' }); return; }
+        } catch (_) {
+            dialog.alert("Couldn't reach the server. Your card wasn't saved.", { title: 'Save failed' });
+            return;
         }
         await refresh();
         setEditing(null);
@@ -2320,18 +2331,42 @@ function CustomCardModal({ onClose }) {
                         <h2>{editing._id ? 'Edit' : 'Create'} Custom Card</h2>
                         <button className="close-btn" onClick={() => setEditing(null)}><Icon name="close" size={16} /></button>
                     </div>
-                    <input type="text" placeholder="Card name" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
-                    <input type="text" placeholder="Image URL" value={editing.imageUrl} onChange={e => setEditing({ ...editing, imageUrl: e.target.value })} />
-                    <input type="text" placeholder="Mana cost (e.g. {2}{W}{W})" value={editing.manaCost} onChange={e => setEditing({ ...editing, manaCost: e.target.value })} />
-                    <input type="text" placeholder="Type line (e.g. Creature — Elf Warrior)" value={editing.typeLine} onChange={e => setEditing({ ...editing, typeLine: e.target.value })} />
-                    <textarea placeholder="Oracle text" value={editing.oracleText} onChange={e => setEditing({ ...editing, oracleText: e.target.value })} rows={4} />
-                    <div className="pt-row">
-                        <input type="text" placeholder="Power" value={editing.power} onChange={e => setEditing({ ...editing, power: e.target.value })} />
-                        <input type="text" placeholder="Toughness" value={editing.toughness} onChange={e => setEditing({ ...editing, toughness: e.target.value })} />
-                    </div>
-                    <div className="modal-actions">
-                        <button onClick={() => setEditing(null)}>Cancel</button>
-                        <button onClick={handleSave} className="primary-btn">Save</button>
+                    <div className="ccm-form">
+                        <label>
+                            Name
+                            <input type="text" placeholder="Custom card name" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} autoFocus />
+                        </label>
+                        <label>
+                            Image URL
+                            <input type="text" placeholder="https://..." value={editing.imageUrl} onChange={e => setEditing({ ...editing, imageUrl: e.target.value })} />
+                        </label>
+                        {editing.imageUrl && <img src={editing.imageUrl} alt="" className="ccm-preview" />}
+                        <label>
+                            Mana cost
+                            <input type="text" placeholder="{2}{W}{W}" value={editing.manaCost} onChange={e => setEditing({ ...editing, manaCost: e.target.value })} />
+                        </label>
+                        <label>
+                            Type line
+                            <input type="text" placeholder="Creature — Elf Warrior" value={editing.typeLine} onChange={e => setEditing({ ...editing, typeLine: e.target.value })} />
+                        </label>
+                        <label>
+                            Oracle text
+                            <textarea placeholder="Rules text..." value={editing.oracleText} onChange={e => setEditing({ ...editing, oracleText: e.target.value })} rows={4} />
+                        </label>
+                        <div className="ccm-form-row">
+                            <label>
+                                Power
+                                <input type="text" value={editing.power} onChange={e => setEditing({ ...editing, power: e.target.value })} />
+                            </label>
+                            <label>
+                                Toughness
+                                <input type="text" value={editing.toughness} onChange={e => setEditing({ ...editing, toughness: e.target.value })} />
+                            </label>
+                        </div>
+                        <div className="modal-actions">
+                            <button onClick={() => setEditing(null)}>Cancel</button>
+                            <button onClick={handleSave} className="primary-btn" disabled={!editing.name?.trim()}>{editing._id ? 'Save' : 'Create'}</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2345,9 +2380,13 @@ function CustomCardModal({ onClose }) {
                     <h2>Custom Cards</h2>
                     <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
-                <button onClick={() => setEditing(blankCard())} className="primary-btn">+ New Custom Card</button>
-                {loading ? <p className="muted muted-centered">Loading...</p> : savedCards.length === 0 ? (
-                    <p className="muted muted-centered">No custom cards yet.</p>
+                <div className="ccm-toolbar">
+                    <button onClick={() => setEditing(blankCard())} className="primary-btn small-btn">New Custom Card</button>
+                </div>
+                {loading ? <p className="muted muted-centered">Loading...</p> : loadError ? (
+                    <p className="error">Couldn't load your custom cards. Close this and try again.</p>
+                ) : savedCards.length === 0 ? (
+                    <p className="muted">No custom cards yet. Make one here and Play puts it on the battlefield; it's saved to your account for any deck.</p>
                 ) : (
                     <div className="custom-card-list">
                         {savedCards.map(card => (
@@ -2462,6 +2501,7 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
         // 0 = no cap. When > 0 the server auto-ends the turn at this many
         // seconds so a single player can't grind the game to a halt.
         maxTurnSeconds: settings?.maxTurnSeconds ?? 0,
+        private: !!settings?.private,
     });
     const [shared, setShared] = useState(!!sharedTeamLife);
     const [teamId, setTeamId] = useState(me?.teamId || '');
@@ -2534,8 +2574,8 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
                     <h2>Game Settings</h2>
                     <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
-                <p className="muted" style={{ marginTop: 0 }}>
-                    Settings are pure tools — nothing is enforced. Host can change them mid-game; existing life totals stay as they are.
+                <p className="muted settings-intro">
+                    Nothing here is enforced. The host sets the table rules, even mid-game (life totals already in play stay put); your team, color and sound are yours to change.
                 </p>
 
                 <div className="settings-section">
@@ -2553,21 +2593,29 @@ function SettingsModal({ settings, isHost, sharedTeamLife, teams, me, gameStarte
                 </div>
 
                 <div className="settings-section">
+                    <strong>Table</strong>
+                    <label className="settings-checkbox-row">
+                        <input type="checkbox" checked={!!draft.private} onChange={e => setDraft({ ...draft, private: e.target.checked })} disabled={!isHost} />
+                        <span>Invite only. Hide this table from the home screen; the code and invite link still work. {!isHost && <span className="muted">(host only)</span>}</span>
+                    </label>
+                </div>
+
+                <div className="settings-section">
                     <strong>Numbers</strong>
-                    <label>Starting life
+                    <label className="settings-number">Starting life
                         <input type="number" value={draft.startingLife} onChange={e => setDraft({ ...draft, startingLife: parseInt(e.target.value) || 0 })} disabled={!isHost} />
                     </label>
-                    <label>Commander damage lethal
+                    <label className="settings-number">Lethal commander damage
                         <input type="number" value={draft.commanderDamageLethal} onChange={e => setDraft({ ...draft, commanderDamageLethal: parseInt(e.target.value) || 0 })} disabled={!isHost} />
                     </label>
-                    <label>Max players
+                    <label className="settings-number">Max players
                         <input type="number" value={draft.maxPlayers} onChange={e => setDraft({ ...draft, maxPlayers: parseInt(e.target.value) || 0 })} disabled={!isHost} />
                     </label>
-                    <label>Hand-size limit
+                    <label className="settings-number">Hand-size limit
                         <input type="number" value={draft.handSizeLimit} onChange={e => setDraft({ ...draft, handSizeLimit: parseInt(e.target.value) || 0 })} disabled={!isHost} />
                     </label>
-                    <label title="Server auto-ends the turn after this many seconds. 0 = no cap.">
-                        Max time per turn (sec, 0 = off)
+                    <label className="settings-number" title="The server ends the turn after this many seconds. 0 means no limit.">
+                        Turn time limit (seconds, 0 = none)
                         <input
                             type="number"
                             min="0"

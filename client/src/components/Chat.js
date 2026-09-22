@@ -120,7 +120,7 @@ export default function Chat({ messages: historyMessages, currentUserId, open, o
                     <button className="close-btn" onClick={onToggle} type="button"><Icon name="close" size={16} /></button>
                 </div>
                 <div className="chat-messages" ref={listRef}>
-                    {messages.length === 0 && <div className="chat-empty">No messages yet.</div>}
+                    {messages.length === 0 && <div className="chat-empty">No messages yet. Say hello to the table.</div>}
                     {messages.map(m => (
                         <div
                             key={m.id}

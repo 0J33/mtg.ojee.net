@@ -18,12 +18,14 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [searchLoading, setSearchLoading] = useState(false);
+    const [searchError, setSearchError] = useState(false);
     const [savedCustomCards, setSavedCustomCards] = useState([]);
     const [tab, setTab] = useState('search'); // search, custom, tokens, deck
     const [saving, setSaving] = useState(false);
     const [tokenQuery, setTokenQuery] = useState('');
     const [tokenResults, setTokenResults] = useState([]);
     const [tokenLoading, setTokenLoading] = useState(false);
+    const [tokenError, setTokenError] = useState(false);
     const [skinPicker, setSkinPicker] = useState(null); // { idx, section, cardName }
     const [skinPrints, setSkinPrints] = useState([]);
     const [skinLoading, setSkinLoading] = useState(false);
@@ -52,11 +54,17 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
     const handleSearch = (q) => {
         setSearchQuery(q);
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (q.length < 2) { setSearchResults([]); return; }
+        if (q.length < 2) { setSearchResults([]); setSearchError(false); return; }
         debounceRef.current = setTimeout(async () => {
             setSearchLoading(true);
-            const data = await scryfall.search(q);
-            setSearchResults(data.data || []);
+            try {
+                const data = await scryfall.search(q);
+                setSearchResults(data.data || []);
+                setSearchError(false);
+            } catch (_) {
+                setSearchResults([]);
+                setSearchError(true);
+            }
             setSearchLoading(false);
         }, 300);
     };
@@ -64,11 +72,17 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
     const handleTokenSearch = (q) => {
         setTokenQuery(q);
         if (tokenDebounceRef.current) clearTimeout(tokenDebounceRef.current);
-        if (q.length < 2) { setTokenResults([]); return; }
+        if (q.length < 2) { setTokenResults([]); setTokenError(false); return; }
         tokenDebounceRef.current = setTimeout(async () => {
             setTokenLoading(true);
-            const data = await scryfall.search(`t:token ${q}`);
-            setTokenResults(data.data || []);
+            try {
+                const data = await scryfall.search(`t:token ${q}`);
+                setTokenResults(data.data || []);
+                setTokenError(false);
+            } catch (_) {
+                setTokenResults([]);
+                setTokenError(true);
+            }
             setTokenLoading(false);
         }, 300);
     };
@@ -212,7 +226,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
     const renderSection = (cards, section, label) => (
         <div className="db-section">
             <strong>{label} ({cards.reduce((s, c) => s + (c.quantity || 1), 0)})</strong>
-            {cards.length === 0 && <div className="muted db-empty">Empty</div>}
+            {cards.length === 0 && <div className="muted db-empty">{section === 'commanders' ? 'None yet. Star a card to make it your commander.' : 'None yet.'}</div>}
             {cards.map((c, i) => (
                 <div key={i} className="db-card-row">
                     <span className="db-card-qty">
@@ -286,6 +300,13 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                                 />
                                 <div className="db-search-results">
                                     {searchLoading && <div className="muted">Searching...</div>}
+                                    {!searchLoading && searchQuery.trim().length < 2 && (
+                                        <p className="muted db-hint">Type at least two letters to search every card on Scryfall. Filters work too: t:creature, c:red, o:draw.</p>
+                                    )}
+                                    {!searchLoading && searchError && <p className="error db-hint">Search failed. Check your connection and try again.</p>}
+                                    {!searchLoading && !searchError && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                                        <p className="muted db-hint">No cards match "{searchQuery.trim()}".</p>
+                                    )}
                                     {searchResults.map(card => {
                                         const face = card.card_faces?.[0];
                                         const img = card.image_uris?.small || face?.image_uris?.small || '';
@@ -310,7 +331,7 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
 
                         {tab === 'custom' && (
                             <div className="db-search-results">
-                                {savedCustomCards.length === 0 && <div className="muted">No custom cards saved.</div>}
+                                {savedCustomCards.length === 0 && <p className="muted db-hint">No custom cards yet. Make them in Custom Cards on the home screen, then add them here.</p>}
                                 {savedCustomCards.map(cc => (
                                     <div key={cc._id} className="db-search-item">
                                         {cc.imageUrl && <img src={cc.imageUrl} alt={cc.name} />}
@@ -351,6 +372,10 @@ export default function DeckBuilder({ deckId, onClose, onSaved }) {
                                 )}
                                 <div className="db-search-results">
                                     {tokenLoading && <div className="muted">Searching...</div>}
+                                    {!tokenLoading && tokenError && <p className="error db-hint">Search failed. Check your connection and try again.</p>}
+                                    {!tokenLoading && !tokenError && tokenQuery.trim().length >= 2 && tokenResults.length === 0 && (
+                                        <p className="muted db-hint">No tokens match "{tokenQuery.trim()}".</p>
+                                    )}
                                     {tokenResults.map(card => {
                                         const face = card.card_faces?.[0];
                                         const img = card.image_uris?.small || face?.image_uris?.small || '';

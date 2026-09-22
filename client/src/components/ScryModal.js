@@ -63,7 +63,7 @@ export default function ScryModal({ cards, onClose }) {
                     <h2>Scry {cards.length}</h2>
                     <button className="close-btn" onClick={onClose}><Icon name="close" size={16} /></button>
                 </div>
-                <p className="muted">Click cards to mark for bottom. Drag to reorder top of library.</p>
+                <p className="muted">Click a card to send it to the bottom; click again to keep it. Drag to change the order of the cards you keep on top.</p>
                 <div className="scry-cards">
                     {order.map((id, idx) => {
                         const card = cards.find(c => c.instanceId === id);
@@ -81,13 +81,15 @@ export default function ScryModal({ cards, onClose }) {
                             >
                                 <Card card={card} onClick={() => toggleBottom(id)} />
                                 <div className="scry-card-label">
-                                    {isBottom ? 'BOTTOM' : `Top #${idx + 1}`}
+                                    {isBottom ? 'Bottom' : `Top #${idx + 1}`}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
-                <button onClick={handleConfirm} className="primary-btn">Confirm</button>
+                <div className="modal-actions">
+                    <button onClick={handleConfirm} className="primary-btn">Confirm</button>
+                </div>
             </div>
         </div>,
         document.body

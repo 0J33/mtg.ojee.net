@@ -19,12 +19,14 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
     const [pickTime, setPickTime] = useState(60);
     const [starting, setStarting] = useState(false);
     const [error, setError] = useState('');
+    const [setsFailed, setSetsFailed] = useState(false);
 
     useEffect(() => {
         draft.sets().then(data => {
             setSets(data.sets || []);
+            setSetsFailed(!data.sets);
             setLoading(false);
-        }).catch(() => setLoading(false));
+        }).catch(() => { setSetsFailed(true); setLoading(false); });
     }, []);
 
     useEffect(() => {
@@ -85,19 +87,22 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
 
                 <div className="draft-set-list">
                     {loading && <div className="muted">Loading sets...</div>}
-                    {!loading && filtered.length === 0 && <div className="muted">No sets found.</div>}
+                    {!loading && setsFailed && <div className="error muted-centered">Couldn't load the set list. Close this and try again.</div>}
+                    {!loading && !setsFailed && filtered.length === 0 && <div className="muted muted-centered">No sets match "{search}".</div>}
                     {filtered.slice(0, 50).map(s => (
-                        <div
+                        <button
+                            type="button"
                             key={s.code}
                             className={`draft-set-item ${selectedSet?.code === s.code ? 'selected' : ''}`}
                             onClick={() => setSelectedSet(s)}
+                            aria-pressed={selectedSet?.code === s.code}
                         >
                             {s.iconUri && <img src={s.iconUri} alt="" className="draft-set-icon" />}
                             <div className="draft-set-info">
                                 <strong>{s.name}</strong>
                                 <span className="muted">{s.code.toUpperCase()} · {s.releaseDate} · {s.type}</span>
                             </div>
-                        </div>
+                        </button>
                     ))}
                 </div>
 
@@ -135,7 +140,7 @@ export default function DraftSetup({ onClose, isHost, mode: initialMode }) {
                         onClick={handleStart}
                         disabled={!selectedSet || !isHost || starting}
                     >
-                        {starting ? 'Generating packs (this may take a moment)...' : !selectedSet ? 'Select a set first' : `Start ${mode === 'sealed' ? 'Sealed' : 'Draft'}`}
+                        {starting ? 'Opening packs (can take a moment)…' : !isHost ? 'Only the host can start' : !selectedSet ? 'Pick a set first' : `Start ${mode === 'sealed' ? 'Sealed' : 'Draft'}`}
                     </button>
                 </div>
             </div>
